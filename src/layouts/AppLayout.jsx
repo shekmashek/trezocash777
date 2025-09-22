@@ -19,7 +19,7 @@ import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import FocusView from '../components/FocusView';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
-import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView } from '../context/actions';
+import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
@@ -300,11 +300,20 @@ const AppLayout = () => {
     };
 
     const handleSaveScenario = (scenarioData) => {
-        if (editingScenario) {
-            dispatch({ type: 'UPDATE_SCENARIO', payload: { ...editingScenario, ...scenarioData } });
-        } else {
-            dispatch({ type: 'ADD_SCENARIO', payload: { ...scenarioData, projectId: activeProjectId } });
+        const user = state.session?.user;
+        if (!user) {
+            dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+            return;
         }
+
+        saveScenario(dispatch, {
+            scenarioData,
+            editingScenario,
+            activeProjectId,
+            user,
+            existingScenariosCount: state.scenarios.length
+        });
+        
         dispatch({ type: 'CLOSE_SCENARIO_MODAL' });
     };
 

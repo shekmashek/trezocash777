@@ -571,7 +571,7 @@ export const deleteConsolidatedView = async (dispatch, viewId) => {
     }
 };
 
-export const inviteCollaborator = async (dispatch, { email, role, projectIds, ownerId }) => {
+export const inviteCollaborator = async (dispatch, { email, role, permissionScope, projectIds, ownerId }) => {
     try {
         const { data, error } = await supabase
             .from('collaborators')
@@ -579,6 +579,7 @@ export const inviteCollaborator = async (dispatch, { email, role, projectIds, ow
                 owner_id: ownerId,
                 email,
                 role,
+                permission_scope: permissionScope,
                 project_ids: projectIds,
                 status: 'pending'
             })
@@ -599,7 +600,8 @@ export const inviteCollaborator = async (dispatch, { email, role, projectIds, ow
                 email: data.email,
                 role: data.role,
                 status: data.status,
-                projectIds: data.project_ids
+                projectIds: data.project_ids,
+                permissionScope: data.permission_scope,
             }
         });
         dispatch({ type: 'ADD_TOAST', payload: { message: `Invitation envoyée à ${email}.`, type: 'success' } });
@@ -618,5 +620,66 @@ export const revokeCollaborator = async (dispatch, collaboratorId) => {
     } catch (error) {
         console.error("Error revoking collaborator access:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef'];
+
+export const saveScenario = async (dispatch, { scenarioData, editingScenario, activeProjectId, user, existingScenariosCount }) => {
+    try {
+        let savedScenario;
+        if (editingScenario) {
+            const dataToUpdate = {
+                name: scenarioData.name,
+                description: scenarioData.description,
+            };
+            const { data, error } = await supabase
+                .from('scenarios')
+                .update(dataToUpdate)
+                .eq('id', editingScenario.id)
+                .select()
+                .single();
+            if (error) throw error;
+            savedScenario = data;
+            dispatch({ type: 'UPDATE_SCENARIO_SUCCESS', payload: {
+                id: savedScenario.id,
+                projectId: savedScenario.project_id,
+                name: savedScenario.name,
+                description: savedScenario.description,
+                color: savedScenario.color,
+                isVisible: savedScenario.is_visible,
+                isArchived: savedScenario.is_archived
+            }});
+            dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario mis à jour.', type: 'success' } });
+        } else {
+            const dataToInsert = {
+                project_id: activeProjectId,
+                user_id: user.id,
+                name: scenarioData.name,
+                description: scenarioData.description,
+                color: SCENARIO_COLORS[existingScenariosCount % SCENARIO_COLORS.length],
+                is_visible: true,
+            };
+            const { data, error } = await supabase
+                .from('scenarios')
+                .insert(dataToInsert)
+                .select()
+                .single();
+            if (error) throw error;
+            savedScenario = data;
+            dispatch({ type: 'ADD_SCENARIO_SUCCESS', payload: {
+                id: savedScenario.id,
+                projectId: savedScenario.project_id,
+                name: savedScenario.name,
+                description: savedScenario.description,
+                color: savedScenario.color,
+                isVisible: savedScenario.is_visible,
+                isArchived: savedScenario.is_archived
+            }});
+            dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario créé.', type: 'success' } });
+        }
+    } catch (error) {
+        console.error("Error saving scenario:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
     }
 };

@@ -1011,7 +1011,7 @@ export const BudgetProvider = ({ children }) => {
             id: v.id, name: v.name, project_ids: v.project_ids
           }));
           const collaborators = (collaboratorsRes.data || []).map(c => ({
-            id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids
+            id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids, permissionScope: c.permission_scope
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {

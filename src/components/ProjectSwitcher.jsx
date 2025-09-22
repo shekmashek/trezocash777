@@ -5,10 +5,11 @@ import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
 import { supabase } from '../utils/supabase';
 import { deleteConsolidatedView } from '../context/actions';
+import Avatar from './Avatar';
 
 const ProjectSwitcher = () => {
   const { state, dispatch } = useBudget();
-  const { projects, activeProjectId, consolidatedViews } = state;
+  const { projects, activeProjectId, consolidatedViews, collaborators, allProfiles } = state;
   const { t } = useTranslation();
   const activeProjects = projects.filter(p => !p.isArchived);
   
@@ -40,6 +41,50 @@ const ProjectSwitcher = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const getUsersForProject = (projectId) => {
+    const usersMap = new Map();
+    const addUser = (userId, role) => {
+      if (!userId || usersMap.has(userId)) return;
+      const profile = allProfiles.find(p => p.id === userId);
+      if (profile) {
+        usersMap.set(userId, { ...profile, role });
+      }
+    };
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return [];
+    addUser(project.user_id, 'Propriétaire');
+    collaborators.forEach(c => {
+      if (c.projectIds && c.projectIds.includes(projectId) && c.user_id) {
+        addUser(c.user_id, c.role === 'editor' ? 'Éditeur' : 'Lecteur');
+      }
+    });
+    return Array.from(usersMap.values());
+  };
+
+  const getUsersForView = (view) => {
+    const usersMap = new Map();
+    const addUser = (userId, role) => {
+      if (!userId || usersMap.has(userId)) return;
+      const profile = allProfiles.find(p => p.id === userId);
+      if (profile) {
+        usersMap.set(userId, { ...profile, role });
+      }
+    };
+    if (!view || !view.project_ids) return [];
+    view.project_ids.forEach(projectId => {
+      const project = projects.find(p => p.id === projectId);
+      if (project) {
+        addUser(project.user_id, 'Propriétaire');
+      }
+      collaborators.forEach(c => {
+        if (c.projectIds && c.projectIds.includes(projectId) && c.user_id) {
+          addUser(c.user_id, c.role === 'editor' ? 'Éditeur' : 'Lecteur');
+        }
+      });
+    });
+    return Array.from(usersMap.values());
+  };
 
   const handleSelectProject = (projectId) => {
     dispatch({ type: 'SET_ACTIVE_PROJECT', payload: projectId });
@@ -145,37 +190,59 @@ const ProjectSwitcher = () => {
               <>
                 <li><hr className="my-1" /></li>
                 <li className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase">Vues Consolidées</li>
-                {consolidatedViews.map(view => (
-                  <li key={view.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-purple-50 group">
-                    <button onClick={() => handleSelectProject(`consolidated_view_${view.id}`)} className="flex items-center gap-2 flex-grow truncate">
-                      <Layers className="w-4 h-4 text-purple-600" />
-                      <span className="truncate">{view.name}</span>
-                    </button>
-                    <div className="flex items-center gap-1 pl-2">
-                      {activeProjectId === `consolidated_view_${view.id}` && <Check className="w-4 h-4 text-purple-600" />}
-                      <button onClick={(e) => { e.stopPropagation(); handleOpenConsolidatedViewModal(view); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Modifier"><Edit className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteConsolidatedView(view.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                  </li>
-                ))}
+                {consolidatedViews.map(view => {
+                  const viewUsers = getUsersForView(view);
+                  return (
+                    <li key={view.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-purple-50 group">
+                      <button onClick={() => handleSelectProject(`consolidated_view_${view.id}`)} className="flex items-center gap-2 flex-grow truncate">
+                        <Layers className="w-4 h-4 text-purple-600" />
+                        <span className="truncate">{view.name}</span>
+                        {viewUsers.length > 1 && (
+                          <div className="flex -space-x-3">
+                            {viewUsers.slice(0, 3).map(user => (
+                              <Avatar key={user.id} name={user.full_name} role={user.role} />
+                            ))}
+                            {viewUsers.length > 3 && <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 border-white bg-gray-200 text-gray-600">+{viewUsers.length - 3}</div>}
+                          </div>
+                        )}
+                      </button>
+                      <div className="flex items-center gap-1 pl-2">
+                        {activeProjectId === `consolidated_view_${view.id}` && <Check className="w-4 h-4 text-purple-600" />}
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenConsolidatedViewModal(view); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Modifier"><Edit className="w-4 h-4" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteConsolidatedView(view.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </li>
+                  );
+                })}
               </>
             )}
 
             <li><hr className="my-1" /></li>
             <li className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase">Projets Individuels</li>
-            {activeProjects.map(project => (
-              <li key={project.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 group">
-                  <button onClick={() => handleSelectProject(project.id)} className="flex items-center gap-2 flex-grow truncate">
-                      <span className="truncate">{project.name}</span>
-                  </button>
-                  <div className="flex items-center gap-1 pl-2">
+            {activeProjects.map(project => {
+              const projectUsers = getUsersForProject(project.id);
+              return (
+                <li key={project.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 group">
+                    <button onClick={() => handleSelectProject(project.id)} className="flex items-center gap-2 flex-grow truncate">
+                        <span className="truncate">{project.name}</span>
+                        {projectUsers.length > 1 && (
+                          <div className="flex -space-x-3">
+                            {projectUsers.slice(0, 3).map(user => (
+                              <Avatar key={user.id} name={user.full_name} role={user.role} />
+                            ))}
+                            {projectUsers.length > 3 && <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 border-white bg-gray-200 text-gray-600">+{projectUsers.length - 3}</div>}
+                          </div>
+                        )}
+                    </button>
+                    <div className="flex items-center gap-1 pl-2">
                       {project.id === activeProjectId && <Check className="w-4 h-4 text-blue-600" />}
                       <button onClick={(e) => { e.stopPropagation(); handleOpenRenameModal(project); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Renommer"><Edit className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id); }} className="p-1 text-gray-400 hover:text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Archiver"><Archive className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-              </li>
-            ))}
+                    </div>
+                </li>
+              );
+            })}
             <li><hr className="my-1" /></li>
             <li><button onClick={() => handleOpenConsolidatedViewModal()} className="flex items-center w-full px-4 py-2 text-left text-purple-600 hover:bg-purple-50"><Layers className="w-4 h-4 mr-2" />Créer une vue consolidée</button></li>
             <li><button onClick={handleStartOnboarding} className="flex items-center w-full px-4 py-2 text-left text-blue-600 hover:bg-blue-50"><Plus className="w-4 h-4 mr-2" />{t('subHeader.newProject')}</button></li>
