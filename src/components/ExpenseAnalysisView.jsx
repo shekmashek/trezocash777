@@ -9,7 +9,7 @@ import { useTranslation } from '../utils/i18n';
 
 const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, rangeEnd: rangeEndProp, analysisType: analysisTypeProp, analysisMode: analysisModeProp, setAnalysisMode: setAnalysisModeProp }) => {
   const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, categories, allActuals, settings, allEntries } = state;
+  const { activeProjectId, projects, categories, allActuals, settings, allEntries, consolidatedViews } = state;
   const { t } = useTranslation();
 
   const [localTimeUnit, setLocalTimeUnit] = useState('month');
@@ -53,6 +53,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
   }, [settings.timezoneOffset, rangeStartProp]);
 
   const isConsolidated = activeProjectId === 'consolidated';
+  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
   const handlePeriodChange = (direction) => {
     setLocalPeriodOffset(prev => prev + direction);
@@ -154,9 +155,18 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
 
   const projectActuals = useMemo(() => {
     if (!rangeStart || !rangeEnd) return [];
-    const relevant = isConsolidated
-      ? Object.values(allActuals).flat()
-      : allActuals[activeProjectId] || [];
+    
+    let relevant;
+    if (isConsolidated) {
+        relevant = Object.values(allActuals).flat();
+    } else if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        relevant = view.project_ids.flatMap(projectId => allActuals[projectId] || []);
+    } else {
+        relevant = allActuals[activeProjectId] || [];
+    }
     
     return relevant.filter(actual => 
         actual.type === (analysisType === 'expense' ? 'payable' : 'receivable') && 
@@ -165,14 +175,22 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             return paymentDate >= rangeStart && paymentDate < rangeEnd;
         })
     );
-  }, [isConsolidated, allActuals, activeProjectId, rangeStart, rangeEnd, analysisType]);
+  }, [isConsolidated, isCustomConsolidated, consolidatedViews, allActuals, activeProjectId, rangeStart, rangeEnd, analysisType]);
 
   const projectEntries = useMemo(() => {
-    const relevant = isConsolidated
-      ? Object.values(allEntries).flat()
-      : allEntries[activeProjectId] || [];
+    let relevant;
+    if (isConsolidated) {
+        relevant = Object.values(allEntries).flat();
+    } else if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        relevant = view.project_ids.flatMap(projectId => allEntries[projectId] || []);
+    } else {
+        relevant = allEntries[activeProjectId] || [];
+    }
     return relevant.filter(e => e.type === (analysisType === 'expense' ? 'depense' : 'revenu'));
-  }, [isConsolidated, allEntries, activeProjectId, analysisType]);
+  }, [isConsolidated, isCustomConsolidated, consolidatedViews, allEntries, activeProjectId, analysisType]);
 
   const categoryAnalysisData = useMemo(() => {
     if (!rangeStart || !rangeEnd) {
@@ -306,12 +324,21 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
   }, [drillDownState, projectActuals, projectEntries, rangeStart, rangeEnd]);
 
   const projectAnalysisData = useMemo(() => {
-    if (!isConsolidated || !rangeStart || !rangeEnd) {
+    if ((!isConsolidated && !isCustomConsolidated) || !rangeStart || !rangeEnd) {
       return { projects: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
     }
   
-    const projectData = projects
-      .filter(p => !p.isArchived)
+    let projectsToAnalyze = [];
+    if (isConsolidated) {
+        projectsToAnalyze = projects.filter(p => !p.isArchived);
+    } else { // isCustomConsolidated
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return { projects: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
+        projectsToAnalyze = projects.filter(p => view.project_ids.includes(p.id) && !p.isArchived);
+    }
+
+    const projectData = projectsToAnalyze
       .map(project => {
         const projectEntries = allEntries[project.id] || [];
         const projectActuals = allActuals[project.id] || [];
@@ -346,7 +373,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
       totalBudget,
       totalActual,
     };
-  }, [projects, allEntries, allActuals, rangeStart, rangeEnd, analysisType, isConsolidated]);
+  }, [projects, allEntries, allActuals, rangeStart, rangeEnd, analysisType, isConsolidated, isCustomConsolidated, consolidatedViews, activeProjectId]);
 
   const tierAnalysisData = useMemo(() => {
     if (!rangeStart || !rangeEnd) {
@@ -722,7 +749,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                         <button onClick={() => setAnalysisMode('category')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisMode === 'category' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
                             Par catégorie
                         </button>
-                        {isConsolidated && (
+                        {(isConsolidated || isCustomConsolidated) && (
                             <button onClick={() => setAnalysisMode('project')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisMode === 'project' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
                                 Par projet
                             </button>

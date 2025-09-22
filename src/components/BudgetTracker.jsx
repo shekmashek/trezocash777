@@ -11,10 +11,11 @@ const getStartOfWeek = (date) => { const d = new Date(date); const day = d.getDa
 
 const BudgetTracker = () => {
   const { state, dispatch } = useBudget();
-  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = state;
+  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews } = state;
   const { t } = useTranslation();
 
   const isConsolidated = activeProjectId === 'consolidated';
+  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
   const { activeProject, budgetEntries, actualTransactions } = useMemo(() => {
     if (isConsolidated) {
@@ -23,15 +24,41 @@ const BudgetTracker = () => {
         budgetEntries: Object.entries(allEntries).flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId }))),
         actualTransactions: Object.entries(allActuals).flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId }))),
       };
-    } else {
-      const project = projects.find(p => p.id === activeProjectId);
-      return {
-        activeProject: project,
-        budgetEntries: project ? (allEntries[project.id] || []) : [],
-        actualTransactions: project ? (allActuals[project.id] || []) : [],
-      };
     }
-  }, [activeProjectId, projects, allEntries, allActuals, isConsolidated]);
+    
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        
+        if (!view || !view.project_ids) {
+            return { activeProject: { id: activeProjectId, name: 'Vue Inconnue' }, budgetEntries: [], actualTransactions: [] };
+        }
+
+        const projectIdsInView = view.project_ids;
+
+        const consolidatedEntries = projectIdsInView.flatMap(projectId => 
+            (allEntries[projectId] || []).map(entry => ({ ...entry, projectId }))
+        );
+
+        const consolidatedActuals = projectIdsInView.flatMap(projectId => 
+            (allActuals[projectId] || []).map(actual => ({ ...actual, projectId }))
+        );
+
+        return {
+            activeProject: { id: activeProjectId, name: view.name },
+            budgetEntries: consolidatedEntries,
+            actualTransactions: consolidatedActuals,
+        };
+    }
+
+    // Single project view
+    const project = projects.find(p => p.id === activeProjectId);
+    return {
+      activeProject: project,
+      budgetEntries: project ? (allEntries[project.id] || []) : [],
+      actualTransactions: project ? (allActuals[project.id] || []) : [],
+    };
+  }, [activeProjectId, projects, allEntries, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
@@ -248,16 +275,16 @@ const BudgetTracker = () => {
     if (searchTerm) {
         entries = entries.filter(entry => entry.supplier.toLowerCase().includes(searchTerm.toLowerCase()));
     }
-    if (isConsolidated && projectSearchTerm) {
+    if ((isConsolidated || isCustomConsolidated) && projectSearchTerm) {
         entries = entries.filter(entry => {
             const project = projects.find(p => p.id === entry.projectId);
             return project && project.name.toLowerCase().includes(projectSearchTerm.toLowerCase());
         });
     }
     return entries;
-  }, [budgetEntries, searchTerm, isConsolidated, projectSearchTerm, projects]);
+  }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
 
-  const handleNewBudget = () => { if (!isConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
+  const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry }); };
   const handleDeleteEntry = (entry) => {
     dispatch({
@@ -406,11 +433,22 @@ const BudgetTracker = () => {
     return totals;
   };
   
+  const userCashAccounts = useMemo(() => {
+    if (isConsolidated) {
+      return Object.values(allCashAccounts).flat();
+    }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(projectId => allCashAccounts[projectId] || []);
+    }
+    return allCashAccounts[activeProjectId] || [];
+  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
+
   const periodPositions = useMemo(() => {
     if (periods.length === 0) return [];
     
-    const userCashAccounts = isConsolidated ? Object.values(allCashAccounts).flat() : allCashAccounts[activeProjectId] || [];
-
     const today = getTodayInTimezone(settings.timezoneOffset);
     let todayIndex = periods.findIndex(p => today >= p.startDate && today < p.endDate);
     if (todayIndex === -1) {
@@ -468,16 +506,16 @@ const BudgetTracker = () => {
         }
     }
     return positions;
-  }, [periods, allCashAccounts, activeProjectId, isConsolidated, actualTransactions, groupedData, settings.timezoneOffset]);
+  }, [periods, userCashAccounts, actualTransactions, groupedData, settings.timezoneOffset]);
   
   const numVisibleCols = Object.values(visibleColumns).filter(v => v).length;
   const periodColumnWidth = numVisibleCols > 0 ? numVisibleCols * 90 : 50;
   const separatorWidth = 4;
-  const fixedColsWidth = columnWidths.category + columnWidths.supplier + (isConsolidated ? columnWidths.project : 0);
+  const fixedColsWidth = columnWidths.category + columnWidths.supplier + ((isConsolidated || isCustomConsolidated) ? columnWidths.project : 0);
   const totalTableWidth = fixedColsWidth + separatorWidth + (periods.length * (periodColumnWidth + separatorWidth));
   const supplierColLeft = columnWidths.category;
   const projectColLeft = supplierColLeft + columnWidths.supplier;
-  const totalCols = (isConsolidated ? 3 : 2) + 1 + (periods.length * 2);
+  const totalCols = ((isConsolidated || isCustomConsolidated) ? 3 : 2) + 1 + (periods.length * 2);
   
   const renderBudgetRows = (type) => {
     const isEntree = type === 'entree';
@@ -495,7 +533,7 @@ const BudgetTracker = () => {
       <>
         {/* Total Row for Type */}
         <tr className="bg-gray-200 border-y-2 border-gray-300 cursor-pointer" onClick={toggleMainCollapse}>
-          <td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10">
+          <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10">
             <div className="flex items-center gap-2">
               <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
               <Icon className={`w-4 h-4 ${colorClass}`} />
@@ -529,7 +567,7 @@ const BudgetTracker = () => {
           return (
             <React.Fragment key={mainCategory.id}>
               <tr onClick={() => toggleCollapse(mainCategory.id)} className="bg-gray-100 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200">
-                <td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-gray-100">
+                <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-gray-100">
                   <div className="flex items-center gap-2">
                     <ChevronDown className={`w-4 h-4 transition-transform ${isMainCollapsed ? '-rotate-90' : ''}`} />
                     {mainCategory.name}
@@ -556,7 +594,7 @@ const BudgetTracker = () => {
                 })}
               </tr>
               {!isMainCollapsed && mainCategory.entries.map((entry) => {
-                const project = isConsolidated ? projects.find(p => p.id === entry.projectId) : null;
+                const project = (isConsolidated || isCustomConsolidated) ? projects.find(p => p.id === entry.projectId) : null;
                 return (
                   <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50 group">
                     <td className="px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10">{entry.category}</td>
@@ -569,7 +607,7 @@ const BudgetTracker = () => {
                         </div>
                       </div>
                     </td>
-                    {isConsolidated && <td className="px-4 py-1 text-gray-600 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${projectColLeft}px` }}><div className="flex items-center gap-2"><Folder className="w-4 h-4 text-blue-500" />{project?.name || 'N/A'}</div></td>}
+                    {(isConsolidated || isCustomConsolidated) && <td className="px-4 py-1 text-gray-600 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${projectColLeft}px` }}><div className="flex items-center gap-2"><Folder className="w-4 h-4 text-blue-500" />{project?.name || 'N/A'}</div></td>}
                     <td className="bg-surface"></td>
                     {periods.map((period, periodIndex) => {
                       const budget = getEntryAmountForPeriod(entry, period.startDate, period.endDate);
@@ -600,7 +638,7 @@ const BudgetTracker = () => {
         {/* Off-budget rows */}
         {(type === 'entree' ? hasOffBudgetRevenues : hasOffBudgetExpenses) && (
           <tr className="bg-purple-50 font-semibold text-purple-800">
-            <td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-purple-50">
+            <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-purple-50">
               <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4" />{isEntree ? 'Entrées Hors Budget' : 'Sorties Hors Budget'}</div>
             </td>
             <td className="bg-surface"></td>
@@ -674,7 +712,7 @@ const BudgetTracker = () => {
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <button onClick={handleNewBudget} className="text-primary-600 hover:bg-primary-100 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors disabled:text-secondary-400 disabled:cursor-not-allowed" disabled={isConsolidated}><Plus className="w-5 h-5" /> Nouvelle Entrée</button>
+                <button onClick={handleNewBudget} className="text-primary-600 hover:bg-primary-100 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors disabled:text-secondary-400 disabled:cursor-not-allowed" disabled={isConsolidated || isCustomConsolidated}><Plus className="w-5 h-5" /> Nouvelle Entrée</button>
             </div>
         </div>
       </div>
@@ -707,7 +745,7 @@ const BudgetTracker = () => {
                         </div>
                     )}
                 </ResizableTh>
-                {isConsolidated && (
+                {(isConsolidated || isCustomConsolidated) && (
                     <ResizableTh id="project" width={columnWidths.project} onResize={handleResize} className="sticky z-20 bg-gray-100" style={{ left: `${projectColLeft}px` }}>
                         {isProjectSearchOpen ? (
                             <div ref={projectSearchRef} className="flex items-center gap-1 w-full">
@@ -752,14 +790,14 @@ const BudgetTracker = () => {
               </tr>
             </thead>
             <tbody>
-              <tr className="bg-gray-200 font-bold text-gray-800"><td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><LogIn className="w-4 h-4" />Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+              <tr className="bg-gray-200 font-bold text-gray-800"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><LogIn className="w-4 h-4" />Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               {renderBudgetRows('entree')}
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               {renderBudgetRows('sortie')}
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               <tr className="bg-gray-200 border-t-2 border-gray-300">
-                  <td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" />Flux de trésorerie</div></td>
+                  <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" />Flux de trésorerie</div></td>
                   <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
                   {periods.map((period, periodIndex) => {
                       const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
@@ -783,7 +821,7 @@ const BudgetTracker = () => {
                       );
                   })}
               </tr>
-              <tr className="bg-gray-300 font-bold text-gray-900"><td colSpan={isConsolidated ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2"><Flag className="w-4 h-4" />Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+              <tr className="bg-gray-300 font-bold text-gray-900"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2"><Flag className="w-4 h-4" />Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
             </tbody>
           </table>
         </div>

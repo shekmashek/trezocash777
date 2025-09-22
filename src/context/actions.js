@@ -19,6 +19,26 @@ const addMonths = (date, months) => {
 
 export const initializeProject = async (dispatch, payload, user, existingTiersData, currency) => {
   try {
+    // Defensively check for and create profile if it doesn't exist
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError && profileError.code === 'PGRST116') { // "Not found"
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: user.id });
+      if (insertError) {
+        console.error("Error creating profile during onboarding:", insertError);
+        throw insertError;
+      }
+    } else if (profileError) {
+      console.error("Error checking for profile:", profileError);
+      throw profileError;
+    }
+
     const { projectName, projectStartDate, cashAccounts, entries, monthlyRevenue, monthlyExpense, loans, borrowings } = payload;
     
     // 1. Create Project
@@ -497,6 +517,56 @@ export const writeOffActual = async (dispatch, actualId) => {
 
     } catch (error) {
         console.error("Error writing off actual:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const saveConsolidatedView = async (dispatch, { viewData, editingView, user }) => {
+  try {
+    const dataToSave = {
+      user_id: user.id,
+      name: viewData.name,
+      project_ids: viewData.project_ids,
+    };
+
+    let savedView;
+    if (editingView) {
+      const { data, error } = await supabase
+        .from('consolidated_views')
+        .update(dataToSave)
+        .eq('id', editingView.id)
+        .select()
+        .single();
+      if (error) throw error;
+      savedView = data;
+      dispatch({ type: 'UPDATE_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée mise à jour.', type: 'success' } });
+    } else {
+      const { data, error } = await supabase
+        .from('consolidated_views')
+        .insert(dataToSave)
+        .select()
+        .single();
+      if (error) throw error;
+      savedView = data;
+      dispatch({ type: 'ADD_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée créée.', type: 'success' } });
+    }
+    dispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' });
+  } catch (error) {
+    console.error("Error saving consolidated view:", error);
+    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+  }
+};
+
+export const deleteConsolidatedView = async (dispatch, viewId) => {
+    try {
+        const { error } = await supabase.from('consolidated_views').delete().eq('id', viewId);
+        if (error) throw error;
+        dispatch({ type: 'DELETE_CONSOLIDATED_VIEW_SUCCESS', payload: viewId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée supprimée.', type: 'success' } });
+    } catch (error) {
+        console.error("Error deleting consolidated view:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

@@ -22,8 +22,32 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        const nameFromEmail = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim();
+        let fullName = nameFromEmail.split(' ').filter(Boolean).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+        if (!fullName) {
+            fullName = 'Nouvel utilisateur';
+        }
+
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName
+            }
+          }
+        });
+        
+        if (error) {
+            if (error.message.includes("duplicate key value violates unique constraint")) {
+                throw new Error("Un utilisateur avec cet e-mail existe déjà.");
+            }
+            if (error.message.includes("Password should be at least 6 characters")) {
+                throw new Error("Le mot de passe doit contenir au moins 6 caractères.");
+            }
+            throw error;
+        }
         setMessage('Inscription réussie ! Veuillez vérifier votre e-mail pour confirmer votre compte.');
       }
     } catch (error) {

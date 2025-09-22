@@ -17,7 +17,7 @@ const AboutPage = () => {
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-12 items-center">
           <div className="md:col-span-1 flex justify-center">
             <img 
-              src="https://img-wrapper.vercel.app/image?url=https://placehold.co/400x400/e2e8f0/475569?text=Levy+R." 
+              src="https://img-wrapper.vercel.app/image?url=https://img-wrapper.vercel.app/image?url=https://placehold.co/400x400/e2e8f0/475569?text=Levy+R." 
               alt="Levy Raveloson, Fondateur de Trezocash" 
               className="rounded-full w-48 h-48 md:w-64 md:h-64 object-cover shadow-2xl border-4 border-white"
             />

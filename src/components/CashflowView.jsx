@@ -49,9 +49,10 @@ function renderBudgetLine(params, api) {
 
 const CashflowView = ({ isFocusMode = false }) => {
   const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect } = state;
+  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews } = state;
   const { t } = useTranslation();
   const isConsolidated = activeProjectId === 'consolidated';
+  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
   const [isScenarioBudgetModalOpen, setIsScenarioBudgetModalOpen] = useState(false);
   const [editingScenarioEntry, setEditingScenarioEntry] = useState(null);
@@ -174,11 +175,39 @@ const CashflowView = ({ isFocusMode = false }) => {
 
   const baseActuals = useMemo(() => {
     if (isConsolidated) return Object.values(allActuals).flat();
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(projectId => allActuals[projectId] || []);
+    }
     const project = projects.find(p => p.id === activeProjectId) || projects[0];
     return project ? (allActuals[project.id] || []) : [];
-  }, [activeProjectId, projects, allActuals, isConsolidated]);
+  }, [activeProjectId, projects, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
-  const userCashAccounts = useMemo(() => { if (isConsolidated) { return Object.values(allCashAccounts).flat(); } return allCashAccounts[activeProjectId] || []; }, [allCashAccounts, activeProjectId, isConsolidated]);
+  const userCashAccounts = useMemo(() => {
+    if (isConsolidated) {
+      return Object.values(allCashAccounts).flat();
+    }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(projectId => allCashAccounts[projectId] || []);
+    }
+    return allCashAccounts[activeProjectId] || [];
+  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
+
+  const baseBudgetEntries = useMemo(() => {
+    if (isConsolidated) return Object.values(allEntries).flat();
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(projectId => allEntries[projectId] || []);
+    }
+    return allEntries[activeProjectId] || [];
+  }, [allEntries, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const periods = useMemo(() => {
     const today = getTodayInTimezone(settings.timezoneOffset);
@@ -367,11 +396,10 @@ const CashflowView = ({ isFocusMode = false }) => {
         };
     };
 
-    const baseBudgetEntries = isConsolidated ? Object.values(allEntries).flat() : allEntries[activeProjectId] || [];
     const baseFlow = calculateCashflowData(baseActuals, baseBudgetEntries);
     
     return { base: baseFlow };
-  }, [baseActuals, projectScenarios, selectedScenarios, state.scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset]);
+  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, state.scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset]);
   
   const getCashflowChartOptions = () => {
     const { base } = cashflowData;

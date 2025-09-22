@@ -10,7 +10,7 @@ import SparklineChart from './SparklineChart';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { state, dispatch } = useBudget();
-  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView } = state;
+  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews } = state;
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -25,6 +25,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
   };
 
   const isConsolidated = activeProjectId === 'consolidated';
+  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
   const handleNavigate = (view) => {
     dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
@@ -37,13 +38,31 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
   };
 
   const headerMetrics = useMemo(() => {
-    const relevantAccounts = isConsolidated 
-        ? Object.values(allCashAccounts).flat()
-        : allCashAccounts[activeProjectId] || [];
-    
-    const relevantActuals = isConsolidated
-        ? Object.values(allActuals).flat()
-        : allActuals[activeProjectId] || [];
+    let relevantAccounts;
+    let relevantActuals;
+    let relevantLoans;
+    let relevantEntries;
+
+    if (isConsolidated) {
+        relevantAccounts = Object.values(allCashAccounts).flat();
+        relevantActuals = Object.values(allActuals).flat();
+        relevantLoans = loans || [];
+        relevantEntries = Object.values(allEntries).flat();
+    } else if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        const projectIds = view ? view.project_ids : [];
+        
+        relevantAccounts = projectIds.flatMap(id => allCashAccounts[id] || []);
+        relevantActuals = projectIds.flatMap(id => allActuals[id] || []);
+        relevantLoans = (loans || []).filter(l => projectIds.includes(l.projectId));
+        relevantEntries = projectIds.flatMap(id => allEntries[id] || []);
+    } else {
+        relevantAccounts = allCashAccounts[activeProjectId] || [];
+        relevantActuals = allActuals[activeProjectId] || [];
+        relevantLoans = (loans || []).filter(l => l.projectId === activeProjectId);
+        relevantEntries = allEntries[activeProjectId] || [];
+    }
 
     let totalActionableCash = 0;
     let totalSavings = 0;
@@ -85,8 +104,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
     let totalBorrowingPrincipalRemaining = 0;
     let totalLoanPrincipalRemaining = 0;
-
-    const relevantLoans = isConsolidated ? (loans || []) : (loans || []).filter(l => l.projectId === activeProjectId);
 
     relevantLoans.forEach(loan => {
         const projectEntries = allEntries[loan.projectId] || [];
@@ -152,20 +169,33 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
         totalDebts: formatCurrency(totalBorrowingPrincipalRemaining, settings),
         totalCredits: formatCurrency(totalLoanPrincipalRemaining, settings),
     };
-  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated]);
+  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const userCashAccounts = useMemo(() => {
     if (isConsolidated) {
       return Object.values(allCashAccounts).flat();
     }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(id => allCashAccounts[id] || []);
+    }
     return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated]);
+  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const relevantActuals = useMemo(() => {
-    return isConsolidated
-      ? Object.values(allActuals).flat()
-      : allActuals[activeProjectId] || [];
-  }, [activeProjectId, allActuals, isConsolidated]);
+    if (isConsolidated) {
+      return Object.values(allActuals).flat();
+    }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(id => allActuals[id] || []);
+    }
+    return allActuals[activeProjectId] || [];
+  }, [activeProjectId, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const accountBalances = useMemo(() => {
     return userCashAccounts.map(account => {
@@ -393,7 +423,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
               <button 
                 onClick={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'cashAccounts' })}
                 className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 disabled:text-gray-400 disabled:cursor-not-allowed ${isCollapsed ? 'justify-center' : ''}`}
-                disabled={isConsolidated}
+                disabled={isConsolidated || isCustomConsolidated}
                 title={isCollapsed ? 'Ajouter un compte' : ''}
               >
                 <PlusCircle className="w-4 h-4 shrink-0" />

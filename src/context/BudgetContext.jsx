@@ -155,6 +155,7 @@ const getInitialState = () => ({
     scenarioEntries: {},
     loans: [],
     notes: [],
+    consolidatedViews: [],
     infoModal: { isOpen: false, title: '', message: '' },
     confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
     inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
@@ -171,6 +172,8 @@ const getInitialState = () => ({
     isActionPriorityModalOpen: false,
     actionPriorityTransaction: null,
     transactionMenu: { isOpen: false, x: 0, y: 0, transaction: null },
+    isConsolidatedViewModalOpen: false,
+    editingConsolidatedView: null,
     activeProjectId: null,
     displayYear: new Date().getFullYear(),
     timeUnit: 'week',
@@ -483,6 +486,22 @@ const budgetReducer = (state, action) => {
       };
 
     // --- Scenarios ---
+    case 'OPEN_CONSOLIDATED_VIEW_MODAL':
+      return { ...state, isConsolidatedViewModalOpen: true, editingConsolidatedView: action.payload };
+    case 'CLOSE_CONSOLIDATED_VIEW_MODAL':
+      return { ...state, isConsolidatedViewModalOpen: false, editingConsolidatedView: null };
+    case 'ADD_CONSOLIDATED_VIEW_SUCCESS':
+      return { ...state, consolidatedViews: [...state.consolidatedViews, action.payload] };
+    case 'UPDATE_CONSOLIDATED_VIEW_SUCCESS':
+      return {
+        ...state,
+        consolidatedViews: state.consolidatedViews.map(v => v.id === action.payload.id ? action.payload : v),
+      };
+    case 'DELETE_CONSOLIDATED_VIEW_SUCCESS':
+      return {
+        ...state,
+        consolidatedViews: state.consolidatedViews.filter(v => v.id !== action.payload),
+      };
     case 'ADD_SCENARIO_SUCCESS': {
         const newScenario = action.payload;
         return {
@@ -911,7 +930,7 @@ export const BudgetProvider = ({ children }) => {
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {} } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [] } });
              return;
           }
 
@@ -925,7 +944,7 @@ export const BudgetProvider = ({ children }) => {
 
           const [
             projectsRes, tiersRes, notesRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -937,9 +956,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('payments').select('*'),
             supabase.from('cash_accounts').select('*'),
             supabase.from('scenario_entries').select('*'),
+            supabase.from('consolidated_views').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes };
+          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -957,6 +977,9 @@ export const BudgetProvider = ({ children }) => {
           }));
           const scenarios = (scenariosRes.data || []).map(s => ({
             id: s.id, projectId: s.project_id, name: s.name, description: s.description, color: s.color, isVisible: s.is_visible, isArchived: s.is_archived
+          }));
+          const consolidatedViews = (consolidatedViewsRes.data || []).map(v => ({
+            id: v.id, name: v.name, project_ids: v.project_ids
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1016,7 +1039,7 @@ export const BudgetProvider = ({ children }) => {
             payload: {
               profile,
               settings,
-              projects, tiers, notes, loans, scenarios,
+              projects, tiers, notes, loans, scenarios, consolidatedViews,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

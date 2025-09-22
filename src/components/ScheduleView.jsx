@@ -82,22 +82,41 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
 
 const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewMode: propViewMode }) => {
     const { state, dispatch } = useBudget();
-    const { allActuals, settings, projects, activeProjectId } = state;
+    const { allActuals, settings, projects, activeProjectId, consolidatedViews } = state;
 
     const [localCurrentDate, setLocalCurrentDate] = useState(new Date());
     const [localViewMode, setLocalViewMode] = useState('month');
 
     const currentDate = isFocusMode ? propCurrentDate : localCurrentDate;
     const viewMode = isFocusMode ? propViewMode : localViewMode;
+    
     const isConsolidated = activeProjectId === 'consolidated';
+    const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
     const today = getTodayInTimezone(settings.timezoneOffset);
 
     const allRelevantActuals = useMemo(() => {
-        return Object.entries(allActuals).flatMap(([projectId, actuals]) => 
-            actuals.map(actual => ({ ...actual, projectId }))
-        );
-    }, [allActuals]);
+        if (isConsolidated) {
+            return Object.values(allActuals).flat().map(actual => {
+                const project = projects.find(p => p.id === actual.projectId);
+                return { ...actual, projectName: project?.name || 'N/A' };
+            });
+        }
+        if (isCustomConsolidated) {
+            const viewId = activeProjectId.replace('consolidated_view_', '');
+            const view = consolidatedViews.find(v => v.id === viewId);
+            if (!view || !view.project_ids) return [];
+            return view.project_ids.flatMap(projectId => 
+                (allActuals[projectId] || []).map(actual => {
+                    const project = projects.find(p => p.id === projectId);
+                    return { ...actual, projectName: project?.name || 'N/A' };
+                })
+            );
+        }
+        // Single project view
+        const project = projects.find(p => p.id === activeProjectId);
+        return (allActuals[activeProjectId] || []).map(actual => ({ ...actual, projectName: project?.name || 'N/A' }));
+    }, [activeProjectId, allActuals, projects, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
     const { transactionsByDate, overdueTransactions } = useMemo(() => {
         const byDate = new Map();
@@ -290,7 +309,6 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                                 {overdueTransactions.map(tx => {
                                     const daysOverdue = Math.floor((today - new Date(tx.date)) / (1000 * 60 * 60 * 24));
                                     const isPayable = tx.type === 'payable';
-                                    const project = isConsolidated ? projects.find(p => p.id === tx.projectId) : null;
                                     return (
                                         <li key={tx.id}>
                                             <button
@@ -305,7 +323,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                                                         <div className="overflow-hidden">
                                                             <p className="font-semibold truncate text-gray-800" title={tx.thirdParty}>
                                                                 {tx.thirdParty}
-                                                                {isConsolidated && project && <span className="text-xs font-normal text-gray-500 ml-1">({project.name})</span>}
+                                                                {(isConsolidated || isCustomConsolidated) && tx.projectName && <span className="text-xs font-normal text-gray-500 ml-1">({tx.projectName})</span>}
                                                             </p>
                                                             <div className="text-xs text-gray-500 flex items-center gap-1.5">
                                                                 <span>{new Date(tx.date).toLocaleDateString('fr-FR')}</span>

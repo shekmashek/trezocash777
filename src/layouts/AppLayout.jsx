@@ -18,7 +18,8 @@ import StickyNote from '../components/StickyNote';
 import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import FocusView from '../components/FocusView';
-import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual } from '../context/actions';
+import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
+import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
@@ -36,7 +37,7 @@ const AppLayout = () => {
         isActualTransactionModalOpen, editingActual, isPaymentModalOpen, payingActual, 
         isDirectPaymentModalOpen, directPaymentType, notes, timeUnit, horizonLength, periodOffset, 
         allCashAccounts, allEntries, allActuals, settings, activeQuickSelect, isTourActive, 
-        transactionMenu, isLoading 
+        transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView
     } = state;
     
     const dragConstraintsRef = useRef(null);
@@ -323,6 +324,12 @@ const AppLayout = () => {
         });
     };
 
+    const handleSaveConsolidatedView = (viewData) => {
+        const user = state.session?.user;
+        if (!user) return;
+        saveConsolidatedView(dispatch, { viewData, editingView: editingConsolidatedView, user });
+    };
+
     return (
         <div ref={dragConstraintsRef} className="flex min-h-screen bg-background">
             <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
@@ -415,6 +422,14 @@ const AppLayout = () => {
                     onClose={() => dispatch({ type: 'CLOSE_SCENARIO_MODAL' })}
                     onSave={handleSaveScenario}
                     scenario={editingScenario}
+                />
+            )}
+            {isConsolidatedViewModalOpen && (
+                <ConsolidatedViewModal
+                    isOpen={isConsolidatedViewModalOpen}
+                    onClose={() => dispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' })}
+                    onSave={handleSaveConsolidatedView}
+                    editingView={editingConsolidatedView}
                 />
             )}
             {infoModal.isOpen && (
