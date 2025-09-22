@@ -144,6 +144,7 @@ const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef']; // violet, orange, fu
 const getInitialState = () => ({
     session: null,
     profile: null,
+    allProfiles: [],
     projects: [],
     categories: initialCategories,
     allEntries: {},
@@ -213,6 +214,7 @@ const budgetReducer = (state, action) => {
         return {
             ...state,
             ...action.payload,
+            allProfiles: action.payload.allProfiles || [],
             isLoading: false,
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
@@ -332,7 +334,9 @@ const budgetReducer = (state, action) => {
 
         let newTiers = state.tiers;
         if (newTier) {
-            newTiers = [...state.tiers, newTier];
+            if (!newState.tiers.some(t => t.id === newTier.id)) {
+                newTiers = [...state.tiers, newTier];
+            }
         }
 
         return {
@@ -970,8 +974,27 @@ export const BudgetProvider = ({ children }) => {
             if (responses[key].error) throw responses[key].error;
           }
 
+          const userIds = new Set();
+          userIds.add(user.id);
+          if (projectsRes.data) {
+              projectsRes.data.forEach(p => userIds.add(p.user_id));
+          }
+          if (collaboratorsRes.data) {
+              collaboratorsRes.data.forEach(c => {
+                  userIds.add(c.owner_id);
+                  if (c.user_id) userIds.add(c.user_id);
+              });
+          }
+
+          const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name')
+              .in('id', Array.from(userIds));
+
+          if (profilesError) throw profilesError;
+
           const projects = (projectsRes.data || []).map(p => ({
-            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived,
+            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived, user_id: p.user_id,
             annualGoals: p.annual_goals, expenseTargets: p.expense_targets
           }));
           
@@ -1047,6 +1070,7 @@ export const BudgetProvider = ({ children }) => {
             type: 'SET_INITIAL_DATA',
             payload: {
               profile,
+              allProfiles: profilesData || [],
               settings,
               projects, tiers, notes, loans, scenarios, consolidatedViews, collaborators,
               allEntries, allActuals, allCashAccounts, scenarioEntries,

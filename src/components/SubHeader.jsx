@@ -8,6 +8,7 @@ import ProjectSwitcher from './ProjectSwitcher';
 import FlagIcon from './FlagIcon';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SubscriptionBadge from './SubscriptionBadge';
+import ProjectCollaborators from './ProjectCollaborators';
 
 const SettingsLink = ({ item, onClick }) => {
   const Icon = item.icon;
@@ -162,10 +163,11 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
       <div className="sticky top-0 z-30 bg-gray-100 border-b border-gray-200">
         <div className="container mx-auto px-6 py-2 flex w-full items-center justify-between">
           
-          <div className="flex-1 flex justify-start">
+          <div className="flex-1 flex justify-start items-center gap-4">
             <div id="project-switcher" className={`w-64 flex-shrink-0 rounded-lg transition-all ${isProjectSwitcherHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}>
               <ProjectSwitcher />
             </div>
+            <ProjectCollaborators />
           </div>
 
           <div className="flex-shrink-0">
