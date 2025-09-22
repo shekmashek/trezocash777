@@ -582,20 +582,20 @@ const BudgetTracker = () => {
                 <td className="px-2 py-2">
                   {numVisibleCols > 0 && (
                     <div className="flex gap-2 justify-around text-sm">
-                        <div className="relative group/subcell flex-1 text-center text-text-primary font-normal">
+                        {visibleColumns.budget && <div className="relative group/subcell flex-1 text-center text-text-primary font-normal">
                             {formatCurrency(totals.budget, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Prév.)`} />
-                        </div>
-                        <div className="relative group/subcell flex-1 text-center">
+                        </div>}
+                        {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center">
                             <button onClick={(e) => { e.stopPropagation(); if (totals.actual !== 0) handleActualClick({ type, period }); }} disabled={totals.actual === 0} className="text-text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60 font-normal">
                                 {formatCurrency(totals.actual, currencySettings)}
                             </button>
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Réel)`} />
-                        </div>
-                        <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
+                        </div>}
+                        {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                             {formatCurrency(reste, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Reste)`} />
-                        </div>
+                        </div>}
                     </div>
                   )}
                 </td>
@@ -628,20 +628,20 @@ const BudgetTracker = () => {
                       <td className="px-2 py-2">
                         {numVisibleCols > 0 && (
                           <div className="flex gap-2 justify-around text-xs">
-                            <div className="relative group/subcell flex-1 text-center font-normal">
+                            {visibleColumns.budget && <div className="relative group/subcell flex-1 text-center font-normal">
                                 {formatCurrency(totals.budget, currencySettings)}
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName={mainCategory.name} columnName={`${period.label} (Prév.)`} />
-                            </div>
-                            <div className="relative group/subcell flex-1 text-center font-normal">
+                            </div>}
+                            {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center font-normal">
                                 <button onClick={(e) => { e.stopPropagation(); if (totals.actual !== 0) handleActualClick({ mainCategory, period }); }} disabled={totals.actual === 0} className="hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                                     {formatCurrency(totals.actual, currencySettings)}
                                 </button>
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName={mainCategory.name} columnName={`${period.label} (Réel)`} />
-                            </div>
-                            <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
+                            </div>}
+                            {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                                 {formatCurrency(reste, currencySettings)}
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName={mainCategory.name} columnName={`${period.label} (Reste)`} />
-                            </div>
+                            </div>}
                           </div>
                         )}
                       </td>
@@ -676,20 +676,20 @@ const BudgetTracker = () => {
                           <td className="px-2 py-1">
                             {numVisibleCols > 0 && (
                               <div className="flex gap-2 justify-around text-xs">
-                                <div className="relative group/subcell flex-1 text-center text-gray-500">
+                                {visibleColumns.budget && <div className="relative group/subcell flex-1 text-center text-gray-500">
                                     {formatCurrency(budget, currencySettings)}
                                     <CommentButton rowId={entry.id} columnId={`${columnIdBase}_budget`} rowName={entry.supplier} columnName={`${period.label} (Prév.)`} />
-                                </div>
-                                <div className="relative group/subcell flex-1 text-center">
+                                </div>}
+                                {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center">
                                     <button onClick={() => handleOpenPaymentDrawer(entry, period)} disabled={actual === 0 && budget === 0} className="text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400">
                                         {formatCurrency(actual, currencySettings)}
                                     </button>
                                     <CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} />
-                                </div>
-                                <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
+                                </div>}
+                                {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                                     {formatCurrency(reste, currencySettings)}
                                     <CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} />
-                                </div>
+                                </div>}
                               </div>
                             )}
                           </td>
@@ -721,20 +721,20 @@ const BudgetTracker = () => {
                   <td className="px-2 py-2">
                     {numVisibleCols > 0 && (
                       <div className="flex gap-2 justify-around text-xs">
-                        <div className="relative group/subcell flex-1 text-center">
+                        {visibleColumns.budget && <div className="relative group/subcell flex-1 text-center">
                             {formatCurrency(totals.budget, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName="Hors Budget" columnName={`${period.label} (Prév.)`} />
-                        </div>
-                        <div className="relative group/subcell flex-1 text-center">
+                        </div>}
+                        {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center">
                             <button onClick={() => totals.actual !== 0 && handleActualClick({ category: isEntree ? 'Entrées Hors Budget' : 'Sorties Hors Budget', period })} disabled={totals.actual === 0} className="hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                                 {formatCurrency(totals.actual, currencySettings)}
                             </button>
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName="Hors Budget" columnName={`${period.label} (Réel)`} />
-                        </div>
-                        <div className={`relative group/subcell flex-1 text-center ${getResteColor(reste, isEntree)}`}>
+                        </div>}
+                        {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center ${getResteColor(reste, isEntree)}`}>
                             {formatCurrency(reste, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName="Hors Budget" columnName={`${period.label} (Reste)`} />
-                        </div>
+                        </div>}
                       </div>
                     )}
                   </td>
@@ -894,24 +894,24 @@ const BudgetTracker = () => {
                               <td className="px-2 py-2">
                                   {numVisibleCols > 0 && (
                                       <div className="flex gap-2 justify-around text-sm">
-                                          <div className={`relative group/subcell flex-1 text-center font-normal ${netBudget < 0 ? 'text-red-600' : 'text-text-primary'}`}>
+                                          {visibleColumns.budget && <div className={`relative group/subcell flex-1 text-center font-normal ${netBudget < 0 ? 'text-red-600' : 'text-text-primary'}`}>
                                               {formatCurrency(netBudget, currencySettings)}
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName="Flux de trésorerie" columnName={`${period.label} (Prév.)`} />
-                                          </div>
-                                          <div className="relative group/subcell flex-1 text-center font-normal">
+                                          </div>}
+                                          {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center font-normal">
                                               <button onClick={() => netActual !== 0 && handleActualClick({ type: 'net', period })} disabled={netActual === 0} className="text-text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                                                   {formatCurrency(netActual, currencySettings)}
                                               </button>
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName="Flux de trésorerie" columnName={`${period.label} (Réel)`} />
-                                          </div>
-                                          <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(netReste, true)}`}>
+                                          </div>}
+                                          {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(netReste, true)}`}>
                                               {formatCurrency(netReste, currencySettings)}
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName="Flux de trésorerie" columnName={`${period.label} (Reste)`} />
-                                          </div>
+                                          </div>}
                                       </div>
                                   )}
                               </td>
-                              <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
+                              <td className="bg-surface"></td>
                           </React.Fragment>
                       );
                   })}
