@@ -101,6 +101,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   const settingsItems = [
     { id: 'projectSettings', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
+    { id: 'userManagement', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
     { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
     { id: 'categoryManagement', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
     { id: 'tiersManagement', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },

@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AreaChart, Calendar, Layers, PieChart, Table, Briefcase, User, CheckCircle, Zap, Plus, BarChart, Lock } from 'lucide-react';
 
 const FeatureCard = ({ icon: Icon, title, description, color }) => {
@@ -60,7 +60,34 @@ const AccordionItem = ({ title, children }) => {
   );
 };
 
+const BillingToggle = ({ billingCycle, setBillingCycle }) => (
+    <div className="flex justify-center items-center gap-4 mb-10">
+        <span className={`font-semibold transition-colors ${billingCycle === 'monthly' ? 'text-blue-600' : 'text-gray-500'}`}>
+            Mensuel
+        </span>
+        <button
+            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
+            className={`w-12 h-6 rounded-full p-1 flex items-center transition-colors ${billingCycle === 'monthly' ? 'bg-blue-600' : 'bg-blue-600'}`}
+        >
+            <motion.div
+                layout
+                transition={{ type: 'spring', stiffness: 700, damping: 30 }}
+                className="w-4 h-4 bg-white rounded-full"
+                style={{ marginLeft: billingCycle === 'monthly' ? '0%' : 'calc(100% - 1rem)' }}
+            />
+        </button>
+        <span className={`font-semibold transition-colors ${billingCycle === 'annual' ? 'text-blue-600' : 'text-gray-500'}`}>
+            Annuel
+        </span>
+        <span className="px-3 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">
+            -33% Économie
+        </span>
+    </div>
+);
+
 const HomePage = ({ onSignUp }) => {
+    const [billingCycle, setBillingCycle] = useState('monthly');
+
     const features = [
         { icon: Table, title: "Trezo", description: "Votre tableau de trésorerie complet pour une vision détaillée de vos flux.", color: "blue" },
         { icon: AreaChart, title: "Flux", description: "Visualisez vos entrées, sorties et l'évolution de votre solde en un clin d'œil.", color: "green" },
@@ -233,67 +260,101 @@ const HomePage = ({ onSignUp }) => {
                     <h2 className="text-3xl font-bold text-gray-900">Une Offre Simple et Transparente</h2>
                     <p className="mt-4 max-w-xl mx-auto text-gray-600">Toutes les fonctionnalités, sans limite. Choisissez le plan qui vous convient.</p>
                 </div>
-                <div className="flex flex-col lg:flex-row justify-center items-stretch gap-8">
-                    {/* Mensuel */}
-                    <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg border flex flex-col">
+                
+                <BillingToggle billingCycle={billingCycle} setBillingCycle={setBillingCycle} />
+
+                <div className="flex flex-col lg:flex-row justify-center items-center lg:items-end gap-8">
+                    {/* SOLO Card */}
+                    <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg border flex flex-col transform transition-transform duration-300 hover:scale-105">
                         <div className="flex-grow">
-                            <div className="h-7 mb-4"></div> {/* Badge Placeholder */}
-                            <h3 className="text-xl font-semibold text-gray-800 text-center">Mensuel</h3>
-                            <p className="text-sm text-gray-500 mt-2 text-center">Flexibilité totale, sans engagement.</p>
+                            <h3 className="text-xl font-semibold text-gray-800 text-center">Pack Solo</h3>
+                            <p className="text-sm text-gray-500 mt-2 text-center h-10">Pour les indépendants et les budgets personnels.</p>
                             <div className="my-8 h-28 flex flex-col justify-center text-center">
-                                <div>
-                                    <span className="text-5xl font-extrabold text-gray-900">12$</span>
-                                    <span className="text-xl font-medium text-gray-500"> / mois</span>
-                                </div>
+                                <AnimatePresence mode="wait">
+                                    <motion.div key={billingCycle} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+                                        {billingCycle === 'monthly' ? (
+                                            <div>
+                                                <span className="text-5xl font-extrabold text-gray-900">12€</span>
+                                                <span className="text-xl font-medium text-gray-500"> / mois</span>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <span className="text-5xl font-extrabold text-gray-900">96€</span>
+                                                <span className="text-xl font-medium text-gray-500"> / an</span>
+                                                <p className="text-sm font-semibold text-blue-600 mt-1">Soit 8€ par mois</p>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
                         </div>
                         <div>
                             <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors">Démarrer l'essai de 14 jours</button>
-                            <div className="h-10 mt-4"></div> {/* Urgency Placeholder */}
                             <hr className="my-8" />
                             <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700">{feature}</span></li>))}</ul>
                         </div>
                     </div>
-                    {/* Annuel */}
-                    <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-xl border-2 border-blue-600 flex flex-col">
+
+                    {/* TEAM Card */}
+                    <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-xl border-2 border-blue-600 flex flex-col relative transform scale-105">
+                        <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-semibold text-white bg-blue-600 rounded-full">Le plus populaire</div>
                         <div className="flex-grow">
-                            <div className="h-7 mb-4 flex justify-center"><span className="px-3 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">ÉCONOMISEZ 33%</span></div>
-                            <h3 className="text-xl font-semibold text-gray-800 text-center">Annuel</h3>
-                            <p className="text-sm text-gray-500 mt-2 text-center">La meilleure offre pour un engagement à long terme.</p>
+                            <h3 className="text-xl font-semibold text-gray-800 text-center">Pack Team</h3>
+                            <p className="text-sm text-gray-500 mt-2 text-center h-10">Pour les équipes et les entreprises qui collaborent.</p>
                             <div className="my-8 h-28 flex flex-col justify-center text-center">
-                                <p className="text-gray-500 line-through">144$</p>
-                                <div>
-                                    <span className="text-5xl font-extrabold text-gray-900">96$</span>
-                                    <span className="text-xl font-medium text-gray-500"> / an</span>
-                                </div>
-                                <p className="text-sm font-semibold text-blue-600 mt-1">Soit 8$ par mois</p>
+                                <AnimatePresence mode="wait">
+                                    <motion.div key={billingCycle} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}>
+                                        {billingCycle === 'monthly' ? (
+                                            <div>
+                                                <span className="text-gray-600 text-lg">À partir de</span>
+                                                <span className="text-5xl font-extrabold text-gray-900 ml-2">20€</span>
+                                                <span className="text-xl font-medium text-gray-500"> / mois</span>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <span className="text-gray-600 text-lg">À partir de</span>
+                                                <span className="text-5xl font-extrabold text-gray-900 ml-2">160€</span>
+                                                <span className="text-xl font-medium text-gray-500"> / an</span>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
                         </div>
                         <div>
                             <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Démarrer l'essai de 14 jours</button>
-                            <div className="h-10 mt-4"></div> {/* Urgency Placeholder */}
                             <hr className="my-8" />
-                            <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700">{feature}</span></li>))}</ul>
+                            <ul className="space-y-3 text-sm">
+                                <li className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700 font-bold">Collaboration illimitée</span></li>
+                                {featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700">{feature}</span></li>))}
+                            </ul>
                         </div>
                     </div>
-                    {/* Lifetime */}
-                    <div className="w-full max-w-sm p-8 bg-gray-800 text-white rounded-2xl shadow-2xl border-2 border-amber-400 flex flex-col">
+
+                    {/* LIFETIME Card */}
+                    <div className="w-full max-w-sm p-8 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl flex flex-col transform transition-transform duration-300 hover:scale-105 relative">
+                        <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-semibold text-amber-900 bg-amber-400 rounded-full">100 Premiers Uniquement</div>
                         <div className="flex-grow">
-                            <div className="h-7 mb-4 flex justify-center"><span className="px-4 py-1 text-sm font-semibold text-gray-900 bg-gradient-to-r from-amber-300 to-yellow-400 rounded-full">Offre de Lancement</span></div>
-                            <h3 className="text-xl font-semibold text-white text-center">Accès à Vie</h3>
-                            <p className="text-sm text-gray-300 mt-2 text-center">Offre exclusive. Plus jamais à ce prix.</p>
+                            <h3 className="text-xl font-semibold text-white text-center">Pack Lifetime</h3>
+                            <p className="text-sm text-gray-300 mt-2 text-center h-10">Un paiement unique, un accès à vie.</p>
                             <div className="my-8 h-28 flex flex-col justify-center text-center">
-                                <div>
-                                    <span className="text-5xl font-extrabold text-white">499$</span>
-                                    <span className="text-xl font-medium text-gray-400"> / à vie</span>
-                                </div>
+                                <span className="text-5xl font-extrabold text-white">499€</span>
+                                <span className="text-xl font-medium text-gray-400"> / à vie</span>
                             </div>
                         </div>
                         <div>
-                            <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-gray-900 bg-gradient-to-r from-amber-300 to-yellow-400 rounded-lg hover:opacity-90 transition-opacity shadow-lg">Devenir un Visionnaire</button>
-                            <p className="text-center text-xs text-yellow-400 font-bold mt-4 h-10 flex items-center justify-center">⚠️ Offre limitée aux 100 premiers visionnaires.</p>
-                            <hr className="my-8 border-gray-600" />
-                            <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-gray-300">{feature}</span></li>))}</ul>
+                            <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-gray-900 bg-amber-400 rounded-lg hover:bg-amber-500 transition-colors shadow-lg">Devenir un Visionnaire</button>
+                            <p className="text-center text-xs text-amber-400 font-semibold mt-4 h-10 flex items-center justify-center">⚠️ Réservé aux 100 premiers visionnaires.</p>
+                            <hr className="my-4 border-gray-700" />
+                            <ul className="space-y-3 text-sm">
+                                <li className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-300 font-bold">Collaboration illimitée</span></li>
+                                {featuresList.map((feature, index) => (
+                                    <li key={index} className="flex items-center gap-3">
+                                        <CheckCircle className="w-5 h-5 text-green-500" />
+                                        <span className="text-gray-300">{feature}</span>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     </div>
                 </div>

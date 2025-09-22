@@ -6,6 +6,7 @@ import CashAccountsView from './CashAccountsView';
 import ArchiveManagementView from './ArchiveManagementView';
 import TimezoneSettingsView from './TimezoneSettingsView';
 import ProjectSettingsView from './ProjectSettingsView';
+import UserManagementView from './UserManagementView';
 import { useBudget } from '../context/BudgetContext';
 
 const SettingsDrawerWrapper = ({ activeDrawer, onClose }) => {
@@ -26,6 +27,7 @@ const SettingsDrawerWrapper = ({ activeDrawer, onClose }) => {
 
   const drawerConfig = {
     projectSettings: { title: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500', component: <ProjectSettingsView /> },
+    userManagement: { title: 'Gestion des Collaborateurs', icon: Users, color: 'text-purple-500', component: <UserManagementView /> },
     categoryManagement: { title: 'Gérer les Catégories', icon: FolderKanban, color: 'text-orange-500', component: <CategoryManagementView /> },
     tiersManagement: { title: 'Gérer les Tiers', icon: Users, color: 'text-pink-500', component: <TiersManagementView /> },
     cashAccounts: { title: cashAccountsTitle, icon: Wallet, color: 'text-teal-500', component: <CashAccountsView /> },

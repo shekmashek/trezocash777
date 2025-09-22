@@ -156,6 +156,7 @@ const getInitialState = () => ({
     loans: [],
     notes: [],
     consolidatedViews: [],
+    collaborators: [],
     infoModal: { isOpen: false, title: '', message: '' },
     confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
     inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
@@ -216,6 +217,10 @@ const budgetReducer = (state, action) => {
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
+    case 'INVITE_COLLABORATOR_SUCCESS':
+        return { ...state, collaborators: [...state.collaborators, action.payload] };
+    case 'REVOKE_COLLABORATOR_SUCCESS':
+        return { ...state, collaborators: state.collaborators.filter(c => c.id !== action.payload) };
     case 'OPEN_TRANSACTION_ACTION_MENU':
       return { ...state, transactionMenu: { isOpen: true, ...action.payload } };
     case 'CLOSE_TRANSACTION_ACTION_MENU':
@@ -659,7 +664,7 @@ const budgetReducer = (state, action) => {
       };
     }
     case 'DELETE_TIER_SUCCESS': {
-      return { ...state, tiers: state.tiers.filter(t => t.id !== action.payload) };
+      return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
     case 'ADD_SUB_CATEGORY_SUCCESS': {
@@ -930,7 +935,7 @@ export const BudgetProvider = ({ children }) => {
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [] } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [] } });
              return;
           }
 
@@ -944,7 +949,7 @@ export const BudgetProvider = ({ children }) => {
 
           const [
             projectsRes, tiersRes, notesRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -957,9 +962,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('cash_accounts').select('*'),
             supabase.from('scenario_entries').select('*'),
             supabase.from('consolidated_views').select('*'),
+            supabase.from('collaborators').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes };
+          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -980,6 +986,9 @@ export const BudgetProvider = ({ children }) => {
           }));
           const consolidatedViews = (consolidatedViewsRes.data || []).map(v => ({
             id: v.id, name: v.name, project_ids: v.project_ids
+          }));
+          const collaborators = (collaboratorsRes.data || []).map(c => ({
+            id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1039,7 +1048,7 @@ export const BudgetProvider = ({ children }) => {
             payload: {
               profile,
               settings,
-              projects, tiers, notes, loans, scenarios, consolidatedViews,
+              projects, tiers, notes, loans, scenarios, consolidatedViews, collaborators,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

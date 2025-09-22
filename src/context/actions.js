@@ -570,3 +570,53 @@ export const deleteConsolidatedView = async (dispatch, viewId) => {
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
+
+export const inviteCollaborator = async (dispatch, { email, role, projectIds, ownerId }) => {
+    try {
+        const { data, error } = await supabase
+            .from('collaborators')
+            .insert({
+                owner_id: ownerId,
+                email,
+                role,
+                project_ids: projectIds,
+                status: 'pending'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Optionally, trigger a Supabase Edge Function to send an email invite
+        // await supabase.functions.invoke('send-invite-email', { body: { email, ownerName } });
+
+        dispatch({
+            type: 'INVITE_COLLABORATOR_SUCCESS',
+            payload: {
+                id: data.id,
+                ownerId: data.owner_id,
+                userId: data.user_id,
+                email: data.email,
+                role: data.role,
+                status: data.status,
+                projectIds: data.project_ids
+            }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Invitation envoyée à ${email}.`, type: 'success' } });
+    } catch (error) {
+        console.error("Error inviting collaborator:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const revokeCollaborator = async (dispatch, collaboratorId) => {
+    try {
+        const { error } = await supabase.from('collaborators').delete().eq('id', collaboratorId);
+        if (error) throw error;
+        dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: collaboratorId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'success' } });
+    } catch (error) {
+        console.error("Error revoking collaborator access:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
