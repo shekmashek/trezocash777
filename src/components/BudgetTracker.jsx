@@ -30,14 +30,16 @@ const BudgetTracker = () => {
         budgetDispatch({ type: 'OPEN_COMMENT_DRAWER', payload: { rowId, columnId, rowName, columnName } });
     };
 
+    const hasComments = commentsForCell.length > 0;
+
     return (
         <button 
             onClick={handleOpenCommentDrawer}
-            className="absolute top-1/2 -translate-y-1/2 right-0 p-0.5 text-gray-400 hover:text-blue-600 opacity-0 group-hover/subcell:opacity-100 transition-opacity z-10"
+            className={`absolute top-1/2 -translate-y-1/2 right-0 p-0.5 hover:text-blue-600 transition-opacity z-10 ${hasComments ? 'opacity-100 text-blue-600' : 'opacity-0 text-gray-400 group-hover/subcell:opacity-100'}`}
             title="Commentaires"
         >
             <MessageSquare className="w-3 h-3" />
-            {commentsForCell.length > 0 && (
+            {hasComments && (
                 <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 text-white" style={{ fontSize: '0.6rem' }}>
                     {commentsForCell.length}
                 </span>
@@ -562,7 +564,7 @@ const BudgetTracker = () => {
       <>
         {/* Total Row for Type */}
         <tr className="bg-gray-200 border-y-2 border-gray-300 cursor-pointer" onClick={toggleMainCollapse}>
-          <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10">
+          <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 text-text-primary bg-gray-200 sticky left-0 z-10">
             <div className="flex items-center gap-2">
               <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
               <Icon className={`w-4 h-4 ${colorClass}`} />
@@ -579,18 +581,18 @@ const BudgetTracker = () => {
               <React.Fragment key={periodIndex}>
                 <td className="px-2 py-2">
                   {numVisibleCols > 0 && (
-                    <div className="flex gap-2 justify-around text-sm font-bold">
-                        <div className="relative group/subcell flex-1 text-center text-text-primary">
+                    <div className="flex gap-2 justify-around text-sm">
+                        <div className="relative group/subcell flex-1 text-center text-text-primary font-normal">
                             {formatCurrency(totals.budget, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Prév.)`} />
                         </div>
                         <div className="relative group/subcell flex-1 text-center">
-                            <button onClick={(e) => { e.stopPropagation(); if (totals.actual !== 0) handleActualClick({ type, period }); }} disabled={totals.actual === 0} className="text-text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                            <button onClick={(e) => { e.stopPropagation(); if (totals.actual !== 0) handleActualClick({ type, period }); }} disabled={totals.actual === 0} className="text-text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60 font-normal">
                                 {formatCurrency(totals.actual, currencySettings)}
                             </button>
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Réel)`} />
                         </div>
-                        <div className={`relative group/subcell flex-1 text-center ${getResteColor(reste, isEntree)}`}>
+                        <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                             {formatCurrency(reste, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName={`Total ${isEntree ? 'Entrées' : 'Sorties'}`} columnName={`${period.label} (Reste)`} />
                         </div>
@@ -608,7 +610,7 @@ const BudgetTracker = () => {
           const isMainCollapsed = collapsedItems[mainCategory.id];
           return (
             <React.Fragment key={mainCategory.id}>
-              <tr onClick={() => toggleCollapse(mainCategory.id)} className="bg-gray-100 font-semibold text-gray-700 cursor-pointer hover:bg-gray-200">
+              <tr onClick={() => toggleCollapse(mainCategory.id)} className="bg-gray-100 text-gray-700 cursor-pointer hover:bg-gray-200">
                 <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-gray-100">
                   <div className="flex items-center gap-2">
                     <ChevronDown className={`w-4 h-4 transition-transform ${isMainCollapsed ? '-rotate-90' : ''}`} />
@@ -625,18 +627,18 @@ const BudgetTracker = () => {
                     <React.Fragment key={periodIndex}>
                       <td className="px-2 py-2">
                         {numVisibleCols > 0 && (
-                          <div className="flex gap-2 justify-around text-xs font-semibold">
-                            <div className="relative group/subcell flex-1 text-center">
+                          <div className="flex gap-2 justify-around text-xs">
+                            <div className="relative group/subcell flex-1 text-center font-normal">
                                 {formatCurrency(totals.budget, currencySettings)}
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName={mainCategory.name} columnName={`${period.label} (Prév.)`} />
                             </div>
-                            <div className="relative group/subcell flex-1 text-center">
+                            <div className="relative group/subcell flex-1 text-center font-normal">
                                 <button onClick={(e) => { e.stopPropagation(); if (totals.actual !== 0) handleActualClick({ mainCategory, period }); }} disabled={totals.actual === 0} className="hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                                     {formatCurrency(totals.actual, currencySettings)}
                                 </button>
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName={mainCategory.name} columnName={`${period.label} (Réel)`} />
                             </div>
-                            <div className={`relative group/subcell flex-1 text-center ${getResteColor(reste, isEntree)}`}>
+                            <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                                 {formatCurrency(reste, currencySettings)}
                                 <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName={mainCategory.name} columnName={`${period.label} (Reste)`} />
                             </div>
@@ -684,7 +686,7 @@ const BudgetTracker = () => {
                                     </button>
                                     <CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} />
                                 </div>
-                                <div className={`relative group/subcell flex-1 text-center font-medium ${getResteColor(reste, isEntree)}`}>
+                                <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(reste, isEntree)}`}>
                                     {formatCurrency(reste, currencySettings)}
                                     <CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} />
                                 </div>
@@ -704,7 +706,7 @@ const BudgetTracker = () => {
         
         {/* Off-budget rows */}
         {(type === 'entree' ? hasOffBudgetRevenues : hasOffBudgetExpenses) && (
-          <tr className="bg-purple-50 font-semibold text-purple-800">
+          <tr className="bg-purple-50 text-purple-800">
             <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-purple-50">
               <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4" />{isEntree ? 'Entrées Hors Budget' : 'Sorties Hors Budget'}</div>
             </td>
@@ -718,7 +720,7 @@ const BudgetTracker = () => {
                 <React.Fragment key={periodIndex}>
                   <td className="px-2 py-2">
                     {numVisibleCols > 0 && (
-                      <div className="flex gap-2 justify-around text-xs font-semibold">
+                      <div className="flex gap-2 justify-around text-xs">
                         <div className="relative group/subcell flex-1 text-center">
                             {formatCurrency(totals.budget, currencySettings)}
                             <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName="Hors Budget" columnName={`${period.label} (Prév.)`} />
@@ -853,8 +855,8 @@ const BudgetTracker = () => {
                   const isNegativeFlow = netBudget < 0;
                   return (
                     <React.Fragment key={periodIndex}>
-                      <th className={`px-2 py-2 text-center font-semibold border-b-2 ${isPast ? 'bg-gray-50' : 'bg-surface'} ${isNegativeFlow && !isPast ? 'bg-red-50' : ''}`} style={{ minWidth: `${periodColumnWidth}px` }}>
-                        <div className={`text-base mb-1 ${isNegativeFlow && !isPast ? 'text-red-700 font-bold' : 'text-text-primary'}`}>{period.label}</div>
+                      <th className={`px-2 py-2 text-center font-medium border-b-2 ${isPast ? 'bg-gray-50' : 'bg-surface'} ${isNegativeFlow && !isPast ? 'bg-red-50' : ''}`} style={{ minWidth: `${periodColumnWidth}px` }}>
+                        <div className={`text-base mb-1 ${isNegativeFlow && !isPast ? 'text-red-700' : 'text-text-primary'}`}>{period.label}</div>
                         {numVisibleCols > 0 && (
                           <div className="flex gap-2 justify-around text-xs font-medium text-text-secondary">
                             {visibleColumns.budget && <div className="flex-1">Prév.</div>}
@@ -870,14 +872,14 @@ const BudgetTracker = () => {
               </tr>
             </thead>
             <tbody>
-              <tr className="bg-gray-200 font-bold text-gray-800"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><LogIn className="w-4 h-4" />Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+              <tr className="bg-gray-200 text-gray-800"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><LogIn className="w-4 h-4" />Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               {renderBudgetRows('entree')}
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               {renderBudgetRows('sortie')}
               <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
               <tr className="bg-gray-200 border-t-2 border-gray-300">
-                  <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 font-bold text-text-primary bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" />Flux de trésorerie</div></td>
+                  <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 text-text-primary bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" />Flux de trésorerie</div></td>
                   <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
                   {periods.map((period, periodIndex) => {
                       const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
@@ -891,18 +893,18 @@ const BudgetTracker = () => {
                           <React.Fragment key={periodIndex}>
                               <td className="px-2 py-2">
                                   {numVisibleCols > 0 && (
-                                      <div className="flex gap-2 justify-around text-sm font-bold">
-                                          <div className={`relative group/subcell flex-1 text-center ${netBudget < 0 ? 'text-red-600' : 'text-text-primary'}`}>
+                                      <div className="flex gap-2 justify-around text-sm">
+                                          <div className={`relative group/subcell flex-1 text-center font-normal ${netBudget < 0 ? 'text-red-600' : 'text-text-primary'}`}>
                                               {formatCurrency(netBudget, currencySettings)}
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName="Flux de trésorerie" columnName={`${period.label} (Prév.)`} />
                                           </div>
-                                          <div className="relative group/subcell flex-1 text-center">
+                                          <div className="relative group/subcell flex-1 text-center font-normal">
                                               <button onClick={() => netActual !== 0 && handleActualClick({ type: 'net', period })} disabled={netActual === 0} className="text-text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                                                   {formatCurrency(netActual, currencySettings)}
                                               </button>
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName="Flux de trésorerie" columnName={`${period.label} (Réel)`} />
                                           </div>
-                                          <div className={`relative group/subcell flex-1 text-center ${getResteColor(netReste, true)}`}>
+                                          <div className={`relative group/subcell flex-1 text-center font-normal ${getResteColor(netReste, true)}`}>
                                               {formatCurrency(netReste, currencySettings)}
                                               <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName="Flux de trésorerie" columnName={`${period.label} (Reste)`} />
                                           </div>
@@ -914,7 +916,7 @@ const BudgetTracker = () => {
                       );
                   })}
               </tr>
-              <tr className="bg-gray-300 font-bold text-gray-900"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2"><Flag className="w-4 h-4" />Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+              <tr className="bg-gray-300 text-gray-900"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2"><Flag className="w-4 h-4" />Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
             </tbody>
           </table>
         </div>
