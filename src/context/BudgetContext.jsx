@@ -155,7 +155,9 @@ const getInitialState = () => ({
     scenarios: [],
     scenarioEntries: {},
     loans: [],
-    notes: [],
+    allComments: {},
+    isCommentDrawerOpen: false,
+    commentDrawerContext: null,
     consolidatedViews: [],
     collaborators: [],
     infoModal: { isOpen: false, title: '', message: '' },
@@ -219,6 +221,23 @@ const budgetReducer = (state, action) => {
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
+    case 'OPEN_COMMENT_DRAWER':
+        return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
+    case 'CLOSE_COMMENT_DRAWER':
+        return { ...state, isCommentDrawerOpen: false, commentDrawerContext: null };
+    case 'ADD_COMMENT_SUCCESS': {
+        const { newComment } = action.payload;
+        const projectId = newComment.projectId === null ? state.activeProjectId : newComment.projectId;
+        const oldProjectComments = state.allComments[projectId] || [];
+        const newProjectComments = [...oldProjectComments, newComment];
+        return {
+            ...state,
+            allComments: {
+                ...state.allComments,
+                [projectId]: newProjectComments,
+            }
+        };
+    }
     case 'INVITE_COLLABORATOR_SUCCESS':
         return { ...state, collaborators: [...state.collaborators, action.payload] };
     case 'REVOKE_COLLABORATOR_SUCCESS':
@@ -237,35 +256,6 @@ const budgetReducer = (state, action) => {
       return { ...state, isTourActive: false, tourHighlightId: null };
     case 'SET_TOUR_HIGHLIGHT':
       return { ...state, tourHighlightId: action.payload };
-    case 'ADD_NOTE_SUCCESS': {
-        return {
-            ...state,
-            notes: [...state.notes, action.payload]
-        };
-    }
-    case 'UPDATE_NOTE_SUCCESS': {
-      const updatedNote = action.payload;
-      return {
-        ...state,
-        notes: state.notes.map(note =>
-          note.id === updatedNote.id ? updatedNote : note
-        )
-      };
-    }
-    case 'TOGGLE_NOTE_MINIMIZE': {
-      return {
-        ...state,
-        notes: state.notes.map(note =>
-          note.id === action.payload ? { ...note, isMinimized: !note.isMinimized } : note
-        )
-      };
-    }
-    case 'DELETE_NOTE_SUCCESS': {
-      return {
-        ...state,
-        notes: state.notes.filter(note => note.id !== action.payload),
-      };
-    }
     case 'OPEN_DIRECT_PAYMENT_MODAL':
       return { ...state, isDirectPaymentModalOpen: true, directPaymentType: action.payload };
     case 'CLOSE_DIRECT_PAYMENT_MODAL':
@@ -334,7 +324,7 @@ const budgetReducer = (state, action) => {
 
         let newTiers = state.tiers;
         if (newTier) {
-            if (!newState.tiers.some(t => t.id === newTier.id)) {
+            if (!state.tiers.some(t => t.id === newTier.id)) {
                 newTiers = [...state.tiers, newTier];
             }
         }
@@ -668,6 +658,7 @@ const budgetReducer = (state, action) => {
       };
     }
     case 'DELETE_TIER_SUCCESS': {
+      const tierId = action.payload;
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
@@ -939,7 +930,7 @@ export const BudgetProvider = ({ children }) => {
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [] } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {} } });
              return;
           }
 
@@ -952,12 +943,11 @@ export const BudgetProvider = ({ children }) => {
           };
 
           const [
-            projectsRes, tiersRes, notesRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes
+            projectsRes, tiersRes, loansRes, scenariosRes, 
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
-            supabase.from('notes').select('*'),
             supabase.from('loans').select('*'),
             supabase.from('scenarios').select('*'),
             supabase.from('budget_entries').select('*'),
@@ -967,9 +957,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('scenario_entries').select('*'),
             supabase.from('consolidated_views').select('*'),
             supabase.from('collaborators').select('*'),
+            supabase.from('comments').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -985,6 +976,9 @@ export const BudgetProvider = ({ children }) => {
                   if (c.user_id) userIds.add(c.user_id);
               });
           }
+           if (commentsRes.data) {
+              commentsRes.data.forEach(c => userIds.add(c.user_id));
+          }
 
           const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
@@ -999,7 +993,6 @@ export const BudgetProvider = ({ children }) => {
           }));
           
           const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type }));
-          const notes = (notesRes.data || []).map(n => ({ id: n.id, content: n.content, color: n.color, x: n.x, y: n.y, isMinimized: n.is_minimized }));
           const loans = (loansRes.data || []).map(l => ({
             id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
             monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
@@ -1066,13 +1059,29 @@ export const BudgetProvider = ({ children }) => {
             return acc;
           }, {});
 
+          const allComments = (commentsRes.data || []).reduce((acc, comment) => {
+              const projectId = comment.project_id || state.activeProjectId || 'consolidated';
+              if (!acc[projectId]) acc[projectId] = [];
+              acc[projectId].push({
+                  id: comment.id,
+                  projectId: comment.project_id,
+                  userId: comment.user_id,
+                  rowId: comment.row_id,
+                  columnId: comment.column_id,
+                  content: comment.content,
+                  createdAt: comment.created_at,
+                  mentionedUsers: comment.mentioned_users,
+              });
+              return acc;
+          }, {});
+
           dispatch({
             type: 'SET_INITIAL_DATA',
             payload: {
               profile,
               allProfiles: profilesData || [],
               settings,
-              projects, tiers, notes, loans, scenarios, consolidatedViews, collaborators,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

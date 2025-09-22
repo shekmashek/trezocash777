@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useBudget } from '../context/BudgetContext';
 import Header from '../components/Header';
@@ -14,11 +14,11 @@ import ScenarioModal from '../components/ScenarioModal';
 import ActualTransactionModal from '../components/ActualTransactionModal';
 import PaymentModal from '../components/PaymentModal';
 import DirectPaymentModal from '../components/DirectPaymentModal';
-import StickyNote from '../components/StickyNote';
 import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import FocusView from '../components/FocusView';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
+import CommentDrawer from '../components/CommentDrawer';
 import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
@@ -35,12 +35,12 @@ const AppLayout = () => {
         infoModal, confirmationModal, inlinePaymentDrawer, isTransferModalOpen, focusView, 
         isCloseAccountModalOpen, accountToClose, isScenarioModalOpen, editingScenario, 
         isActualTransactionModalOpen, editingActual, isPaymentModalOpen, payingActual, 
-        isDirectPaymentModalOpen, directPaymentType, notes, timeUnit, horizonLength, periodOffset, 
+        isDirectPaymentModalOpen, directPaymentType, timeUnit, horizonLength, periodOffset, 
         allCashAccounts, allEntries, allActuals, settings, activeQuickSelect, isTourActive, 
-        transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView
+        transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView,
+        isCommentDrawerOpen, commentDrawerContext
     } = state;
     
-    const dragConstraintsRef = useRef(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     const isConsolidated = activeProjectId === 'consolidated';
@@ -234,7 +234,7 @@ const AppLayout = () => {
         }
         return positions;
     }, [periods, allCashAccounts, activeProjectId, isConsolidated, activeEntries, activeActuals, state.categories, settings.timezoneOffset]);
-    
+
     if (isLoading) {
         return (
             <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
@@ -340,13 +340,8 @@ const AppLayout = () => {
     };
 
     return (
-        <div ref={dragConstraintsRef} className="flex min-h-screen bg-background">
+        <div className="flex min-h-screen bg-background">
             <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
-            <AnimatePresence>
-                {notes.map((note, index) => (
-                    <StickyNote key={note.id} note={note} index={index} constraintsRef={dragConstraintsRef} />
-                ))}
-            </AnimatePresence>
             
             <Header 
                 isCollapsed={isSidebarCollapsed} 
@@ -481,6 +476,11 @@ const AppLayout = () => {
                 onClose={() => dispatch({ type: 'CLOSE_TRANSACTION_ACTION_MENU' })}
                 onPay={handlePayAction}
                 onWriteOff={handleWriteOffAction}
+            />
+            <CommentDrawer
+                isOpen={isCommentDrawerOpen}
+                onClose={() => dispatch({ type: 'CLOSE_COMMENT_DRAWER' })}
+                context={commentDrawerContext}
             />
         </div>
     );

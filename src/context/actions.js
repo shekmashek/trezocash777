@@ -683,3 +683,47 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
     }
 };
+
+export const addComment = async (dispatch, { projectId, rowId, columnId, content, authorId }) => {
+    try {
+        const mentions = content.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
+        const mentionedUserIds = mentions.map(mention => {
+            const match = /@\[([^\]]+)\]\(([^)]+)\)/.exec(mention);
+            return match ? match[2] : null;
+        }).filter(Boolean);
+
+        const newCommentData = {
+            project_id: projectId === 'consolidated' || projectId.startsWith('consolidated_view_') ? null : projectId,
+            user_id: authorId,
+            row_id: rowId,
+            column_id: columnId,
+            content: content,
+            mentioned_users: mentionedUserIds,
+        };
+
+        const { data: savedComment, error } = await supabase
+            .from('comments')
+            .insert(newCommentData)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const newCommentForState = {
+            id: savedComment.id,
+            projectId: savedComment.project_id,
+            userId: savedComment.user_id,
+            rowId: savedComment.row_id,
+            columnId: savedComment.column_id,
+            content: savedComment.content,
+            createdAt: savedComment.created_at,
+            mentionedUsers: savedComment.mentioned_users,
+        };
+
+        dispatch({ type: 'ADD_COMMENT_SUCCESS', payload: { newComment: newCommentForState } });
+
+    } catch (error) {
+        console.error("Error adding comment:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'ajout du commentaire: ${error.message}`, type: 'error' } });
+    }
+};
