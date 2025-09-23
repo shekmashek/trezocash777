@@ -1,24 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { X, GripVertical, Minimize2, Maximize2 } from 'lucide-react';
 import { useBudget } from '../context/BudgetContext';
+import { updateNote, deleteNote } from '../context/actions';
 
 const StickyNote = ({ note, index, constraintsRef }) => {
-  const { dispatch } = useBudget();
+  const { dispatch, state } = useBudget();
+  const { activeProjectId } = state;
   const dragControls = useDragControls();
+  
+  const [internalContent, setInternalContent] = useState(note.content);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (internalContent !== note.content) {
+        updateNote(dispatch, note.id, { content: internalContent });
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [internalContent, note.id, note.content, dispatch]);
 
   const handleContentChange = (e) => {
-    dispatch({ type: 'UPDATE_NOTE', payload: { id: note.id, content: e.target.value } });
+    setInternalContent(e.target.value);
   };
 
   const handleDragEnd = (event, info) => {
     if (!note.isMinimized) {
-        dispatch({ type: 'UPDATE_NOTE', payload: { id: note.id, x: info.point.x, y: info.point.y } });
+        updateNote(dispatch, note.id, { x: info.point.x, y: info.point.y });
     }
   };
 
   const handleDelete = () => {
-    dispatch({ type: 'DELETE_NOTE', payload: note.id });
+    deleteNote(dispatch, { noteId: note.id, projectId: activeProjectId });
   };
 
   const handleToggleMinimize = () => {
@@ -91,7 +107,7 @@ const StickyNote = ({ note, index, constraintsRef }) => {
       </div>
       {!note.isMinimized && (
         <textarea
-          value={note.content}
+          value={internalContent}
           onChange={handleContentChange}
           className="w-full h-full bg-transparent resize-none focus:outline-none text-gray-800 text-sm placeholder-gray-600 cursor-text"
           placeholder="Écrivez quelque chose..."

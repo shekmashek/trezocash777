@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown } from 'lucide-react';
+import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown, Users, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
@@ -7,10 +7,13 @@ import { getTodayInTimezone } from '../utils/budgetCalculations';
 import TrezocashLogo from './TrezocashLogo';
 import ActionableBalanceDrawer from './ActionableBalanceDrawer';
 import SparklineChart from './SparklineChart';
+import Avatar from './Avatar';
+import { useNavigate } from 'react-router-dom';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { state, dispatch } = useBudget();
-  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews } = state;
+  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews, projects, collaborators, allProfiles } = state;
+  const navigate = useNavigate();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -230,6 +233,68 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
       };
     });
   }, [userCashAccounts, relevantActuals]);
+
+  const projectTeam = useMemo(() => {
+    if (!activeProjectId || !allProfiles.length) return [];
+
+    const usersMap = new Map();
+
+    const addUser = (userId, role) => {
+        if (!userId || usersMap.has(userId)) return;
+        const profile = allProfiles.find(p => p.id === userId);
+        if (profile) {
+            usersMap.set(userId, { ...profile, role });
+        }
+    };
+
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view) return [];
+
+        const projectIdsInView = view.project_ids || [];
+
+        projectIdsInView.forEach(projectId => {
+            const project = projects.find(p => p.id === projectId);
+            if (project) {
+                addUser(project.user_id, 'Propriétaire');
+            }
+        });
+
+        collaborators.forEach(c => {
+            if (c.projectIds && c.projectIds.some(pid => projectIdsInView.includes(pid))) {
+                addUser(c.user_id, c.role === 'editor' ? 'Éditeur' : 'Lecteur');
+            }
+        });
+
+    } else if (isConsolidated) {
+        const activeProjects = projects.filter(p => !p.isArchived);
+        const activeProjectIds = activeProjects.map(p => p.id);
+
+        activeProjects.forEach(project => {
+            addUser(project.user_id, 'Propriétaire');
+        });
+
+        collaborators.forEach(c => {
+            if (c.projectIds && c.projectIds.some(pid => activeProjectIds.includes(pid))) {
+                addUser(c.user_id, c.role === 'editor' ? 'Éditeur' : 'Lecteur');
+            }
+        });
+    } else { // Single project
+        const project = projects.find(p => p.id === activeProjectId);
+        if (!project) return [];
+
+        addUser(project.user_id, 'Propriétaire');
+
+        collaborators.forEach(c => {
+            if (c.projectIds && c.projectIds.includes(activeProjectId)) {
+                addUser(c.user_id, c.role === 'editor' ? 'Éditeur' : 'Lecteur');
+            }
+        });
+    }
+
+    return Array.from(usersMap.values());
+  }, [activeProjectId, projects, collaborators, allProfiles, consolidatedViews, isConsolidated, isCustomConsolidated]);
   
   const handleWalletClick = (accountId) => {
     setSelectedAccountId(accountId);
@@ -421,7 +486,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
             </div>
             <div className={`mt-3 space-y-2 ${isCollapsed ? 'px-0' : 'px-2'}`}>
               <button 
-                onClick={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'cashAccounts' })}
+                onClick={() => navigate('/app/comptes')}
                 className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 disabled:text-gray-400 disabled:cursor-not-allowed ${isCollapsed ? 'justify-center' : ''}`}
                 disabled={isConsolidated || isCustomConsolidated}
                 title={isCollapsed ? 'Ajouter un compte' : ''}
@@ -438,6 +503,40 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                 {!isCollapsed && 'Transfert interne'}
               </button>
             </div>
+          </div>
+          <div className={`px-2 pt-2`}>
+            <hr className="my-2 border-secondary-200" />
+            <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
+                {isCollapsed ? '👥' : <><Users className="w-4 h-4 text-purple-600" /><span>Équipe</span></>}
+            </h3>
+            <div className="space-y-1">
+              {projectTeam.map(member => (
+                <div 
+                  key={member.id} 
+                  className={`w-full text-left flex items-center gap-3 px-2 py-1.5 rounded-lg ${isCollapsed ? 'justify-center' : ''}`}
+                  title={isCollapsed ? `${member.full_name} (${member.role})` : ''}
+                >
+                  <Avatar name={member.full_name} role={member.role} />
+                  {!isCollapsed && (
+                    <div className="flex-grow overflow-hidden">
+                      <div className="text-sm font-medium text-text-primary truncate">{member.full_name}</div>
+                      <div className="text-xs text-text-secondary">{member.role}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {!isCollapsed && (
+              <div className="mt-3 px-2">
+                <button 
+                  onClick={() => navigate('/app/collaborateurs')}
+                  className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50`}
+                >
+                  <Settings className="w-4 h-4 shrink-0" />
+                  Gérer l'équipe
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>

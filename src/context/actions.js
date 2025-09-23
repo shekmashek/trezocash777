@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { deriveActualsFromEntry } from '../utils/scenarioCalculations';
+import { templates as officialTemplatesData } from '../utils/templates';
+import { v4 as uuidv4 } from 'uuid';
 
 const getDefaultExpenseTargets = () => ({
   'exp-main-1': 20, 'exp-main-2': 35, 'exp-main-3': 10, 'exp-main-4': 0,
@@ -7,142 +9,113 @@ const getDefaultExpenseTargets = () => ({
   'exp-main-9': 5, 'exp-main-10': 0,
 });
 
-const addMonths = (date, months) => {
-  const d = new Date(date);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() !== day) {
-    d.setDate(0);
-  }
-  return d;
-};
-
-export const initializeProject = async (dispatch, payload, user, existingTiersData, currency) => {
+export const initializeProject = async (dispatch, payload, user, existingTiersData, allTemplates) => {
   try {
-    // Defensively check for and create profile if it doesn't exist
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError && profileError.code === 'PGRST116') { // "Not found"
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({ id: user.id });
-      if (insertError) {
-        console.error("Error creating profile during onboarding:", insertError);
-        throw insertError;
-      }
-    } else if (profileError) {
-      console.error("Error checking for profile:", profileError);
-      throw profileError;
-    }
-
-    const { projectName, projectStartDate, cashAccounts, entries, monthlyRevenue, monthlyExpense, loans, borrowings } = payload;
+    const { projectName, projectStartDate, projectEndDate, isEndDateIndefinite, templateId, startOption } = payload;
     
-    // 1. Create Project
     const { data: newProjectData, error: projectError } = await supabase
         .from('projects')
         .insert({
-            user_id: user.id, name: projectName, start_date: projectStartDate, currency: currency,
-            annual_goals: { [new Date().getFullYear()]: { revenue: (parseFloat(monthlyRevenue) || 0) * 12, expense: (parseFloat(monthlyExpense) || 0) * 12 } },
+            user_id: user.id,
+            name: projectName,
+            start_date: projectStartDate,
+            end_date: isEndDateIndefinite ? null : projectEndDate,
+            currency: '€',
             expense_targets: getDefaultExpenseTargets(),
         })
         .select().single();
     if (projectError) throw projectError;
 
-    // 2. Create Cash Accounts
+    const projectId = newProjectData.id;
+
+    if (startOption === 'blank' || templateId === 'blank') {
+        const { data: defaultAccount, error: accountError } = await supabase
+            .from('cash_accounts')
+            .insert({
+                project_id: projectId, user_id: user.id, main_category_id: 'bank',
+                name: 'Compte Principal', initial_balance: 0, initial_balance_date: projectStartDate,
+            })
+            .select().single();
+        if (accountError) throw accountError;
+
+        dispatch({ 
+            type: 'INITIALIZE_PROJECT_SUCCESS', 
+            payload: {
+                newProject: {
+                    id: projectId, name: projectName, currency: '€', startDate: projectStartDate, endDate: isEndDateIndefinite ? null : projectEndDate,
+                    isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
+                },
+                finalCashAccounts: [{
+                    id: defaultAccount.id, projectId: projectId, mainCategoryId: 'bank',
+                    name: 'Compte Principal', initialBalance: 0, initialBalanceDate: projectStartDate,
+                    isClosed: false, closureDate: null
+                }],
+                newAllEntries: [], newAllActuals: [], newTiers: [], newLoans: [], newCategories: null,
+            }
+        });
+        return;
+    }
+
+    const officialTemplate = [...officialTemplatesData.personal, ...officialTemplatesData.professional].find(t => t.id === templateId);
+    const customTemplate = allTemplates.find(t => t.id === templateId);
+    
+    let templateData;
+    let newCategories = null;
+    if (officialTemplate) {
+        templateData = officialTemplate.data;
+    } else if (customTemplate) {
+        templateData = customTemplate.structure;
+        newCategories = customTemplate.structure.categories;
+    } else {
+        throw new Error("Template not found");
+    }
+
     const { data: newCashAccountsData, error: cashAccountsError } = await supabase
         .from('cash_accounts')
-        .insert(cashAccounts.map(acc => ({
-            project_id: newProjectData.id, user_id: user.id, main_category_id: acc.mainCategoryId,
-            name: acc.name, initial_balance: acc.initialBalance, initial_balance_date: acc.initialBalanceDate,
+        .insert(templateData.cashAccounts.map(acc => ({
+            project_id: projectId, user_id: user.id, main_category_id: acc.mainCategoryId,
+            name: acc.name, initial_balance: acc.initialBalance, initial_balance_date: projectStartDate,
         })))
         .select();
     if (cashAccountsError) throw cashAccountsError;
+
+    const allTiersFromTemplate = [...templateData.entries, ...(templateData.loans || []), ...(templateData.borrowings || [])]
+        .map(item => item.supplier || item.thirdParty).filter(Boolean);
+    const uniqueTiers = [...new Set(allTiersFromTemplate)];
     
-    // 3. Handle Tiers
-    const existingTiers = new Set((existingTiersData || []).map(t => t.name.toLowerCase()));
-    const newTiersToCreate = new Set();
-    const allEntriesAndLoans = [...entries, ...loans, ...borrowings];
-    allEntriesAndLoans.forEach(item => {
-        const tierName = item.supplier || item.thirdParty;
-        if (tierName && !existingTiers.has(tierName.toLowerCase())) {
-            const type = item.type === 'revenu' || item.type === 'loan' ? 'client' : 'fournisseur';
-            newTiersToCreate.add(JSON.stringify({ name: tierName, type, user_id: user.id }));
-        }
-    });
     let createdTiers = [];
-    if (newTiersToCreate.size > 0) {
-        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(Array.from(newTiersToCreate).map(t => JSON.parse(t)), { onConflict: 'user_id,name,type' }).select();
+    if (uniqueTiers.length > 0) {
+        const tiersToInsert = uniqueTiers.map(name => ({ name, type: 'fournisseur', user_id: user.id }));
+        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(tiersToInsert, { onConflict: 'user_id,name,type' }).select();
         if (tiersError) throw tiersError;
         createdTiers = insertedTiers;
     }
 
-    // 4. Create Budget Entries
+    const today = new Date().toISOString().split('T')[0];
+    const entriesToInsert = templateData.entries.map(entry => ({
+        project_id: projectId, user_id: user.id, type: entry.type, category: entry.category,
+        frequency: entry.frequency, amount: entry.amount, 
+        date: entry.frequency === 'ponctuel' ? (entry.date || today) : null,
+        start_date: entry.frequency !== 'ponctuel' ? (entry.startDate || today) : null,
+        supplier: entry.supplier, description: entry.description,
+    }));
     const { data: newEntriesData, error: entriesError } = await supabase
         .from('budget_entries')
-        .insert(entries.map(entry => ({
-            project_id: newProjectData.id, user_id: user.id, type: entry.type, category: entry.category,
-            frequency: entry.frequency, amount: entry.amount, date: entry.date, start_date: entry.startDate,
-            supplier: entry.supplier, description: entry.description,
-        })))
+        .insert(entriesToInsert)
         .select();
     if (entriesError) throw entriesError;
 
-    // 5. Create Actuals from entries
     let newActualsToInsert = [];
     newEntriesData.forEach(entry => {
-        const actuals = deriveActualsFromEntry(entry, newProjectData.id, newCashAccountsData);
+        const actuals = deriveActualsFromEntry(entry, projectId, newCashAccountsData);
         newActualsToInsert.push(...actuals);
     });
 
-    // 6. Loans and their entries/actuals
-    const allLoans = [...borrowings, ...loans];
-    let newLoans = [];
-    if (allLoans.length > 0) {
-        const loansToInsert = allLoans.map(l => ({
-            project_id: newProjectData.id, user_id: user.id, type: l.type, third_party: l.thirdParty,
-            principal: parseFloat(l.principal), monthly_payment: parseFloat(l.monthlyPayment), term: parseInt(l.term, 10),
-            principal_date: l.principalDate, repayment_start_date: l.repaymentStartDate,
-        }));
-        const { data: insertedLoans, error: loansError } = await supabase.from('loans').insert(loansToInsert).select();
-        if (loansError) throw loansError;
-        newLoans = insertedLoans;
-
-        const loanEntriesToInsert = [];
-        for (const loan of newLoans) {
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'revenu' : 'depense',
-                category: loan.type === 'borrowing' ? 'Réception Emprunt' : 'Octroi de Prêt', frequency: 'ponctuel', amount: loan.principal,
-                date: loan.principal_date, supplier: loan.third_party, description: `Principal pour prêt/emprunt`
-            });
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'depense' : 'revenu',
-                category: loan.type === 'borrowing' ? 'Remboursement d\'emprunt' : 'Remboursement de prêt reçu', frequency: 'mensuel',
-                amount: loan.monthly_payment, start_date: loan.repayment_start_date,
-                end_date: addMonths(new Date(loan.repayment_start_date), loan.term - 1).toISOString().split('T')[0],
-                supplier: loan.third_party, description: `Remboursement prêt/emprunt`
-            });
-        }
-        const { data: insertedLoanEntries, error: loanEntriesError } = await supabase.from('budget_entries').insert(loanEntriesToInsert).select();
-        if (loanEntriesError) throw loanEntriesError;
-
-        for (const entry of insertedLoanEntries) {
-            const actuals = deriveActualsFromEntry(entry, entry.project_id, newCashAccountsData);
-            newActualsToInsert.push(...actuals);
-        }
-    }
-
-    // Batch insert all actuals
     if (newActualsToInsert.length > 0) {
         const { error: actualsError } = await supabase.from('actual_transactions').insert(newActualsToInsert.map(a => ({
             id: a.id, budget_id: a.budgetId, project_id: a.projectId, user_id: user.id, type: a.type,
             category: a.category, third_party: a.thirdParty, description: a.description, date: a.date,
-            amount: a.amount, status: a.status, is_off_budget: a.isOffBudget, is_provision: a.isProvision,
-            is_final_provision_payment: a.isFinalProvisionPayment, provision_details: a.provisionDetails,
-            is_internal_transfer: a.isInternalTransfer,
+            amount: a.amount, status: a.status
         })));
         if (actualsError) throw actualsError;
     }
@@ -151,9 +124,8 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         type: 'INITIALIZE_PROJECT_SUCCESS', 
         payload: {
             newProject: {
-                id: newProjectData.id, name: newProjectData.name, currency: newProjectData.currency,
-                startDate: newProjectData.start_date, isArchived: newProjectData.is_archived,
-                annualGoals: newProjectData.annual_goals, expenseTargets: newProjectData.expense_targets
+                id: projectId, name: projectName, currency: '€', startDate: projectStartDate, endDate: isEndDateIndefinite ? null : projectEndDate,
+                isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
             },
             finalCashAccounts: newCashAccountsData.map(acc => ({
                 id: acc.id, projectId: acc.project_id, mainCategoryId: acc.main_category_id,
@@ -161,23 +133,17 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
                 isClosed: acc.is_closed, closureDate: acc.closure_date
             })),
             newAllEntries: newEntriesData.map(entry => ({
-              id: entry.id, loanId: entry.loan_id, type: entry.type, category: entry.category, frequency: entry.frequency,
-              amount: entry.amount, date: entry.date, startDate: entry.start_date, endDate: entry.end_date,
-              supplier: entry.supplier, description: entry.description, isOffBudget: entry.is_off_budget,
-              payments: entry.payments, provisionDetails: entry.provisionDetails
+              id: entry.id, type: entry.type, category: entry.category, frequency: entry.frequency,
+              amount: entry.amount, date: entry.date, startDate: entry.start_date,
+              supplier: entry.supplier, description: entry.description
             })),
-            newAllActuals: newActualsToInsert.map(a => ({
-                ...a,
-                payments: []
-            })),
+            newAllActuals: newActualsToInsert.map(a => ({ ...a, payments: [] })),
             newTiers: createdTiers.map(t => ({ id: t.id, name: t.name, type: t.type })),
-            newLoans: newLoans.map(l => ({
-                id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
-                monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
-            })),
+            newLoans: [],
+            newCategories,
         }
     });
-    
+
   } catch (error) {
     console.error("Onboarding failed:", error);
     dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la création du projet: ${error.message}`, type: 'error' } });
@@ -185,6 +151,43 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
   }
 };
 
+export const updateProjectSettings = async (dispatch, { projectId, newSettings }) => {
+    try {
+        const updates = {
+            name: newSettings.name,
+            start_date: newSettings.startDate,
+            end_date: newSettings.endDate,
+        };
+
+        const { data, error } = await supabase
+            .from('projects')
+            .update(updates)
+            .eq('id', projectId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        dispatch({
+            type: 'UPDATE_PROJECT_SETTINGS_SUCCESS',
+            payload: {
+                projectId,
+                newSettings: {
+                    name: data.name,
+                    startDate: data.start_date,
+                    endDate: data.end_date,
+                }
+            }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres du projet mis à jour.', type: 'success' } });
+    } catch (error) {
+        console.error("Error updating project settings:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+// Keep other actions as they are
+// ... (rest of the file)
 export const saveEntry = async (dispatch, { entryData, editingEntry, activeProjectId, tiers, user, cashAccounts }) => {
     try {
         const { supplier, type } = entryData;
@@ -681,5 +684,127 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
     } catch (error) {
         console.error("Error saving scenario:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const addComment = async (dispatch, { projectId, rowId, columnId, content, authorId }) => {
+    try {
+        const mentions = content.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
+        const mentionedUserIds = mentions.map(mention => {
+            const match = /@\[([^\]]+)\]\(([^)]+)\)/.exec(mention);
+            return match ? match[2] : null;
+        }).filter(Boolean);
+
+        const newCommentData = {
+            project_id: projectId === 'consolidated' || projectId.startsWith('consolidated_view_') ? null : projectId,
+            user_id: authorId,
+            row_id: rowId,
+            column_id: columnId,
+            content: content,
+            mentioned_users: mentionedUserIds,
+        };
+
+        const { data: savedComment, error } = await supabase
+            .from('comments')
+            .insert(newCommentData)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const newCommentForState = {
+            id: savedComment.id,
+            projectId: savedComment.project_id,
+            userId: savedComment.user_id,
+            rowId: savedComment.row_id,
+            columnId: savedComment.column_id,
+            content: savedComment.content,
+            createdAt: savedComment.created_at,
+            mentionedUsers: savedComment.mentioned_users,
+        };
+
+        dispatch({ type: 'ADD_COMMENT_SUCCESS', payload: { newComment: newCommentForState } });
+
+    } catch (error) {
+        console.error("Error adding comment:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'ajout du commentaire: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const saveTemplate = async (dispatch, { templateData, editingTemplate, projectStructure, user }) => {
+  try {
+    const dataToSave = {
+      user_id: user.id,
+      name: templateData.name,
+      description: templateData.description,
+      structure: projectStructure,
+      is_public: templateData.is_public || false,
+      tags: templateData.tags || [],
+      icon: templateData.icon,
+      color: templateData.color,
+      purpose: templateData.purpose,
+    };
+
+    let savedTemplate;
+    if (editingTemplate) {
+      const { data, error } = await supabase
+        .from('templates')
+        .update(dataToSave)
+        .eq('id', editingTemplate.id)
+        .select()
+        .single();
+      if (error) throw error;
+      savedTemplate = data;
+      dispatch({ type: 'UPDATE_TEMPLATE_SUCCESS', payload: {
+          id: savedTemplate.id,
+          userId: savedTemplate.user_id,
+          name: savedTemplate.name,
+          description: savedTemplate.description,
+          structure: savedTemplate.structure,
+          isPublic: savedTemplate.is_public,
+          tags: savedTemplate.tags,
+          icon: savedTemplate.icon,
+          color: savedTemplate.color,
+          purpose: savedTemplate.purpose,
+      }});
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle mis à jour.', type: 'success' } });
+    } else {
+      const { data, error } = await supabase
+        .from('templates')
+        .insert(dataToSave)
+        .select()
+        .single();
+      if (error) throw error;
+      savedTemplate = data;
+      dispatch({ type: 'SAVE_TEMPLATE_SUCCESS', payload: {
+          id: savedTemplate.id,
+          userId: savedTemplate.user_id,
+          name: savedTemplate.name,
+          description: savedTemplate.description,
+          structure: savedTemplate.structure,
+          isPublic: savedTemplate.is_public,
+          tags: savedTemplate.tags,
+          icon: savedTemplate.icon,
+          color: savedTemplate.color,
+          purpose: savedTemplate.purpose,
+      }});
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle créé.', type: 'success' } });
+    }
+    dispatch({ type: 'CLOSE_SAVE_TEMPLATE_MODAL' });
+  } catch (error) {
+    console.error("Error saving template:", error);
+    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+  }
+};
+
+export const deleteTemplate = async (dispatch, templateId) => {
+    try {
+        const { error } = await supabase.from('templates').delete().eq('id', templateId);
+        if (error) throw error;
+        dispatch({ type: 'DELETE_TEMPLATE_SUCCESS', payload: templateId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle supprimé.', type: 'success' } });
+    } catch (error) {
+        console.error("Error deleting template:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

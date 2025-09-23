@@ -155,9 +155,14 @@ const getInitialState = () => ({
     scenarios: [],
     scenarioEntries: {},
     loans: [],
-    notes: [],
+    allComments: {},
+    isCommentDrawerOpen: false,
+    commentDrawerContext: null,
     consolidatedViews: [],
     collaborators: [],
+    templates: [],
+    isSaveTemplateModalOpen: false,
+    editingTemplate: null,
     infoModal: { isOpen: false, title: '', message: '' },
     confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
     inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
@@ -219,6 +224,23 @@ const budgetReducer = (state, action) => {
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
+    case 'OPEN_COMMENT_DRAWER':
+        return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
+    case 'CLOSE_COMMENT_DRAWER':
+        return { ...state, isCommentDrawerOpen: false, commentDrawerContext: null };
+    case 'ADD_COMMENT_SUCCESS': {
+        const { newComment } = action.payload;
+        const projectId = newComment.projectId === null ? state.activeProjectId : newComment.projectId;
+        const oldProjectComments = state.allComments[projectId] || [];
+        const newProjectComments = [...oldProjectComments, newComment];
+        return {
+            ...state,
+            allComments: {
+                ...state.allComments,
+                [projectId]: newProjectComments,
+            }
+        };
+    }
     case 'INVITE_COLLABORATOR_SUCCESS':
         return { ...state, collaborators: [...state.collaborators, action.payload] };
     case 'REVOKE_COLLABORATOR_SUCCESS':
@@ -237,35 +259,6 @@ const budgetReducer = (state, action) => {
       return { ...state, isTourActive: false, tourHighlightId: null };
     case 'SET_TOUR_HIGHLIGHT':
       return { ...state, tourHighlightId: action.payload };
-    case 'ADD_NOTE_SUCCESS': {
-        return {
-            ...state,
-            notes: [...state.notes, action.payload]
-        };
-    }
-    case 'UPDATE_NOTE_SUCCESS': {
-      const updatedNote = action.payload;
-      return {
-        ...state,
-        notes: state.notes.map(note =>
-          note.id === updatedNote.id ? updatedNote : note
-        )
-      };
-    }
-    case 'TOGGLE_NOTE_MINIMIZE': {
-      return {
-        ...state,
-        notes: state.notes.map(note =>
-          note.id === action.payload ? { ...note, isMinimized: !note.isMinimized } : note
-        )
-      };
-    }
-    case 'DELETE_NOTE_SUCCESS': {
-      return {
-        ...state,
-        notes: state.notes.filter(note => note.id !== action.payload),
-      };
-    }
     case 'OPEN_DIRECT_PAYMENT_MODAL':
       return { ...state, isDirectPaymentModalOpen: true, directPaymentType: action.payload };
     case 'CLOSE_DIRECT_PAYMENT_MODAL':
@@ -334,7 +327,7 @@ const budgetReducer = (state, action) => {
 
         let newTiers = state.tiers;
         if (newTier) {
-            if (!newState.tiers.some(t => t.id === newTier.id)) {
+            if (!state.tiers.some(t => t.id === newTier.id)) {
                 newTiers = [...state.tiers, newTier];
             }
         }
@@ -578,7 +571,7 @@ const budgetReducer = (state, action) => {
     }
 
     case 'INITIALIZE_PROJECT_SUCCESS': {
-        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans } = action.payload;
+        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans, newCategories } = action.payload;
         return {
             ...state,
             projects: [...state.projects, newProject],
@@ -587,6 +580,7 @@ const budgetReducer = (state, action) => {
             allCashAccounts: { ...state.allCashAccounts, [newProject.id]: finalCashAccounts },
             tiers: newTiers,
             loans: [...state.loans, ...newLoans],
+            categories: newCategories || state.categories,
             activeProjectId: newProject.id,
             isOnboarding: false,
         };
@@ -668,6 +662,7 @@ const budgetReducer = (state, action) => {
       };
     }
     case 'DELETE_TIER_SUCCESS': {
+      const tierId = action.payload;
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
@@ -901,6 +896,22 @@ const budgetReducer = (state, action) => {
         const newSettings = action.payload;
         return { ...state, settings: { ...state.settings, ...newSettings } };
     }
+    case 'OPEN_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: true, editingTemplate: action.payload };
+    case 'CLOSE_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: false, editingTemplate: null };
+    case 'SAVE_TEMPLATE_SUCCESS':
+      return { ...state, templates: [...state.templates, action.payload] };
+    case 'UPDATE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.map(t => t.id === action.payload.id ? action.payload : t),
+      };
+    case 'DELETE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.filter(t => t.id !== action.payload),
+      };
 
     default:
       return state;
@@ -922,7 +933,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role')
             .eq('id', user.id)
             .single();
 
@@ -934,12 +945,13 @@ export const BudgetProvider = ({ children }) => {
             subscriptionStatus: profileData.subscription_status,
             trialEndsAt: profileData.trial_ends_at,
             planId: profileData.plan_id,
+            role: profileData.role,
           } : null;
 
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [] } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [] } });
              return;
           }
 
@@ -952,12 +964,12 @@ export const BudgetProvider = ({ children }) => {
           };
 
           const [
-            projectsRes, tiersRes, notesRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes
+            projectsRes, tiersRes, loansRes, scenariosRes, 
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
-            supabase.from('notes').select('*'),
             supabase.from('loans').select('*'),
             supabase.from('scenarios').select('*'),
             supabase.from('budget_entries').select('*'),
@@ -967,9 +979,11 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('scenario_entries').select('*'),
             supabase.from('consolidated_views').select('*'),
             supabase.from('collaborators').select('*'),
+            supabase.from('comments').select('*'),
+            supabase.from('templates').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -985,6 +999,12 @@ export const BudgetProvider = ({ children }) => {
                   if (c.user_id) userIds.add(c.user_id);
               });
           }
+           if (commentsRes.data) {
+              commentsRes.data.forEach(c => userIds.add(c.user_id));
+          }
+          if (templatesRes.data) {
+              templatesRes.data.forEach(t => userIds.add(t.user_id));
+          }
 
           const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
@@ -994,12 +1014,11 @@ export const BudgetProvider = ({ children }) => {
           if (profilesError) throw profilesError;
 
           const projects = (projectsRes.data || []).map(p => ({
-            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived, user_id: p.user_id,
+            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id,
             annualGoals: p.annual_goals, expenseTargets: p.expense_targets
           }));
           
           const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type }));
-          const notes = (notesRes.data || []).map(n => ({ id: n.id, content: n.content, color: n.color, x: n.x, y: n.y, isMinimized: n.is_minimized }));
           const loans = (loansRes.data || []).map(l => ({
             id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
             monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
@@ -1012,6 +1031,9 @@ export const BudgetProvider = ({ children }) => {
           }));
           const collaborators = (collaboratorsRes.data || []).map(c => ({
             id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids, permissionScope: c.permission_scope
+          }));
+          const templates = (templatesRes.data || []).map(t => ({
+            id: t.id, userId: t.user_id, name: t.name, description: t.description, structure: t.structure, isPublic: t.is_public, tags: t.tags, icon: t.icon, color: t.color, purpose: t.purpose
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1066,13 +1088,29 @@ export const BudgetProvider = ({ children }) => {
             return acc;
           }, {});
 
+          const allComments = (commentsRes.data || []).reduce((acc, comment) => {
+              const projectId = comment.project_id || state.activeProjectId || 'consolidated';
+              if (!acc[projectId]) acc[projectId] = [];
+              acc[projectId].push({
+                  id: comment.id,
+                  projectId: comment.project_id,
+                  userId: comment.user_id,
+                  rowId: comment.row_id,
+                  columnId: comment.column_id,
+                  content: comment.content,
+                  createdAt: comment.created_at,
+                  mentionedUsers: comment.mentioned_users,
+              });
+              return acc;
+          }, {});
+
           dispatch({
             type: 'SET_INITIAL_DATA',
             payload: {
               profile,
               allProfiles: profilesData || [],
               settings,
-              projects, tiers, notes, loans, scenarios, consolidatedViews, collaborators,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });
