@@ -466,10 +466,11 @@ export const deleteActual = async (dispatch, actualId) => {
     }
 };
 
-export const recordPayment = async (dispatch, { actualId, paymentData, allActuals }) => {
+export const recordPayment = async (dispatch, { actualId, paymentData, allActuals, user }) => {
     try {
         const { data: payment, error: paymentError } = await supabase.from('payments').insert({
             actual_id: actualId,
+            user_id: user.id,
             payment_date: paymentData.paymentDate,
             paid_amount: paymentData.paidAmount,
             cash_account: paymentData.cashAccount,
@@ -688,6 +689,29 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
     } catch (error) {
         console.error("Error saving scenario:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const deleteScenarioEntry = async (dispatch, { scenarioId, entryId }) => {
+    try {
+        const { error } = await supabase
+            .from('scenario_entries')
+            .delete()
+            .eq('scenario_id', scenarioId)
+            .eq('id', entryId);
+
+        if (error) throw error;
+
+        dispatch({
+            type: 'DELETE_SCENARIO_ENTRY_SUCCESS',
+            payload: { scenarioId, entryId },
+        });
+
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario supprimée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting scenario entry:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 

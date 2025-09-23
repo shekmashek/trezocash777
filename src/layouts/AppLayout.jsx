@@ -406,7 +406,7 @@ const AppLayout = () => {
                 <PaymentModal
                     isOpen={isPaymentModalOpen}
                     onClose={() => dispatch({ type: 'CLOSE_PAYMENT_MODAL' })}
-                    onSave={(paymentData) => recordPayment(dispatch, { actualId: payingActual.id, paymentData, allActuals: state.allActuals })}
+                    onSave={(paymentData) => recordPayment(dispatch, { actualId: payingActual.id, paymentData, allActuals: state.allActuals, user: state.session.user })}
                     actualToPay={payingActual}
                     type={payingActual?.type}
                 />

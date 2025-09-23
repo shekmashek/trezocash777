@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../utils/supabase';
-import { saveEntry, updateSettings, updateUserCashAccount } from '../context/actions';
+import { saveEntry, updateSettings, updateUserCashAccount, recordPayment } from '../context/actions';
 
 // --- Helper Functions & Constants ---
 
@@ -843,6 +843,15 @@ const budgetReducer = (state, action) => {
         }
         return { ...state, allActuals: newAllActuals };
     }
+    case 'RECORD_PAYMENT': {
+      const user = state.session?.user;
+      if (user) {
+        recordPayment(dispatch, { ...action.payload, allActuals: state.allActuals, user });
+      } else {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+      }
+      return state;
+    }
     case 'RECORD_PAYMENT_SUCCESS': {
         const { updatedActual } = action.payload;
         const newAllActuals = JSON.parse(JSON.stringify(state.allActuals));
@@ -933,7 +942,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email')
             .eq('id', user.id)
             .single();
 

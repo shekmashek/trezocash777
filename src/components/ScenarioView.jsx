@@ -11,6 +11,7 @@ import { useTranslation } from '../utils/i18n';
 import ScenarioEntriesDrawer from './ScenarioEntriesDrawer';
 import { supabase } from '../utils/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { saveScenario, deleteScenarioEntry } from '../context/actions';
 
 const colorMap = {
   '#8b5cf6': { bg: 'bg-violet-50', text: 'text-violet-800', button: 'bg-violet-200 hover:bg-violet-300', line: '#8b5cf6' },
@@ -277,8 +278,8 @@ const ScenarioView = ({ isFocusMode = false }) => {
             end_date: entryData.endDate,
             supplier: entryData.supplier,
             description: entryData.description,
-            payments: entryData.payments,
             is_deleted: false,
+            payments: entryData.payments,
         };
 
         const { data: savedEntry, error } = await supabase
@@ -355,7 +356,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
       payload: {
         title: 'Supprimer cette modification ?',
         message: "Cette modification sera retirée du scénario. Si c'est une nouvelle entrée, elle sera supprimée. Si c'est une modification d'une entrée de base, l'entrée de base sera restaurée.",
-        onConfirm: () => dispatch({ type: 'DELETE_SCENARIO_ENTRY', payload: { scenarioId: selectedScenario.id, entryId } }),
+        onConfirm: () => deleteScenarioEntry(dispatch, { scenarioId: selectedScenario.id, entryId }),
       }
     });
   };
@@ -381,7 +382,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
                 <div><h3 className={`font-bold ${colors.text}`}>{scenario.displayName}</h3><p className={`text-sm ${colors.text}`}>{scenario.description}</p></div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => handleToggleVisibility(scenario.id)} className="p-2 text-gray-500 hover:text-gray-800" title={scenario.isVisible ? "Masquer dans le graphique" : "Afficher dans le graphique"}>{scenario.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                  <button onClick={() => handleOpenDrawer(scenario)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-gray-500 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Gérer les écritures"><List className="w-4 h-4" /></button>
+                  <button onClick={() => handleOpenDrawer(scenario)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-sm rounded-md flex items-center gap-1 bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed" title="Gérer les écritures"><List className="w-4 h-4" /><span>Gérer les écritures</span></button>
                   <button onClick={() => handleAddEntryToScenario(scenario.id)} disabled={isConsolidated || isCustomConsolidated} className={`p-2 text-sm rounded-md flex items-center gap-1 ${colors.button} ${colors.text} disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed`}><Plus className="w-4 h-4" /> Ajouter une entrée</button>
                   <button onClick={() => handleOpenScenarioModal(scenario)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleArchiveScenario(scenario.id)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-yellow-600 hover:text-yellow-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Archiver"><Archive className="w-4 h-4" /></button>
