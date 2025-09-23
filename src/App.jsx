@@ -24,6 +24,10 @@ import SecurityPage from './pages/SecurityPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
 import DisplaySettingsPage from './pages/DisplaySettingsPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminLayout from './layouts/AdminLayout';
+import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
@@ -132,6 +136,15 @@ function App() {
       <Routes>
         {session ? (
           <>
+            {/* Admin Routes are checked first for authenticated users */}
+            <Route element={<AdminProtectedRoute />}>
+                <Route path="/admin" element={<AdminLayout />}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
+                </Route>
+            </Route>
+
+            {/* Regular App Routes */}
             <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DashboardView />} />
@@ -149,21 +162,26 @@ function App() {
               <Route path="delete-account" element={<DeleteAccountPage />} />
               <Route path="factures" element={<UnderConstructionView title="Factures" />} />
               <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
-              <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Route>
+
+            {/* Catch-all for logged-in users, redirects to their main dashboard */}
             <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
           </>
         ) : (
-          <Route element={<PublicArea />}>
-            <Route path="/" element={<HomePageWithAuthTrigger />} />
-            <Route path="/a-propos" element={<AboutPage />} />
-            <Route path="/cgu" element={<LegalPage type="cgu" />} />
-            <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
-            <Route path="/cookies" element={<LegalPage type="cookies" />} />
-            <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
-            <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
+          <>
+            {/* Public routes and admin login for unauthenticated users */}
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route element={<PublicArea />}>
+              <Route path="/" element={<HomePageWithAuthTrigger />} />
+              <Route path="/a-propos" element={<AboutPage />} />
+              <Route path="/cgu" element={<LegalPage type="cgu" />} />
+              <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
+              <Route path="/cookies" element={<LegalPage type="cookies" />} />
+              <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
+              <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </>
         )}
       </Routes>
     </>

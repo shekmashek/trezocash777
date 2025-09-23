@@ -160,16 +160,18 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   return (
     <>
       <div className="sticky top-0 z-30 bg-gray-100 border-b border-gray-200">
-        <div className="container mx-auto px-6 py-2 flex w-full items-center justify-between">
+        <div className="container mx-auto px-6 py-2 flex w-full items-center justify-between relative">
           
-          <div className="flex-1 flex justify-start items-center gap-4">
-            <div id="project-switcher" className={`w-64 flex-shrink-0 rounded-lg transition-all ${isProjectSwitcherHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}>
+          {/* Left Group */}
+          <div className="flex items-center gap-4">
+            <div id="project-switcher" className={`w-auto min-w-[10rem] max-w-xs rounded-lg transition-all ${isProjectSwitcherHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}>
               <ProjectSwitcher />
             </div>
             <ProjectCollaborators />
           </div>
 
-          <div className="flex-shrink-0">
+          {/* Center Group (Absolutely Positioned) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
             <nav className="flex items-center gap-1">
               {navItems.map(item => {
                 const isActive = location.pathname === item.path;
@@ -179,7 +181,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                     key={item.id}
                     id={`tour-step-${item.id}`}
                     onClick={() => handleNavigate(item.path)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
+                    className={`px-4 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
                       isActive
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
@@ -193,8 +195,8 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
             </nav>
           </div>
 
-          <div className="flex-1 flex justify-end">
-            <div className="flex items-center gap-4">
+          {/* Right Group */}
+          <div className="flex items-center gap-4">
               <div className="relative" ref={newMenuRef}>
                   <button
                       onClick={() => setIsNewMenuOpen(p => !p)}
@@ -361,7 +363,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                       <Maximize className="w-5 h-5" />
                   </button>
               </div>
-            </div>
           </div>
         </div>
       </div>
