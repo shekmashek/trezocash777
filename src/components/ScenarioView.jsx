@@ -9,6 +9,8 @@ import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../
 import { resolveScenarioEntries } from '../utils/scenarioCalculations';
 import { useTranslation } from '../utils/i18n';
 import ScenarioEntriesDrawer from './ScenarioEntriesDrawer';
+import { supabase } from '../utils/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 const colorMap = {
   '#8b5cf6': { bg: 'bg-violet-50', text: 'text-violet-800', button: 'bg-violet-200 hover:bg-violet-300', line: '#8b5cf6' },
@@ -19,7 +21,7 @@ const defaultColors = colorMap['#8b5cf6'];
 
 const ScenarioView = ({ isFocusMode = false }) => {
   const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, scenarios, allEntries, allActuals, allCashAccounts, scenarioEntries, settings, timeUnit, horizonLength, periodOffset, activeQuickSelect } = state;
+  const { activeProjectId, projects, scenarios, allEntries, allActuals, allCashAccounts, scenarioEntries, settings, timeUnit, horizonLength, periodOffset, activeQuickSelect, session } = state;
   const { t } = useTranslation();
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -29,6 +31,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
   const [selectedScenario, setSelectedScenario] = useState(null);
 
   const isConsolidated = activeProjectId === 'consolidated';
+  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
   const projectScenarios = useMemo(() => {
     if (isConsolidated) {
@@ -250,7 +253,75 @@ const ScenarioView = ({ isFocusMode = false }) => {
     dispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: `Archiver le scénario "${scenarioToArchive.name}" ?`, message: "L'archivage d'un scénario le masquera de la liste, mais toutes ses données seront conservées. Vous pourrez le restaurer à tout moment.", onConfirm: () => dispatch({ type: 'ARCHIVE_SCENARIO', payload: scenarioId }), confirmText: 'Archiver', cancelText: 'Annuler', confirmColor: 'primary' } });
   };
   const handleAddEntryToScenario = (scenarioId) => { setActiveScenarioId(scenarioId); setEditingEntry(null); setIsBudgetModalOpen(true); };
-  const handleSaveScenarioEntry = (entryData) => { dispatch({ type: 'SAVE_SCENARIO_ENTRY', payload: { scenarioId: activeScenarioId, entryData, editingEntry } }); setIsBudgetModalOpen(false); setActiveScenarioId(null); };
+  
+  const handleSaveScenarioEntry = async (entryData) => {
+    const user = session?.user;
+    if (!user) {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        return;
+    }
+
+    try {
+        const entryId = editingEntry ? editingEntry.id : uuidv4();
+
+        const dataToSave = {
+            scenario_id: activeScenarioId,
+            id: entryId,
+            user_id: user.id,
+            type: entryData.type,
+            category: entryData.category,
+            frequency: entryData.frequency,
+            amount: entryData.amount,
+            date: entryData.date,
+            start_date: entryData.startDate,
+            end_date: entryData.endDate,
+            supplier: entryData.supplier,
+            description: entryData.description,
+            payments: entryData.payments,
+            is_deleted: false,
+        };
+
+        const { data: savedEntry, error } = await supabase
+            .from('scenario_entries')
+            .upsert(dataToSave, { onConflict: 'scenario_id,id' })
+            .select()
+            .single();
+
+        if (error) throw error;
+        
+        const savedEntryForClient = {
+            id: savedEntry.id,
+            type: savedEntry.type,
+            category: savedEntry.category,
+            frequency: savedEntry.frequency,
+            amount: savedEntry.amount,
+            date: savedEntry.date,
+            startDate: savedEntry.start_date,
+            endDate: savedEntry.end_date,
+            supplier: savedEntry.supplier,
+            description: savedEntry.description,
+            isDeleted: savedEntry.is_deleted,
+            payments: savedEntry.payments,
+        };
+
+        dispatch({
+            type: 'SAVE_SCENARIO_ENTRY_SUCCESS',
+            payload: {
+                scenarioId: activeScenarioId,
+                savedEntry: savedEntryForClient,
+            },
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario enregistrée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error saving scenario entry:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+
+    setIsBudgetModalOpen(false);
+    setActiveScenarioId(null);
+  };
+  
   const handleToggleVisibility = (scenarioId) => dispatch({ type: 'TOGGLE_SCENARIO_VISIBILITY', payload: scenarioId });
 
   const handleOpenDrawer = (scenario) => {
@@ -302,7 +373,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
       <div className="bg-white p-6 rounded-lg shadow mb-8 flex-shrink-0">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-800">Vos Scénarios</h2>
-          {projectScenarios.length < 3 && (<button onClick={() => handleOpenScenarioModal()} disabled={isConsolidated} className="bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"><Plus className="w-5 h-5" /> Nouveau Scénario</button>)}
+          {projectScenarios.length < 3 && (<button onClick={() => handleOpenScenarioModal()} disabled={isConsolidated || isCustomConsolidated} className="bg-accent-600 hover:bg-accent-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"><Plus className="w-5 h-5" /> Nouveau Scénario</button>)}
         </div>
         <div className="space-y-3">
           {projectScenarios.length > 0 ? (projectScenarios.map(scenario => { const colors = colorMap[scenario.color] || defaultColors; return (
@@ -310,14 +381,14 @@ const ScenarioView = ({ isFocusMode = false }) => {
                 <div><h3 className={`font-bold ${colors.text}`}>{scenario.displayName}</h3><p className={`text-sm ${colors.text}`}>{scenario.description}</p></div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => handleToggleVisibility(scenario.id)} className="p-2 text-gray-500 hover:text-gray-800" title={scenario.isVisible ? "Masquer dans le graphique" : "Afficher dans le graphique"}>{scenario.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                  <button onClick={() => handleOpenDrawer(scenario)} disabled={isConsolidated} className="p-2 text-gray-500 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Gérer les écritures"><List className="w-4 h-4" /></button>
-                  <button onClick={() => handleAddEntryToScenario(scenario.id)} disabled={isConsolidated} className={`p-2 text-sm rounded-md flex items-center gap-1 ${colors.button} ${colors.text} disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed`}><Plus className="w-4 h-4" /> Ajouter une entrée</button>
-                  <button onClick={() => handleOpenScenarioModal(scenario)} disabled={isConsolidated} className="p-2 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleArchiveScenario(scenario.id)} disabled={isConsolidated} className="p-2 text-yellow-600 hover:text-yellow-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Archiver"><Archive className="w-4 h-4" /></button>
-                  <button onClick={() => handleDeleteScenario(scenario.id)} disabled={isConsolidated} className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => handleOpenDrawer(scenario)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-gray-500 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Gérer les écritures"><List className="w-4 h-4" /></button>
+                  <button onClick={() => handleAddEntryToScenario(scenario.id)} disabled={isConsolidated || isCustomConsolidated} className={`p-2 text-sm rounded-md flex items-center gap-1 ${colors.button} ${colors.text} disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed`}><Plus className="w-4 h-4" /> Ajouter une entrée</button>
+                  <button onClick={() => handleOpenScenarioModal(scenario)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleArchiveScenario(scenario.id)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-yellow-600 hover:text-yellow-800 disabled:opacity-50 disabled:cursor-not-allowed" title="Archiver"><Archive className="w-4 h-4" /></button>
+                  <button onClick={() => handleDeleteScenario(scenario.id)} disabled={isConsolidated || isCustomConsolidated} className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-            ); })) : (<EmptyState icon={Layers} title="Aucun scénario pour l'instant" message="Créez des simulations pour comparer différentes hypothèses financières et prendre de meilleures décisions." actionText={isConsolidated ? undefined : "Nouveau Scénario"} onActionClick={isConsolidated ? undefined : () => handleOpenScenarioModal()} />)}
+            ); })) : (<EmptyState icon={Layers} title="Aucun scénario pour l'instant" message="Créez des simulations pour comparer différentes hypothèses financières et prendre de meilleures décisions." actionText={isConsolidated || isCustomConsolidated ? undefined : "Nouveau Scénario"} onActionClick={isConsolidated || isCustomConsolidated ? undefined : () => handleOpenScenarioModal()} />)}
         </div>
       </div>
       <div className="bg-white p-6 rounded-lg shadow flex-grow flex flex-col min-h-0">

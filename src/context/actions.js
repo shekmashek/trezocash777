@@ -630,6 +630,10 @@ const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef'];
 
 export const saveScenario = async (dispatch, { scenarioData, editingScenario, activeProjectId, user, existingScenariosCount }) => {
     try {
+        if (activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_')) {
+            throw new Error("Les scénarios ne peuvent être créés que sur des projets individuels.");
+        }
+        
         let savedScenario;
         if (editingScenario) {
             const dataToUpdate = {

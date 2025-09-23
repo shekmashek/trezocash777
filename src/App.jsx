@@ -26,8 +26,8 @@ import DeleteAccountPage from './pages/DeleteAccountPage';
 import DisplaySettingsPage from './pages/DisplaySettingsPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import AdminLayout from './layouts/AdminLayout';
-import AdminProtectedRoute from './components/AdminProtectedRoute';
 import CollaboratorsPage from './pages/CollaboratorsPage';
 import CashAccountsPage from './pages/CashAccountsPage';
 import CategoryManagementPage from './pages/CategoryManagementPage';
@@ -88,44 +88,49 @@ function App() {
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       dispatch({ type: 'SET_SESSION', payload: session });
-      if (!session) setAuthMode({ mode: null, fromTrial: false });
+      if (!session) {
+        setAuthMode({ mode: null, fromTrial: false });
+        dispatch({ type: 'RESET_STATE' });
+      }
     });
     return () => authListener.subscription.unsubscribe();
   }, [dispatch]);
 
-  if (isLoading) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader className="w-12 h-12 text-blue-600 animate-spin" />
-        </div>
-      </div>
-    );
-  }
-
-  const ProtectedRoute = ({ children }) => {
+  const ProtectedRoute = () => {
     const location = useLocation();
     
+    if (isLoading) {
+        return (
+            <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
+                <Loader className="w-12 h-12 text-blue-600 animate-spin" />
+            </div>
+        );
+    }
+
     if (!session) {
       return <Navigate to="/" replace />;
     }
 
     if (profile?.role === 'superadmin' && !location.pathname.startsWith('/admin')) {
-        return <Navigate to="/admin/dashboard" replace />;
+        return <Navigate to="/admin" replace />;
+    }
+    
+    if (profile?.role !== 'superadmin' && location.pathname.startsWith('/admin')) {
+        return <Navigate to="/app" replace />;
     }
 
-    if (state.isOnboarding || state.projects.length === 0) {
+    if (!location.pathname.startsWith('/admin') && (state.isOnboarding || state.projects.length === 0)) {
       return <OnboardingView />;
     }
 
-    return children;
+    return <Outlet />;
   };
 
   const PublicArea = () => {
+    if (isLoading) return <div className="w-screen h-screen flex items-center justify-center bg-gray-50"><Loader className="w-12 h-12 text-blue-600 animate-spin" /></div>;
+    
     if (session) {
-      if (profile?.role === 'superadmin') {
-        return <Navigate to="/admin/dashboard" replace />;
-      }
+      if (profile?.role === 'superadmin') return <Navigate to="/admin" replace />;
       return <Navigate to="/app" replace />;
     }
 
@@ -150,36 +155,36 @@ function App() {
     <>
       <ToastContainer />
       <Routes>
-          <Route element={<AdminProtectedRoute />}>
+          <Route element={<ProtectedRoute />}>
               <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<AdminDashboardPage />} />
+                  <Route path="users" element={<AdminUsersPage />} />
               </Route>
-          </Route>
-
-          <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardView />} />
-            <Route path="trezo" element={<BudgetTracker />} />
-            <Route path="flux" element={<CashflowView />} />
-            <Route path="echeancier" element={<ScheduleView />} />
-            <Route path="scenarios" element={<ScenarioView />} />
-            <Route path="analyse" element={<ExpenseAnalysisView />} />
-            <Route path="journal-budget" element={<JournalsView type="budget" />} />
-            <Route path="journal-paiements" element={<JournalsView type="payment" />} />
-            <Route path="profil" element={<ProfilePage />} />
-            <Route path="securite" element={<SecurityPage />} />
-            <Route path="abonnement" element={<SubscriptionPage />} />
-            <Route path="collaborateurs" element={<CollaboratorsPage />} />
-            <Route path="comptes" element={<CashAccountsPage />} />
-            <Route path="categories" element={<CategoryManagementPage />} />
-            <Route path="tiers" element={<TiersManagementPage />} />
-            <Route path="archives" element={<ArchivesPage />} />
-            <Route path="templates" element={<MyTemplatesPage />} />
-            <Route path="display-settings" element={<DisplaySettingsPage />} />
-            <Route path="delete-account" element={<DeleteAccountPage />} />
-            <Route path="factures" element={<UnderConstructionView title="Factures" />} />
-            <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
+              <Route path="/app" element={<AppLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardView />} />
+                <Route path="trezo" element={<BudgetTracker />} />
+                <Route path="flux" element={<CashflowView />} />
+                <Route path="echeancier" element={<ScheduleView />} />
+                <Route path="scenarios" element={<ScenarioView />} />
+                <Route path="analyse" element={<ExpenseAnalysisView />} />
+                <Route path="journal-budget" element={<JournalsView type="budget" />} />
+                <Route path="journal-paiements" element={<JournalsView type="payment" />} />
+                <Route path="profil" element={<ProfilePage />} />
+                <Route path="securite" element={<SecurityPage />} />
+                <Route path="abonnement" element={<SubscriptionPage />} />
+                <Route path="collaborateurs" element={<CollaboratorsPage />} />
+                <Route path="comptes" element={<CashAccountsPage />} />
+                <Route path="categories" element={<CategoryManagementPage />} />
+                <Route path="tiers" element={<TiersManagementPage />} />
+                <Route path="archives" element={<ArchivesPage />} />
+                <Route path="templates" element={<MyTemplatesPage />} />
+                <Route path="display-settings" element={<DisplaySettingsPage />} />
+                <Route path="delete-account" element={<DeleteAccountPage />} />
+                <Route path="factures" element={<UnderConstructionView title="Factures" />} />
+                <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
+              </Route>
           </Route>
 
           <Route path="/admin/login" element={<AdminLoginPage />} />
