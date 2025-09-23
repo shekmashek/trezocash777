@@ -160,6 +160,9 @@ const getInitialState = () => ({
     commentDrawerContext: null,
     consolidatedViews: [],
     collaborators: [],
+    templates: [],
+    isSaveTemplateModalOpen: false,
+    editingTemplate: null,
     infoModal: { isOpen: false, title: '', message: '' },
     confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
     inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
@@ -568,7 +571,7 @@ const budgetReducer = (state, action) => {
     }
 
     case 'INITIALIZE_PROJECT_SUCCESS': {
-        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans } = action.payload;
+        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans, newCategories } = action.payload;
         return {
             ...state,
             projects: [...state.projects, newProject],
@@ -577,6 +580,7 @@ const budgetReducer = (state, action) => {
             allCashAccounts: { ...state.allCashAccounts, [newProject.id]: finalCashAccounts },
             tiers: newTiers,
             loans: [...state.loans, ...newLoans],
+            categories: newCategories || state.categories,
             activeProjectId: newProject.id,
             isOnboarding: false,
         };
@@ -892,6 +896,22 @@ const budgetReducer = (state, action) => {
         const newSettings = action.payload;
         return { ...state, settings: { ...state.settings, ...newSettings } };
     }
+    case 'OPEN_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: true, editingTemplate: action.payload };
+    case 'CLOSE_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: false, editingTemplate: null };
+    case 'SAVE_TEMPLATE_SUCCESS':
+      return { ...state, templates: [...state.templates, action.payload] };
+    case 'UPDATE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.map(t => t.id === action.payload.id ? action.payload : t),
+      };
+    case 'DELETE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.filter(t => t.id !== action.payload),
+      };
 
     default:
       return state;
@@ -913,7 +933,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role')
             .eq('id', user.id)
             .single();
 
@@ -925,12 +945,13 @@ export const BudgetProvider = ({ children }) => {
             subscriptionStatus: profileData.subscription_status,
             trialEndsAt: profileData.trial_ends_at,
             planId: profileData.plan_id,
+            role: profileData.role,
           } : null;
 
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {} } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [] } });
              return;
           }
 
@@ -944,7 +965,8 @@ export const BudgetProvider = ({ children }) => {
 
           const [
             projectsRes, tiersRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -958,9 +980,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('consolidated_views').select('*'),
             supabase.from('collaborators').select('*'),
             supabase.from('comments').select('*'),
+            supabase.from('templates').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -978,6 +1001,9 @@ export const BudgetProvider = ({ children }) => {
           }
            if (commentsRes.data) {
               commentsRes.data.forEach(c => userIds.add(c.user_id));
+          }
+          if (templatesRes.data) {
+              templatesRes.data.forEach(t => userIds.add(t.user_id));
           }
 
           const { data: profilesData, error: profilesError } = await supabase
@@ -1005,6 +1031,9 @@ export const BudgetProvider = ({ children }) => {
           }));
           const collaborators = (collaboratorsRes.data || []).map(c => ({
             id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids, permissionScope: c.permission_scope
+          }));
+          const templates = (templatesRes.data || []).map(t => ({
+            id: t.id, userId: t.user_id, name: t.name, description: t.description, structure: t.structure, isPublic: t.is_public, tags: t.tags, icon: t.icon, color: t.color, purpose: t.purpose
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1081,7 +1110,7 @@ export const BudgetProvider = ({ children }) => {
               profile,
               allProfiles: profilesData || [],
               settings,
-              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

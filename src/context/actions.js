@@ -1,6 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { deriveActualsFromEntry } from '../utils/scenarioCalculations';
-import { templates } from '../utils/templates';
+import { templates as officialTemplatesData } from '../utils/templates';
 import { v4 as uuidv4 } from 'uuid';
 
 const getDefaultExpenseTargets = () => ({
@@ -9,21 +9,10 @@ const getDefaultExpenseTargets = () => ({
   'exp-main-9': 5, 'exp-main-10': 0,
 });
 
-const addMonths = (date, months) => {
-  const d = new Date(date);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() !== day) {
-    d.setDate(0);
-  }
-  return d;
-};
-
-export const initializeProject = async (dispatch, payload, user, existingTiersData) => {
+export const initializeProject = async (dispatch, payload, user, existingTiersData, allTemplates) => {
   try {
     const { projectName, projectStartDate, templateId, startOption } = payload;
     
-    // 1. Create Project
     const { data: newProjectData, error: projectError } = await supabase
         .from('projects')
         .insert({
@@ -57,20 +46,26 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
                     name: 'Compte Principal', initialBalance: 0, initialBalanceDate: projectStartDate,
                     isClosed: false, closureDate: null
                 }],
-                newAllEntries: [], newAllActuals: [], newTiers: [], newLoans: [],
+                newAllEntries: [], newAllActuals: [], newTiers: [], newLoans: [], newCategories: null,
             }
         });
         return;
     }
 
-    // --- Logic for populated template ---
-    const templateGroup = Object.values(templates).flat();
-    const template = templateGroup.find(t => t.id === templateId);
-    if (!template) throw new Error("Template not found");
+    const officialTemplate = [...officialTemplatesData.personal, ...officialTemplatesData.professional].find(t => t.id === templateId);
+    const customTemplate = allTemplates.find(t => t.id === templateId);
+    
+    let templateData;
+    let newCategories = null;
+    if (officialTemplate) {
+        templateData = officialTemplate.data;
+    } else if (customTemplate) {
+        templateData = customTemplate.structure;
+        newCategories = customTemplate.structure.categories;
+    } else {
+        throw new Error("Template not found");
+    }
 
-    const templateData = template.data;
-
-    // 2. Create Cash Accounts from template
     const { data: newCashAccountsData, error: cashAccountsError } = await supabase
         .from('cash_accounts')
         .insert(templateData.cashAccounts.map(acc => ({
@@ -80,7 +75,6 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         .select();
     if (cashAccountsError) throw cashAccountsError;
 
-    // 3. Handle Tiers
     const allTiersFromTemplate = [...templateData.entries, ...(templateData.loans || []), ...(templateData.borrowings || [])]
         .map(item => item.supplier || item.thirdParty).filter(Boolean);
     const uniqueTiers = [...new Set(allTiersFromTemplate)];
@@ -93,7 +87,6 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         createdTiers = insertedTiers;
     }
 
-    // 4. Create Budget Entries from template
     const today = new Date().toISOString().split('T')[0];
     const entriesToInsert = templateData.entries.map(entry => ({
         project_id: projectId, user_id: user.id, type: entry.type, category: entry.category,
@@ -108,14 +101,12 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         .select();
     if (entriesError) throw entriesError;
 
-    // 5. Create Actuals from entries
     let newActualsToInsert = [];
     newEntriesData.forEach(entry => {
         const actuals = deriveActualsFromEntry(entry, projectId, newCashAccountsData);
         newActualsToInsert.push(...actuals);
     });
 
-    // Batch insert all actuals
     if (newActualsToInsert.length > 0) {
         const { error: actualsError } = await supabase.from('actual_transactions').insert(newActualsToInsert.map(a => ({
             id: a.id, budget_id: a.budgetId, project_id: a.projectId, user_id: user.id, type: a.type,
@@ -145,6 +136,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
             newAllActuals: newActualsToInsert.map(a => ({ ...a, payments: [] })),
             newTiers: createdTiers.map(t => ({ id: t.id, name: t.name, type: t.type })),
             newLoans: [],
+            newCategories,
         }
     });
 
@@ -155,6 +147,8 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
   }
 };
 
+// Keep other actions as they are
+// ... (rest of the file)
 export const saveEntry = async (dispatch, { entryData, editingEntry, activeProjectId, tiers, user, cashAccounts }) => {
     try {
         const { supplier, type } = entryData;
@@ -695,5 +689,83 @@ export const addComment = async (dispatch, { projectId, rowId, columnId, content
     } catch (error) {
         console.error("Error adding comment:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'ajout du commentaire: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const saveTemplate = async (dispatch, { templateData, editingTemplate, projectStructure, user }) => {
+  try {
+    const dataToSave = {
+      user_id: user.id,
+      name: templateData.name,
+      description: templateData.description,
+      structure: projectStructure,
+      is_public: templateData.is_public || false,
+      tags: templateData.tags || [],
+      icon: templateData.icon,
+      color: templateData.color,
+      purpose: templateData.purpose,
+    };
+
+    let savedTemplate;
+    if (editingTemplate) {
+      const { data, error } = await supabase
+        .from('templates')
+        .update(dataToSave)
+        .eq('id', editingTemplate.id)
+        .select()
+        .single();
+      if (error) throw error;
+      savedTemplate = data;
+      dispatch({ type: 'UPDATE_TEMPLATE_SUCCESS', payload: {
+          id: savedTemplate.id,
+          userId: savedTemplate.user_id,
+          name: savedTemplate.name,
+          description: savedTemplate.description,
+          structure: savedTemplate.structure,
+          isPublic: savedTemplate.is_public,
+          tags: savedTemplate.tags,
+          icon: savedTemplate.icon,
+          color: savedTemplate.color,
+          purpose: savedTemplate.purpose,
+      }});
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle mis à jour.', type: 'success' } });
+    } else {
+      const { data, error } = await supabase
+        .from('templates')
+        .insert(dataToSave)
+        .select()
+        .single();
+      if (error) throw error;
+      savedTemplate = data;
+      dispatch({ type: 'SAVE_TEMPLATE_SUCCESS', payload: {
+          id: savedTemplate.id,
+          userId: savedTemplate.user_id,
+          name: savedTemplate.name,
+          description: savedTemplate.description,
+          structure: savedTemplate.structure,
+          isPublic: savedTemplate.is_public,
+          tags: savedTemplate.tags,
+          icon: savedTemplate.icon,
+          color: savedTemplate.color,
+          purpose: savedTemplate.purpose,
+      }});
+      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle créé.', type: 'success' } });
+    }
+    dispatch({ type: 'CLOSE_SAVE_TEMPLATE_MODAL' });
+  } catch (error) {
+    console.error("Error saving template:", error);
+    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+  }
+};
+
+export const deleteTemplate = async (dispatch, templateId) => {
+    try {
+        const { error } = await supabase.from('templates').delete().eq('id', templateId);
+        if (error) throw error;
+        dispatch({ type: 'DELETE_TEMPLATE_SUCCESS', payload: templateId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle supprimé.', type: 'success' } });
+    } catch (error) {
+        console.error("Error deleting template:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

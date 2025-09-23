@@ -7,30 +7,25 @@ export const templates = {
       name: 'Budget Familial',
       description: 'Suivez les revenus, les dépenses courantes, l\'épargne et les projets de votre famille.',
       icon: 'Home',
+      color: 'blue',
       data: {
         cashAccounts: [
           { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Courant Joint', initialBalance: 1500 },
           { id: uuidv4(), mainCategoryId: 'savings', name: 'Livret A', initialBalance: 5000 },
         ],
         entries: [
-          // Revenus
           { id: uuidv4(), type: 'revenu', category: 'Salaires et traitements', supplier: 'Salaire Principal', amount: 2500, frequency: 'mensuel' },
           { id: uuidv4(), type: 'revenu', category: 'Salaires et traitements', supplier: 'Salaire Conjoint(e)', amount: 1800, frequency: 'mensuel' },
-          // Dépenses Fixes
           { id: uuidv4(), type: 'depense', category: 'Logement', supplier: 'Loyer / Crédit Immobilier', amount: 1200, frequency: 'mensuel' },
           { id: uuidv4(), type: 'depense', category: 'Eau et Electricité', supplier: 'Facture Énergie (EDF, etc.)', amount: 150, frequency: 'mensuel' },
           { id: uuidv4(), type: 'depense', category: 'Communication et divertissement', supplier: 'Abonnement Internet/Mobile', amount: 50, frequency: 'mensuel' },
           { id: uuidv4(), type: 'depense', category: 'Assurance divers', supplier: 'Assurance Habitation', amount: 30, frequency: 'mensuel' },
-          // Dépenses Variables
           { id: uuidv4(), type: 'depense', category: 'Nourriture & alimentation', supplier: 'Courses Alimentaires', amount: 600, frequency: 'mensuel' },
           { id: uuidv4(), type: 'depense', category: 'Transports et déplacement', supplier: 'Carburant / Transports en commun', amount: 150, frequency: 'mensuel' },
           { id: uuidv4(), type: 'depense', category: 'Sorties et restaurants', supplier: 'Restaurants & Loisirs', amount: 200, frequency: 'mensuel' },
-          // Epargne
           { id: uuidv4(), type: 'depense', category: 'Epargne Projet à court et moyen termes', supplier: 'Épargne Mensuelle', amount: 250, frequency: 'mensuel' },
         ],
-        tiers: [],
-        loans: [],
-        borrowings: [],
+        tiers: [], loans: [], borrowings: [],
       }
     },
     {
@@ -38,6 +33,7 @@ export const templates = {
       name: 'Projet Vacances',
       description: 'Planifiez le budget pour votre prochain grand voyage.',
       icon: 'Plane',
+      color: 'teal',
       data: {
         cashAccounts: [
           { id: uuidv4(), mainCategoryId: 'savings', name: 'Cagnotte Vacances', initialBalance: 500 },
@@ -57,6 +53,7 @@ export const templates = {
         name: 'Projet Mariage',
         description: 'Organisez le budget du plus beau jour de votre vie.',
         icon: 'Heart',
+        color: 'pink',
         data: {
             cashAccounts: [
                 { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Mariage', initialBalance: 2000 },
@@ -78,6 +75,7 @@ export const templates = {
       name: 'Freelance / Auto-entrepreneur',
       description: 'Un modèle simple pour suivre vos missions, charges sociales et frais professionnels.',
       icon: 'User',
+      color: 'indigo',
       data: {
         cashAccounts: [
           { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Professionnel', initialBalance: 1000 },
@@ -98,6 +96,7 @@ export const templates = {
       name: 'TPE / Artisan',
       description: 'Suivez vos chantiers, vos achats de matières premières et vos charges fixes.',
       icon: 'Briefcase',
+      color: 'amber',
       data: {
         cashAccounts: [
           { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Principal TPE', initialBalance: 5000 },
@@ -118,6 +117,7 @@ export const templates = {
         name: 'Restaurant / Café',
         description: 'Gérez vos achats de denrées, salaires, et revenus journaliers.',
         icon: 'Coffee',
+        color: 'orange',
         data: {
           cashAccounts: [
             { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Bancaire Pro', initialBalance: 3000 },
@@ -138,6 +138,7 @@ export const templates = {
         name: 'Association',
         description: 'Suivez les cotisations, les subventions et les dépenses de fonctionnement.',
         icon: 'HeartHandshake',
+        color: 'rose',
         data: {
           cashAccounts: [
             { id: uuidv4(), mainCategoryId: 'bank', name: 'Compte Association', initialBalance: 1200 },

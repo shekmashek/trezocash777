@@ -33,6 +33,7 @@ import CashAccountsPage from './pages/CashAccountsPage';
 import CategoryManagementPage from './pages/CategoryManagementPage';
 import TiersManagementPage from './pages/TiersManagementPage';
 import ArchivesPage from './pages/ArchivesPage';
+import MyTemplatesPage from './pages/MyTemplatesPage';
 
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
@@ -174,6 +175,7 @@ function App() {
             <Route path="categories" element={<CategoryManagementPage />} />
             <Route path="tiers" element={<TiersManagementPage />} />
             <Route path="archives" element={<ArchivesPage />} />
+            <Route path="templates" element={<MyTemplatesPage />} />
             <Route path="display-settings" element={<DisplaySettingsPage />} />
             <Route path="delete-account" element={<DeleteAccountPage />} />
             <Route path="factures" element={<UnderConstructionView title="Factures" />} />

@@ -19,6 +19,7 @@ import TransactionActionMenu from '../components/TransactionActionMenu';
 import FocusView from '../components/FocusView';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
+import SaveTemplateModal from '../components/SaveTemplateModal';
 import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
@@ -38,7 +39,7 @@ const AppLayout = () => {
         isDirectPaymentModalOpen, directPaymentType, timeUnit, horizonLength, periodOffset, 
         allCashAccounts, allEntries, allActuals, settings, activeQuickSelect, isTourActive, 
         transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView,
-        isCommentDrawerOpen, commentDrawerContext
+        isCommentDrawerOpen, commentDrawerContext, isSaveTemplateModalOpen, editingTemplate
     } = state;
     
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -434,6 +435,13 @@ const AppLayout = () => {
                     onClose={() => dispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' })}
                     onSave={handleSaveConsolidatedView}
                     editingView={editingConsolidatedView}
+                />
+            )}
+            {isSaveTemplateModalOpen && (
+                <SaveTemplateModal
+                    isOpen={isSaveTemplateModalOpen}
+                    onClose={() => dispatch({ type: 'CLOSE_SAVE_TEMPLATE_MODAL' })}
+                    editingTemplate={editingTemplate}
                 />
             )}
             {infoModal.isOpen && (
