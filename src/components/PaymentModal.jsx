@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Check } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
-import { recordPayment } from '../context/actions';
 
-const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
+const PaymentModal = ({ isOpen, onClose, actualToPay, type, onSave }) => {
   const { state, dispatch } = useBudget();
   const { allCashAccounts, settings, activeProjectId, projects } = state;
 
@@ -44,17 +43,22 @@ const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
 
     const paymentData = { paymentDate, paidAmount: amount, cashAccount, isFinalPayment };
 
+    const doSave = () => {
+        onSave(paymentData);
+        onClose();
+    };
+
     if (amount > remainingAmount && !isFinalPayment) {
       dispatch({
         type: 'OPEN_CONFIRMATION_MODAL',
         payload: {
           title: 'Montant supérieur au restant dû',
           message: 'Le montant saisi est supérieur au montant restant. Voulez-vous continuer ?',
-          onConfirm: () => recordPayment(dispatch, { actualId: actualToPay.id, paymentData, allActuals: state.allActuals }),
+          onConfirm: doSave,
         }
       });
     } else {
-      recordPayment(dispatch, { actualId: actualToPay.id, paymentData, allActuals: state.allActuals });
+      doSave();
     }
   };
 
