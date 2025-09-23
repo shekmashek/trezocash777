@@ -310,6 +310,38 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
     }
 };
 
+export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
+    try {
+        if (!entryProjectId) {
+            throw new Error("L'ID du projet est manquant pour la suppression.");
+        }
+
+        const unsettledStatuses = ['pending', 'partially_paid', 'partially_received'];
+        await supabase
+            .from('actual_transactions')
+            .delete()
+            .eq('budget_id', entryId)
+            .in('status', unsettledStatuses);
+        
+        const { error: deleteEntryError } = await supabase
+            .from('budget_entries')
+            .delete()
+            .eq('id', entryId);
+
+        if (deleteEntryError) throw deleteEntryError;
+
+        dispatch({
+            type: 'DELETE_ENTRY_SUCCESS',
+            payload: { entryId, entryProjectId }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire supprimée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting entry:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression: ${error.message}`, type: 'error' } });
+    }
+};
+
 export const updateSettings = async (dispatch, user, newSettings) => {
     if (!user) {
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
@@ -468,6 +500,9 @@ export const deleteActual = async (dispatch, actualId) => {
 
 export const recordPayment = async (dispatch, { actualId, paymentData, allActuals, user }) => {
     try {
+        if (!user || !user.id) {
+            throw new Error("ID utilisateur manquant.");
+        }
         const { data: payment, error: paymentError } = await supabase.from('payments').insert({
             actual_id: actualId,
             user_id: user.id,

@@ -182,6 +182,7 @@ const getInitialState = () => ({
     isConsolidatedViewModalOpen: false,
     editingConsolidatedView: null,
     activeProjectId: null,
+    activeTrezoView: 'tableau',
     displayYear: new Date().getFullYear(),
     timeUnit: 'week',
     horizonLength: 6,
@@ -224,6 +225,8 @@ const budgetReducer = (state, action) => {
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
+    case 'SET_ACTIVE_TREZO_VIEW':
+        return { ...state, activeTrezoView: action.payload };
     case 'OPEN_COMMENT_DRAWER':
         return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
     case 'CLOSE_COMMENT_DRAWER':

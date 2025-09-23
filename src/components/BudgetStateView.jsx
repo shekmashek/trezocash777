@@ -4,6 +4,7 @@ import { formatCurrency } from '../utils/formatting';
 import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder } from 'lucide-react';
 import EmptyState from './EmptyState';
 import AddCategoryModal from './AddCategoryModal';
+import { deleteEntry } from '../context/actions';
 
 const BudgetStateView = () => {
     const { state, dispatch } = useBudget();
@@ -17,7 +18,9 @@ const BudgetStateView = () => {
 
         if (isConsolidatedView) {
             return {
-                budgetEntries: Object.values(allEntries).flat(),
+                budgetEntries: Object.entries(allEntries).flatMap(([projectId, entries]) => 
+                    entries.map(entry => ({ ...entry, projectId }))
+                ),
                 isConsolidated: true,
             };
         }
@@ -26,13 +29,16 @@ const BudgetStateView = () => {
             const view = consolidatedViews.find(v => v.id === viewId);
             if (!view || !view.project_ids) return { budgetEntries: [], isConsolidated: true };
             return {
-                budgetEntries: view.project_ids.flatMap(id => allEntries[id] || []),
+                budgetEntries: view.project_ids.flatMap(projectId => 
+                    (allEntries[projectId] || []).map(entry => ({ ...entry, projectId }))
+                ),
                 isConsolidated: true,
             };
         }
+        // Single project view
         const project = projects.find(p => p.id === activeProjectId);
         return {
-            budgetEntries: project ? (allEntries[project.id] || []) : [],
+            budgetEntries: project ? (allEntries[project.id] || []).map(entry => ({ ...entry, projectId: activeProjectId })) : [],
             isConsolidated: false,
         };
     }, [activeProjectId, projects, allEntries, consolidatedViews]);
@@ -56,7 +62,7 @@ const BudgetStateView = () => {
             payload: {
                 title: 'Supprimer cette entrée ?',
                 message: 'Cette action est irréversible et supprimera l\'entrée budgétaire.',
-                onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId: entry.id, entryProjectId: entry.projectId || activeProjectId } }),
+                onConfirm: () => deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId }),
             }
         });
     };
