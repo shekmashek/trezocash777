@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../utils/supabase';
 import { useBudget } from '../context/BudgetContext';
+<<<<<<< HEAD
 import { Loader, UserX, UserCheck, Shield, Star, Clock, Search, Users, BarChart } from 'lucide-react';
+=======
+import { Loader, UserX, UserCheck, Search, Users, BarChart, ShieldCheck, Clock, Folder, UserPlus } from 'lucide-react';
+>>>>>>> origin/main
 import ReactECharts from 'echarts-for-react';
 
 const AdminDashboardPage = () => {
@@ -10,6 +14,7 @@ const AdminDashboardPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
+<<<<<<< HEAD
     const fetchUsers = async () => {
         setLoading(true);
         const { data, error } = await supabase
@@ -21,11 +26,54 @@ const AdminDashboardPage = () => {
         } else {
             setUsers(data);
         }
+=======
+    const fetchAdminData = async () => {
+        setLoading(true);
+
+        const [usersRes, projectsRes, collaboratorsRes] = await Promise.all([
+            supabase.from('profiles').select('id, full_name, email, subscription_status, is_blocked, created_at'),
+            supabase.from('projects').select('id, user_id'),
+            supabase.from('collaborators').select('id, owner_id')
+        ]);
+
+        if (usersRes.error || projectsRes.error || collaboratorsRes.error) {
+            const error = usersRes.error || projectsRes.error || collaboratorsRes.error;
+            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+            setLoading(false);
+            return;
+        }
+
+        const usersData = usersRes.data || [];
+        const projectsData = projectsRes.data || [];
+        const collaboratorsData = collaboratorsRes.data || [];
+
+        const projectCounts = projectsData.reduce((acc, project) => {
+            acc[project.user_id] = (acc[project.user_id] || 0) + 1;
+            return acc;
+        }, {});
+
+        const collaboratorCounts = collaboratorsData.reduce((acc, collaborator) => {
+            acc[collaborator.owner_id] = (acc[collaborator.owner_id] || 0) + 1;
+            return acc;
+        }, {});
+
+        const augmentedUsers = usersData.map(user => ({
+            ...user,
+            projectCount: projectCounts[user.id] || 0,
+            collaboratorCount: collaboratorCounts[user.id] || 0,
+        }));
+
+        setUsers(augmentedUsers);
+>>>>>>> origin/main
         setLoading(false);
     };
 
     useEffect(() => {
+<<<<<<< HEAD
         fetchUsers();
+=======
+        fetchAdminData();
+>>>>>>> origin/main
     }, [dispatch]);
 
     const kpiData = useMemo(() => {
@@ -90,6 +138,7 @@ const AdminDashboardPage = () => {
         });
     };
 
+<<<<<<< HEAD
     const handleSubscriptionChange = async (userId, newStatus) => {
         const { data, error } = await supabase.from('profiles').update({ subscription_status: newStatus }).eq('id', userId).select().single();
         if (error) {
@@ -98,6 +147,25 @@ const AdminDashboardPage = () => {
             setUsers(users.map(u => u.id === userId ? { ...u, subscription_status: data.subscription_status } : u));
             dispatch({ type: 'ADD_TOAST', payload: { message: 'Abonnement mis à jour.', type: 'success' } });
         }
+=======
+    const handleSubscriptionChange = (user, newStatus) => {
+        dispatch({
+            type: 'OPEN_CONFIRMATION_MODAL',
+            payload: {
+                title: 'Changer le statut de l\'abonnement ?',
+                message: `Voulez-vous vraiment passer l'abonnement de ${user.full_name} à "${newStatus}" ?`,
+                onConfirm: async () => {
+                    const { data, error } = await supabase.from('profiles').update({ subscription_status: newStatus }).eq('id', user.id).select().single();
+                    if (error) {
+                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+                    } else {
+                        setUsers(users.map(u => u.id === user.id ? { ...u, subscription_status: data.subscription_status } : u));
+                        dispatch({ type: 'ADD_TOAST', payload: { message: 'Abonnement mis à jour.', type: 'success' } });
+                    }
+                },
+            }
+        });
+>>>>>>> origin/main
     };
 
     const filteredUsers = users.filter(user =>
@@ -154,6 +222,11 @@ const AdminDashboardPage = () => {
                         <tr>
                             <th className="px-6 py-3 text-left font-medium text-gray-600">Utilisateur</th>
                             <th className="px-6 py-3 text-left font-medium text-gray-600">Inscrit le</th>
+<<<<<<< HEAD
+=======
+                            <th className="px-6 py-3 text-center font-medium text-gray-600">Projets</th>
+                            <th className="px-6 py-3 text-center font-medium text-gray-600">Collabs.</th>
+>>>>>>> origin/main
                             <th className="px-6 py-3 text-left font-medium text-gray-600">Statut Abonnement</th>
                             <th className="px-6 py-3 text-center font-medium text-gray-600">Actions</th>
                         </tr>
@@ -166,8 +239,29 @@ const AdminDashboardPage = () => {
                                     <div className="text-gray-500">{user.email}</div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-600">{new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
+<<<<<<< HEAD
                                 <td className="px-6 py-4">
                                     <select value={user.subscription_status || ''} onChange={(e) => handleSubscriptionChange(user.id, e.target.value)} className="text-xs p-1 border rounded-md bg-white">
+=======
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Folder size={14} className="text-gray-500" />
+                                        <span className="font-semibold">{user.projectCount}</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <UserPlus size={14} className="text-gray-500" />
+                                        <span className="font-semibold">{user.collaboratorCount}</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <select 
+                                        value={user.subscription_status || ''} 
+                                        onChange={(e) => handleSubscriptionChange(user, e.target.value)} 
+                                        className="text-xs p-1 border rounded-md bg-white"
+                                    >
+>>>>>>> origin/main
                                         {subscriptionOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
                                 </td>
