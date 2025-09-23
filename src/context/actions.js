@@ -1,5 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { deriveActualsFromEntry } from '../utils/scenarioCalculations';
+import { templates } from '../utils/templates';
+import { v4 as uuidv4 } from 'uuid';
 
 const getDefaultExpenseTargets = () => ({
   'exp-main-1': 20, 'exp-main-2': 35, 'exp-main-3': 10, 'exp-main-4': 0,
@@ -17,132 +19,108 @@ const addMonths = (date, months) => {
   return d;
 };
 
-export const initializeProject = async (dispatch, payload, user, existingTiersData, currency) => {
+export const initializeProject = async (dispatch, payload, user, existingTiersData) => {
   try {
-    // Defensively check for and create profile if it doesn't exist
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError && profileError.code === 'PGRST116') { // "Not found"
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({ id: user.id });
-      if (insertError) {
-        console.error("Error creating profile during onboarding:", insertError);
-        throw insertError;
-      }
-    } else if (profileError) {
-      console.error("Error checking for profile:", profileError);
-      throw profileError;
-    }
-
-    const { projectName, projectStartDate, cashAccounts, entries, monthlyRevenue, monthlyExpense, loans, borrowings } = payload;
+    const { projectName, projectStartDate, templateId, startOption } = payload;
     
     // 1. Create Project
     const { data: newProjectData, error: projectError } = await supabase
         .from('projects')
         .insert({
-            user_id: user.id, name: projectName, start_date: projectStartDate, currency: currency,
-            annual_goals: { [new Date().getFullYear()]: { revenue: (parseFloat(monthlyRevenue) || 0) * 12, expense: (parseFloat(monthlyExpense) || 0) * 12 } },
+            user_id: user.id, name: projectName, start_date: projectStartDate, currency: '€',
             expense_targets: getDefaultExpenseTargets(),
         })
         .select().single();
     if (projectError) throw projectError;
 
-    // 2. Create Cash Accounts
+    const projectId = newProjectData.id;
+
+    if (startOption === 'blank') {
+        const { data: defaultAccount, error: accountError } = await supabase
+            .from('cash_accounts')
+            .insert({
+                project_id: projectId, user_id: user.id, main_category_id: 'bank',
+                name: 'Compte Principal', initial_balance: 0, initial_balance_date: projectStartDate,
+            })
+            .select().single();
+        if (accountError) throw accountError;
+
+        dispatch({ 
+            type: 'INITIALIZE_PROJECT_SUCCESS', 
+            payload: {
+                newProject: {
+                    id: projectId, name: projectName, currency: '€', startDate: projectStartDate,
+                    isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
+                },
+                finalCashAccounts: [{
+                    id: defaultAccount.id, projectId: projectId, mainCategoryId: 'bank',
+                    name: 'Compte Principal', initialBalance: 0, initialBalanceDate: projectStartDate,
+                    isClosed: false, closureDate: null
+                }],
+                newAllEntries: [], newAllActuals: [], newTiers: [], newLoans: [],
+            }
+        });
+        return;
+    }
+
+    // --- Logic for populated template ---
+    const templateGroup = Object.values(templates).flat();
+    const template = templateGroup.find(t => t.id === templateId);
+    if (!template) throw new Error("Template not found");
+
+    const templateData = template.data;
+
+    // 2. Create Cash Accounts from template
     const { data: newCashAccountsData, error: cashAccountsError } = await supabase
         .from('cash_accounts')
-        .insert(cashAccounts.map(acc => ({
-            project_id: newProjectData.id, user_id: user.id, main_category_id: acc.mainCategoryId,
-            name: acc.name, initial_balance: acc.initialBalance, initial_balance_date: acc.initialBalanceDate,
+        .insert(templateData.cashAccounts.map(acc => ({
+            project_id: projectId, user_id: user.id, main_category_id: acc.mainCategoryId,
+            name: acc.name, initial_balance: acc.initialBalance, initial_balance_date: projectStartDate,
         })))
         .select();
     if (cashAccountsError) throw cashAccountsError;
-    
+
     // 3. Handle Tiers
-    const existingTiers = new Set((existingTiersData || []).map(t => t.name.toLowerCase()));
-    const newTiersToCreate = new Set();
-    const allEntriesAndLoans = [...entries, ...loans, ...borrowings];
-    allEntriesAndLoans.forEach(item => {
-        const tierName = item.supplier || item.thirdParty;
-        if (tierName && !existingTiers.has(tierName.toLowerCase())) {
-            const type = item.type === 'revenu' || item.type === 'loan' ? 'client' : 'fournisseur';
-            newTiersToCreate.add(JSON.stringify({ name: tierName, type, user_id: user.id }));
-        }
-    });
+    const allTiersFromTemplate = [...templateData.entries, ...(templateData.loans || []), ...(templateData.borrowings || [])]
+        .map(item => item.supplier || item.thirdParty).filter(Boolean);
+    const uniqueTiers = [...new Set(allTiersFromTemplate)];
+    
     let createdTiers = [];
-    if (newTiersToCreate.size > 0) {
-        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(Array.from(newTiersToCreate).map(t => JSON.parse(t)), { onConflict: 'user_id,name,type' }).select();
+    if (uniqueTiers.length > 0) {
+        const tiersToInsert = uniqueTiers.map(name => ({ name, type: 'fournisseur', user_id: user.id }));
+        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(tiersToInsert, { onConflict: 'user_id,name,type' }).select();
         if (tiersError) throw tiersError;
         createdTiers = insertedTiers;
     }
 
-    // 4. Create Budget Entries
+    // 4. Create Budget Entries from template
+    const today = new Date().toISOString().split('T')[0];
+    const entriesToInsert = templateData.entries.map(entry => ({
+        project_id: projectId, user_id: user.id, type: entry.type, category: entry.category,
+        frequency: entry.frequency, amount: entry.amount, 
+        date: entry.frequency === 'ponctuel' ? (entry.date || today) : null,
+        start_date: entry.frequency !== 'ponctuel' ? (entry.startDate || today) : null,
+        supplier: entry.supplier, description: entry.description,
+    }));
     const { data: newEntriesData, error: entriesError } = await supabase
         .from('budget_entries')
-        .insert(entries.map(entry => ({
-            project_id: newProjectData.id, user_id: user.id, type: entry.type, category: entry.category,
-            frequency: entry.frequency, amount: entry.amount, date: entry.date, start_date: entry.startDate,
-            supplier: entry.supplier, description: entry.description,
-        })))
+        .insert(entriesToInsert)
         .select();
     if (entriesError) throw entriesError;
 
     // 5. Create Actuals from entries
     let newActualsToInsert = [];
     newEntriesData.forEach(entry => {
-        const actuals = deriveActualsFromEntry(entry, newProjectData.id, newCashAccountsData);
+        const actuals = deriveActualsFromEntry(entry, projectId, newCashAccountsData);
         newActualsToInsert.push(...actuals);
     });
-
-    // 6. Loans and their entries/actuals
-    const allLoans = [...borrowings, ...loans];
-    let newLoans = [];
-    if (allLoans.length > 0) {
-        const loansToInsert = allLoans.map(l => ({
-            project_id: newProjectData.id, user_id: user.id, type: l.type, third_party: l.thirdParty,
-            principal: parseFloat(l.principal), monthly_payment: parseFloat(l.monthlyPayment), term: parseInt(l.term, 10),
-            principal_date: l.principalDate, repayment_start_date: l.repaymentStartDate,
-        }));
-        const { data: insertedLoans, error: loansError } = await supabase.from('loans').insert(loansToInsert).select();
-        if (loansError) throw loansError;
-        newLoans = insertedLoans;
-
-        const loanEntriesToInsert = [];
-        for (const loan of newLoans) {
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'revenu' : 'depense',
-                category: loan.type === 'borrowing' ? 'Réception Emprunt' : 'Octroi de Prêt', frequency: 'ponctuel', amount: loan.principal,
-                date: loan.principal_date, supplier: loan.third_party, description: `Principal pour prêt/emprunt`
-            });
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'depense' : 'revenu',
-                category: loan.type === 'borrowing' ? 'Remboursement d\'emprunt' : 'Remboursement de prêt reçu', frequency: 'mensuel',
-                amount: loan.monthly_payment, start_date: loan.repayment_start_date,
-                end_date: addMonths(new Date(loan.repayment_start_date), loan.term - 1).toISOString().split('T')[0],
-                supplier: loan.third_party, description: `Remboursement prêt/emprunt`
-            });
-        }
-        const { data: insertedLoanEntries, error: loanEntriesError } = await supabase.from('budget_entries').insert(loanEntriesToInsert).select();
-        if (loanEntriesError) throw loanEntriesError;
-
-        for (const entry of insertedLoanEntries) {
-            const actuals = deriveActualsFromEntry(entry, entry.project_id, newCashAccountsData);
-            newActualsToInsert.push(...actuals);
-        }
-    }
 
     // Batch insert all actuals
     if (newActualsToInsert.length > 0) {
         const { error: actualsError } = await supabase.from('actual_transactions').insert(newActualsToInsert.map(a => ({
             id: a.id, budget_id: a.budgetId, project_id: a.projectId, user_id: user.id, type: a.type,
             category: a.category, third_party: a.thirdParty, description: a.description, date: a.date,
-            amount: a.amount, status: a.status, is_off_budget: a.isOffBudget, is_provision: a.isProvision,
-            is_final_provision_payment: a.isFinalProvisionPayment, provision_details: a.provisionDetails,
-            is_internal_transfer: a.isInternalTransfer,
+            amount: a.amount, status: a.status
         })));
         if (actualsError) throw actualsError;
     }
@@ -151,9 +129,8 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         type: 'INITIALIZE_PROJECT_SUCCESS', 
         payload: {
             newProject: {
-                id: newProjectData.id, name: newProjectData.name, currency: newProjectData.currency,
-                startDate: newProjectData.start_date, isArchived: newProjectData.is_archived,
-                annualGoals: newProjectData.annual_goals, expenseTargets: newProjectData.expense_targets
+                id: projectId, name: projectName, currency: '€', startDate: projectStartDate,
+                isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
             },
             finalCashAccounts: newCashAccountsData.map(acc => ({
                 id: acc.id, projectId: acc.project_id, mainCategoryId: acc.main_category_id,
@@ -161,23 +138,16 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
                 isClosed: acc.is_closed, closureDate: acc.closure_date
             })),
             newAllEntries: newEntriesData.map(entry => ({
-              id: entry.id, loanId: entry.loan_id, type: entry.type, category: entry.category, frequency: entry.frequency,
-              amount: entry.amount, date: entry.date, startDate: entry.start_date, endDate: entry.end_date,
-              supplier: entry.supplier, description: entry.description, isOffBudget: entry.is_off_budget,
-              payments: entry.payments, provisionDetails: entry.provisionDetails
+              id: entry.id, type: entry.type, category: entry.category, frequency: entry.frequency,
+              amount: entry.amount, date: entry.date, startDate: entry.start_date,
+              supplier: entry.supplier, description: entry.description
             })),
-            newAllActuals: newActualsToInsert.map(a => ({
-                ...a,
-                payments: []
-            })),
+            newAllActuals: newActualsToInsert.map(a => ({ ...a, payments: [] })),
             newTiers: createdTiers.map(t => ({ id: t.id, name: t.name, type: t.type })),
-            newLoans: newLoans.map(l => ({
-                id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
-                monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
-            })),
+            newLoans: [],
         }
     });
-    
+
   } catch (error) {
     console.error("Onboarding failed:", error);
     dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la création du projet: ${error.message}`, type: 'error' } });

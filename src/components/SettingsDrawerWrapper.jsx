@@ -1,38 +1,15 @@
 import React from 'react';
-import { X, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe } from 'lucide-react';
-import CategoryManagementView from './CategoryManagementView';
-import TiersManagementView from './TiersManagementView';
-import CashAccountsView from './CashAccountsView';
-import ArchiveManagementView from './ArchiveManagementView';
+import { X, FolderCog, Globe } from 'lucide-react';
 import TimezoneSettingsView from './TimezoneSettingsView';
 import ProjectSettingsView from './ProjectSettingsView';
-import UserManagementView from './UserManagementView';
-import { useBudget } from '../context/BudgetContext';
 
 const SettingsDrawerWrapper = ({ activeDrawer, onClose }) => {
-  const { state } = useBudget();
-  const { projects, activeProjectId } = state;
 
   if (!activeDrawer) return null;
 
-  const activeProject = projects.find(p => p.id === activeProjectId);
-  const isConsolidated = activeProjectId === 'consolidated';
-  
-  let cashAccountsTitle = 'Gérer les Comptes';
-  if (isConsolidated) {
-    cashAccountsTitle = 'Gérer les Comptes (Vue Consolidée)';
-  } else if (activeProject) {
-    cashAccountsTitle = `Gérer les comptes du projet "${activeProject.name}"`;
-  }
-
   const drawerConfig = {
     projectSettings: { title: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500', component: <ProjectSettingsView /> },
-    userManagement: { title: 'Gestion des Collaborateurs', icon: Users, color: 'text-purple-500', component: <UserManagementView /> },
-    categoryManagement: { title: 'Gérer les Catégories', icon: FolderKanban, color: 'text-orange-500', component: <CategoryManagementView /> },
-    tiersManagement: { title: 'Gérer les Tiers', icon: Users, color: 'text-pink-500', component: <TiersManagementView /> },
-    cashAccounts: { title: cashAccountsTitle, icon: Wallet, color: 'text-teal-500', component: <CashAccountsView /> },
     timezoneSettings: { title: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500', component: <TimezoneSettingsView /> },
-    archives: { title: 'Gérer les Archives', icon: Archive, color: 'text-slate-500', component: <ArchiveManagementView /> },
   };
 
   const currentConfig = drawerConfig[activeDrawer];

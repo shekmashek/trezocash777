@@ -102,13 +102,13 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   const settingsItems = [
     { id: 'projectSettings', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
-    { id: 'userManagement', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
+    { id: '/app/collaborateurs', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
     { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
-    { id: 'categoryManagement', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
-    { id: 'tiersManagement', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },
-    { id: 'cashAccounts', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
+    { id: '/app/categories', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
+    { id: '/app/tiers', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },
+    { id: '/app/comptes', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
     { id: 'timezoneSettings', label: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500' },
-    { id: 'archives', label: t('advancedSettings.archives'), icon: Archive, color: 'text-secondary-500' },
+    { id: '/app/archives', label: t('advancedSettings.archives'), icon: Archive, color: 'text-slate-500' },
   ];
 
   const newMenuItems = [
@@ -116,7 +116,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { label: 'Entrée reçue', icon: HandCoins, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'receivable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Encaisser directement des entrées" },
     { label: 'Sortie payée', icon: Banknote, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" },
     { label: 'Scénario', icon: Layers, action: onNewScenario, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Créer une nouvelle simulation financière" },
-    { label: 'Compte de liquidité', icon: Wallet, action: () => onOpenSettingsDrawer('cashAccounts'), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
+    { label: 'Compte de liquidité', icon: Wallet, action: () => navigate('/app/comptes'), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
   ];
 
   const handleSettingsItemClick = (itemId) => {

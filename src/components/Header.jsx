@@ -8,10 +8,12 @@ import TrezocashLogo from './TrezocashLogo';
 import ActionableBalanceDrawer from './ActionableBalanceDrawer';
 import SparklineChart from './SparklineChart';
 import Avatar from './Avatar';
+import { useNavigate } from 'react-router-dom';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { state, dispatch } = useBudget();
   const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews, projects, collaborators, allProfiles } = state;
+  const navigate = useNavigate();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -484,7 +486,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
             </div>
             <div className={`mt-3 space-y-2 ${isCollapsed ? 'px-0' : 'px-2'}`}>
               <button 
-                onClick={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'cashAccounts' })}
+                onClick={() => navigate('/app/comptes')}
                 className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 disabled:text-gray-400 disabled:cursor-not-allowed ${isCollapsed ? 'justify-center' : ''}`}
                 disabled={isConsolidated || isCustomConsolidated}
                 title={isCollapsed ? 'Ajouter un compte' : ''}
@@ -527,7 +529,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
             {!isCollapsed && (
               <div className="mt-3 px-2">
                 <button 
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'userManagement' })}
+                  onClick={() => navigate('/app/collaborateurs')}
                   className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50`}
                 >
                   <Settings className="w-4 h-4 shrink-0" />
