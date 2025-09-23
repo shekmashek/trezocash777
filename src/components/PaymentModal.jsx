@@ -3,7 +3,7 @@ import { X, DollarSign, Check } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
 
-const PaymentModal = ({ isOpen, onClose, actualToPay, type, onSave }) => {
+const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
   const { state, dispatch } = useBudget();
   const { allCashAccounts, settings, activeProjectId, projects } = state;
 
@@ -44,7 +44,13 @@ const PaymentModal = ({ isOpen, onClose, actualToPay, type, onSave }) => {
     const paymentData = { paymentDate, paidAmount: amount, cashAccount, isFinalPayment };
 
     const doSave = () => {
-        onSave(paymentData);
+        dispatch({
+            type: 'RECORD_PAYMENT',
+            payload: {
+                actualId: actualToPay.id,
+                paymentData,
+            }
+        });
         onClose();
     };
 

@@ -749,15 +749,7 @@ const BudgetTracker = () => {
   };
   
   return (
-    <div className="container mx-auto p-6 max-w-full">
-      <div className="mb-8 flex justify-between items-start">
-        <div className="flex items-center gap-4">
-            <Table className="w-8 h-8 text-blue-600" />
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Votre tableau de Trésorerie</h1>
-            </div>
-        </div>
-      </div>
+    <>
       <div className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -922,7 +914,7 @@ const BudgetTracker = () => {
         </div>
       </div>
       <TransactionDetailDrawer isOpen={drawerData.isOpen} onClose={handleCloseDrawer} transactions={drawerData.transactions} title={drawerData.title} currency={projectCurrency} />
-    </div>
+    </>
   );
 };
 

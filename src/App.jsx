@@ -12,7 +12,7 @@ import HomePage from './pages/HomePage';
 import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
 import DashboardView from './components/DashboardView';
-import BudgetTracker from './components/BudgetTracker';
+import TrezoPage from './pages/TrezoPage';
 import CashflowView from './components/CashflowView';
 import ScheduleView from './components/ScheduleView';
 import ScenarioView from './components/ScenarioView';
@@ -164,7 +164,7 @@ function App() {
               <Route path="/app" element={<AppLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
-                <Route path="trezo" element={<BudgetTracker />} />
+                <Route path="trezo" element={<TrezoPage />} />
                 <Route path="flux" element={<CashflowView />} />
                 <Route path="echeancier" element={<ScheduleView />} />
                 <Route path="scenarios" element={<ScenarioView />} />
