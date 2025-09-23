@@ -3,14 +3,14 @@ import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder } from 'lucide-react';
 import EmptyState from './EmptyState';
-import AddCategoryModal from './AddCategoryModal';
+import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
 
 const BudgetStateView = () => {
     const { state, dispatch } = useBudget();
     const { allEntries, activeProjectId, projects, categories, settings, consolidatedViews } = state;
     
-    const [addCategoryModalState, setAddCategoryModalState] = useState({ isOpen: false, type: '', mainCategoryId: '', mainCategoryName: '' });
+    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
 
     const { budgetEntries, isConsolidated } = useMemo(() => {
         const isConsolidatedView = activeProjectId === 'consolidated';
@@ -43,17 +43,8 @@ const BudgetStateView = () => {
         };
     }, [activeProjectId, projects, allEntries, consolidatedViews]);
 
-    const handleAddEntry = (categoryName, mainCategoryType) => {
-        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType } });
-    };
-
-    const handleOpenAddSubCategory = (type, mainCat) => {
-        setAddCategoryModalState({ isOpen: true, type, mainCategoryId: mainCat.id, mainCategoryName: mainCat.name });
-    };
-
-    const handleSaveNewCategory = (subCategoryName) => {
-        dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type: addCategoryModalState.type, mainCategoryId: addCategoryModalState.mainCategoryId, subCategoryName } });
-        setAddCategoryModalState({ isOpen: false, type: '', mainCategoryId: '', mainCategoryName: '' });
+    const handleAddEntry = (categoryName, mainCategoryType, mainCategoryId) => {
+        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
 
     const handleDeleteEntry = (entry) => {
@@ -142,13 +133,10 @@ const BudgetStateView = () => {
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span>Ajouter :</span>
                                                 {mainCat.subCategories.slice(0,3).map(sc => (
-                                                    <button key={sc.id} onClick={() => handleAddEntry(sc.name, type)} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300">
+                                                    <button key={sc.id} onClick={() => handleAddEntry(sc.name, type, mainCat.id)} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300">
                                                         <Plus size={12} /> {sc.name}
                                                     </button>
                                                 ))}
-                                                <button onClick={() => handleOpenAddSubCategory(type, mainCat)} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300">
-                                                    <Plus size={12} /> Nouvelle sous-catégorie
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -157,7 +145,7 @@ const BudgetStateView = () => {
                         })}
                         <tr className="border-b">
                             <td colSpan="8" className="py-4 px-4 text-center">
-                                <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
+                                <button onClick={() => setIsAddCategoryModalOpen(true)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
                                     <Plus size={16} /> Ajouter une catégorie
                                 </button>
                             </td>
@@ -180,11 +168,9 @@ const BudgetStateView = () => {
         <div>
             {renderSection('revenu')}
             {renderSection('depense')}
-            <AddCategoryModal 
-                isOpen={addCategoryModalState.isOpen}
-                onClose={() => setAddCategoryModalState({ isOpen: false, type: '', mainCategoryId: '', mainCategoryName: '' })}
-                onSave={handleSaveNewCategory}
-                mainCategoryName={addCategoryModalState.mainCategoryName}
+            <AddCategoryFlowModal 
+                isOpen={isAddCategoryModalOpen}
+                onClose={() => setIsAddCategoryModalOpen(false)}
             />
         </div>
     );

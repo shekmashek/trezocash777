@@ -20,7 +20,7 @@ import FocusView from '../components/FocusView';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
 import SaveTemplateModal from '../components/SaveTemplateModal';
-import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario } from '../context/actions';
+import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, deleteEntry } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
@@ -270,7 +270,7 @@ const AppLayout = () => {
     
     const handleDeleteEntryWrapper = (entryId) => {
         const entryToDelete = editingEntry || activeEntries.find(e => e.id === entryId);
-        dispatch({ type: 'DELETE_ENTRY', payload: { entryId, entryProjectId: entryToDelete?.projectId } });
+        deleteEntry(dispatch, { entryId, entryProjectId: entryToDelete?.projectId });
     };
 
     const handleNewBudgetEntry = () => dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null });
@@ -383,20 +383,6 @@ const AppLayout = () => {
                 <ActualTransactionModal
                     isOpen={isActualTransactionModalOpen}
                     onClose={() => dispatch({ type: 'CLOSE_ACTUAL_TRANSACTION_MODAL' })}
-                    onSave={(data) => saveActual(dispatch, { actualData: data, editingActual, user: state.session.user, tiers: state.tiers })}
-                    onDelete={(id) => {
-                        dispatch({
-                            type: 'OPEN_CONFIRMATION_MODAL',
-                            payload: {
-                                title: `Supprimer cette transaction ?`,
-                                message: 'Cette action est irréversible.',
-                                onConfirm: () => {
-                                    deleteActual(dispatch, id);
-                                    dispatch({ type: 'CLOSE_ACTUAL_TRANSACTION_MODAL' });
-                                },
-                            }
-                        });
-                    }}
                     editingData={editingActual}
                     type={editingActual?.type}
                 />
@@ -406,7 +392,6 @@ const AppLayout = () => {
                 <PaymentModal
                     isOpen={isPaymentModalOpen}
                     onClose={() => dispatch({ type: 'CLOSE_PAYMENT_MODAL' })}
-                    onSave={(paymentData) => recordPayment(dispatch, { actualId: payingActual.id, paymentData, allActuals: state.allActuals, user: state.session.user })}
                     actualToPay={payingActual}
                     type={payingActual?.type}
                 />

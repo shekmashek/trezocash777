@@ -182,7 +182,7 @@ const getInitialState = () => ({
     isConsolidatedViewModalOpen: false,
     editingConsolidatedView: null,
     activeProjectId: null,
-    activeTrezoView: 'tableau',
+    activeTrezoView: sessionStorage.getItem('activeTrezoView') || 'tableau',
     displayYear: new Date().getFullYear(),
     timeUnit: 'week',
     horizonLength: 6,
@@ -226,6 +226,7 @@ const budgetReducer = (state, action) => {
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
     case 'SET_ACTIVE_TREZO_VIEW':
+        sessionStorage.setItem('activeTrezoView', action.payload);
         return { ...state, activeTrezoView: action.payload };
     case 'OPEN_COMMENT_DRAWER':
         return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
@@ -669,12 +670,18 @@ const budgetReducer = (state, action) => {
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
-    case 'ADD_SUB_CATEGORY_SUCCESS': {
-        const { type, mainCategoryId, newSubCategory } = action.payload;
+    case 'ADD_MAIN_CATEGORY': {
+        const { type, newMainCategory } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        newCategories[type].push(newMainCategory);
+        return { ...state, categories: newCategories };
+    }
+    case 'ADD_SUB_CATEGORY': {
+        const { type, mainCategoryId, subCategoryName } = action.payload;
         const newCategories = JSON.parse(JSON.stringify(state.categories));
         const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
         if (mainCat) {
-            mainCat.subCategories.push(newSubCategory);
+            mainCat.subCategories.push({ id: uuidv4(), name: subCategoryName });
         }
         return { ...state, categories: newCategories };
     }

@@ -223,7 +223,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
         };
 
         let savedEntryFromDB;
-        if (editingEntry) {
+        if (editingEntry && editingEntry.id) {
             const { data, error } = await supabase
                 .from('budget_entries')
                 .update(finalEntryDataForDB)
