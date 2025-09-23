@@ -11,12 +11,16 @@ const getDefaultExpenseTargets = () => ({
 
 export const initializeProject = async (dispatch, payload, user, existingTiersData, allTemplates) => {
   try {
-    const { projectName, projectStartDate, templateId, startOption } = payload;
+    const { projectName, projectStartDate, projectEndDate, isEndDateIndefinite, templateId, startOption } = payload;
     
     const { data: newProjectData, error: projectError } = await supabase
         .from('projects')
         .insert({
-            user_id: user.id, name: projectName, start_date: projectStartDate, currency: '€',
+            user_id: user.id,
+            name: projectName,
+            start_date: projectStartDate,
+            end_date: isEndDateIndefinite ? null : projectEndDate,
+            currency: '€',
             expense_targets: getDefaultExpenseTargets(),
         })
         .select().single();
@@ -24,7 +28,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
 
     const projectId = newProjectData.id;
 
-    if (startOption === 'blank') {
+    if (startOption === 'blank' || templateId === 'blank') {
         const { data: defaultAccount, error: accountError } = await supabase
             .from('cash_accounts')
             .insert({
@@ -38,7 +42,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
             type: 'INITIALIZE_PROJECT_SUCCESS', 
             payload: {
                 newProject: {
-                    id: projectId, name: projectName, currency: '€', startDate: projectStartDate,
+                    id: projectId, name: projectName, currency: '€', startDate: projectStartDate, endDate: isEndDateIndefinite ? null : projectEndDate,
                     isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
                 },
                 finalCashAccounts: [{
@@ -120,7 +124,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         type: 'INITIALIZE_PROJECT_SUCCESS', 
         payload: {
             newProject: {
-                id: projectId, name: projectName, currency: '€', startDate: projectStartDate,
+                id: projectId, name: projectName, currency: '€', startDate: projectStartDate, endDate: isEndDateIndefinite ? null : projectEndDate,
                 isArchived: false, annualGoals: {}, expenseTargets: getDefaultExpenseTargets()
             },
             finalCashAccounts: newCashAccountsData.map(acc => ({
@@ -145,6 +149,41 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
     dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la création du projet: ${error.message}`, type: 'error' } });
     throw error;
   }
+};
+
+export const updateProjectSettings = async (dispatch, { projectId, newSettings }) => {
+    try {
+        const updates = {
+            name: newSettings.name,
+            start_date: newSettings.startDate,
+            end_date: newSettings.endDate,
+        };
+
+        const { data, error } = await supabase
+            .from('projects')
+            .update(updates)
+            .eq('id', projectId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        dispatch({
+            type: 'UPDATE_PROJECT_SETTINGS_SUCCESS',
+            payload: {
+                projectId,
+                newSettings: {
+                    name: data.name,
+                    startDate: data.start_date,
+                    endDate: data.end_date,
+                }
+            }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres du projet mis à jour.', type: 'success' } });
+    } catch (error) {
+        console.error("Error updating project settings:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
 };
 
 // Keep other actions as they are

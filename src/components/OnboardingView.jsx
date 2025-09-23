@@ -24,9 +24,11 @@ const OnboardingView = () => {
   const [direction, setDirection] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState({
-    templateId: 'blank',
     projectName: '',
     projectStartDate: new Date().toISOString().split('T')[0],
+    projectEndDate: '',
+    isEndDateIndefinite: true,
+    templateId: 'blank',
     startOption: 'blank',
   });
 
@@ -34,7 +36,8 @@ const OnboardingView = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const steps = [
-    { id: 'template', title: 'Choisissez un modèle pour votre projet' },
+    { id: 'details', title: 'Détails de votre projet' },
+    { id: 'template', title: 'Choisissez un modèle' },
     { id: 'start', title: 'Comment voulez-vous commencer ?' },
     { id: 'finish', title: 'Finalisation' },
   ];
@@ -45,14 +48,11 @@ const OnboardingView = () => {
       dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du projet est obligatoire.", type: 'error' } });
       return;
     }
-    if (step === 0 && !data.templateId) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez choisir un modèle.", type: 'error' } });
-      return;
-    }
     
-    if (step === 0 && data.templateId === 'blank') {
+    if (step === 1 && data.templateId === 'blank') {
+      setData(prev => ({ ...prev, startOption: 'blank' }));
       setDirection(1);
-      setStep(step + 2); // Skip 'start' step
+      setStep(3); // Skip to 'finish' step
       return;
     }
 
@@ -63,9 +63,9 @@ const OnboardingView = () => {
   };
 
   const handleBack = () => {
-    if (step === 2 && data.templateId === 'blank') {
+    if (step === 3 && data.templateId === 'blank') {
         setDirection(-1);
-        setStep(0); // Go back to details
+        setStep(1); // Go back to template selection
         return;
     }
     if (step > 0) {
@@ -96,7 +96,7 @@ const OnboardingView = () => {
     return [blankTemplate, ...officialTemplates.personal, ...officialTemplates.professional];
   }, []);
 
-  const communityTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.isPublic && t.userId !== session.user.id), [userAndCommunityTemplates, session.user.id]);
+  const communityTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.isPublic), [userAndCommunityTemplates]);
   const myTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.userId === session.user.id), [userAndCommunityTemplates, session.user.id]);
 
   const filteredTemplates = useMemo(() => {
@@ -117,11 +117,37 @@ const OnboardingView = () => {
 
   const renderStepContent = () => {
     switch (currentStepInfo.id) {
+      case 'details':
+        return (
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">{currentStepInfo.title}</h2>
+            <div className="space-y-6 max-w-md mx-auto">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 text-left mb-1">Nom du projet *</label>
+                <input type="text" value={data.projectName} onChange={(e) => setData(prev => ({ ...prev, projectName: e.target.value }))} placeholder="Ex: Mon Budget 2025" className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" autoFocus required />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de début</label>
+                    <input type="date" value={data.projectStartDate} onChange={(e) => setData(prev => ({ ...prev, projectStartDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de fin</label>
+                    <input type="date" value={data.projectEndDate} onChange={(e) => setData(prev => ({ ...prev, projectEndDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent disabled:bg-gray-100" disabled={data.isEndDateIndefinite} min={data.projectStartDate} />
+                </div>
+              </div>
+              <div className="flex items-center justify-end">
+                <input type="checkbox" id="indefinite-date" checked={data.isEndDateIndefinite} onChange={(e) => setData(prev => ({ ...prev, isEndDateIndefinite: e.target.checked, projectEndDate: e.target.checked ? '' : prev.projectEndDate }))} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                <label htmlFor="indefinite-date" className="ml-2 block text-sm text-gray-900">Durée indéterminée</label>
+              </div>
+            </div>
+          </div>
+        );
       case 'template':
         return (
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Galerie de Modèles</h2>
-            <p className="text-gray-600 mb-6">Choisissez un modèle pour démarrer votre projet plus rapidement.</p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">{currentStepInfo.title}</h2>
+            <p className="text-gray-600 mb-6">Commencez avec un projet vierge ou choisissez un modèle pour démarrer plus rapidement.</p>
             
             <div className="flex justify-center border-b mb-6">
               <button onClick={() => setActiveTab('official')} className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 ${activeTab === 'official' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}><Star className="w-4 h-4"/>Modèles Officiels</button>
@@ -138,7 +164,7 @@ const OnboardingView = () => {
               {filteredTemplates.map(template => {
                 const isSelected = data.templateId === template.id;
                 return (
-                  <button key={template.id} onClick={() => setData(prev => ({...prev, templateId: template.id, startOption: template.id === 'blank' ? 'blank' : prev.startOption}))} className={`p-4 border-2 rounded-lg text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-400'}`}>
+                  <button key={template.id} onClick={() => setData(prev => ({...prev, templateId: template.id}))} className={`p-4 border-2 rounded-lg text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-400'}`}>
                     <TemplateIcon icon={template.icon} color={template.color} className="w-7 h-7 mb-2" />
                     <h4 className="font-semibold text-gray-800">{template.name}</h4>
                     <p className="text-xs text-gray-500">{template.description}</p>
@@ -146,17 +172,6 @@ const OnboardingView = () => {
                 );
               })}
             </div>
-            
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-md mx-auto">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 text-left mb-1">Nom du projet *</label>
-                <input type="text" value={data.projectName} onChange={(e) => setData(prev => ({ ...prev, projectName: e.target.value }))} placeholder="Ex: Mon Budget 2025" className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" autoFocus required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de début du projet</label>
-                <input type="date" value={data.projectStartDate} onChange={(e) => setData(prev => ({ ...prev, projectStartDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" />
-              </div>
-            </motion.div>
           </div>
         );
       case 'start':
@@ -165,11 +180,11 @@ const OnboardingView = () => {
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Comment voulez-vous commencer ?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
               <button onClick={() => { setData(prev => ({...prev, startOption: 'populated'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all text-left">
-                <h3 className="font-semibold text-lg">Avec un modèle pré-rempli</h3>
+                <h3 className="font-semibold text-lg">Avec des données d'exemple</h3>
                 <p className="text-sm text-gray-600">Idéal pour démarrer vite avec des exemples concrets que vous pourrez modifier.</p>
               </button>
               <button onClick={() => { setData(prev => ({...prev, startOption: 'blank'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-gray-100 hover:border-gray-400 transition-all text-left">
-                <h3 className="font-semibold text-lg">Avec un projet vierge</h3>
+                <h3 className="font-semibold text-lg">Avec une structure vierge</h3>
                 <p className="text-sm text-gray-600">Parfait si vous préférez tout configurer vous-même de A à Z.</p>
               </button>
             </div>
@@ -220,7 +235,7 @@ const OnboardingView = () => {
             </button>
           )}
           {step < steps.length - 1 && (
-            <button onClick={handleNext} disabled={isLoading || (step === 0 && !data.templateId)} className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold disabled:bg-gray-400">
+            <button onClick={handleNext} disabled={isLoading || (step === 0 && !data.projectName.trim()) || (step === 1 && !data.templateId)} className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold disabled:bg-gray-400">
               Suivant <ArrowRight className="w-4 h-4" />
             </button>
           )}

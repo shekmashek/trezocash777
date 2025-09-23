@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, AlertCircle } from 'lucide-react';
 import { useBudget } from '../context/BudgetContext';
+import { updateProjectSettings } from '../context/actions';
 
 const ProjectSettingsView = () => {
   const { state, dispatch } = useBudget();
@@ -10,11 +11,15 @@ const ProjectSettingsView = () => {
 
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isEndDateIndefinite, setIsEndDateIndefinite] = useState(true);
 
   useEffect(() => {
     if (activeProject) {
       setName(activeProject.name);
       setStartDate(activeProject.startDate || new Date().toISOString().split('T')[0]);
+      setEndDate(activeProject.endDate || '');
+      setIsEndDateIndefinite(!activeProject.endDate);
     }
   }, [activeProject]);
 
@@ -23,11 +28,12 @@ const ProjectSettingsView = () => {
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Le nom et la date de début sont requis.', type: 'error' } });
       return;
     }
-    dispatch({
-      type: 'UPDATE_PROJECT_SETTINGS',
-      payload: {
-        projectId: activeProjectId,
-        newSettings: { name, startDate }
+    updateProjectSettings(dispatch, {
+      projectId: activeProjectId,
+      newSettings: {
+        name,
+        startDate,
+        endDate: isEndDateIndefinite ? null : endDate
       }
     });
   };
@@ -71,6 +77,32 @@ const ProjectSettingsView = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
              <p className="text-xs text-gray-500 mt-1">Aucune transaction ne peut être enregistrée avant cette date.</p>
+          </div>
+           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de Fin du Projet</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100"
+              disabled={isEndDateIndefinite}
+              min={startDate}
+            />
+            <div className="flex items-center mt-2">
+                <input
+                    type="checkbox"
+                    id="project-indefinite-date"
+                    checked={isEndDateIndefinite}
+                    onChange={(e) => {
+                        setIsEndDateIndefinite(e.target.checked);
+                        if (e.target.checked) setEndDate('');
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="project-indefinite-date" className="ml-2 block text-sm text-gray-900">
+                    Durée indéterminée
+                </label>
+            </div>
           </div>
         </div>
       </div>

@@ -1014,7 +1014,7 @@ export const BudgetProvider = ({ children }) => {
           if (profilesError) throw profilesError;
 
           const projects = (projectsRes.data || []).map(p => ({
-            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived, user_id: p.user_id,
+            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id,
             annualGoals: p.annual_goals, expenseTargets: p.expense_targets
           }));
           
