@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useBudget } from './context/BudgetContext';
 import OnboardingView from './components/OnboardingView';
 import AuthView from './components/AuthView';
@@ -28,6 +28,11 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminLayout from './layouts/AdminLayout';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
+import CollaboratorsPage from './pages/CollaboratorsPage';
+import CashAccountsPage from './pages/CashAccountsPage';
+import CategoryManagementPage from './pages/CategoryManagementPage';
+import TiersManagementPage from './pages/TiersManagementPage';
+import ArchivesPage from './pages/ArchivesPage';
 
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
@@ -74,24 +79,9 @@ const ToastContainer = () => {
   );
 };
 
-const ProtectedRoute = ({ children }) => {
-  const { state } = useBudget();
-  const { session, isOnboarding, projects } = state;
-
-  if (!session) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (isOnboarding || projects.length === 0) {
-    return <OnboardingView />;
-  }
-
-  return children;
-};
-
 function App() {
   const { state, dispatch } = useBudget();
-  const { session, isLoading } = state;
+  const { session, isLoading, profile } = state;
   const [authMode, setAuthMode] = useState({ mode: null, fromTrial: false });
 
   useEffect(() => {
@@ -112,7 +102,32 @@ function App() {
     );
   }
 
+  const ProtectedRoute = ({ children }) => {
+    const location = useLocation();
+    
+    if (!session) {
+      return <Navigate to="/" replace />;
+    }
+
+    if (profile?.role === 'superadmin' && !location.pathname.startsWith('/admin')) {
+        return <Navigate to="/admin/dashboard" replace />;
+    }
+
+    if (state.isOnboarding || state.projects.length === 0) {
+      return <OnboardingView />;
+    }
+
+    return children;
+  };
+
   const PublicArea = () => {
+    if (session) {
+      if (profile?.role === 'superadmin') {
+        return <Navigate to="/admin/dashboard" replace />;
+      }
+      return <Navigate to="/app" replace />;
+    }
+
     if (authMode.mode) {
       return <AuthView 
         initialMode={authMode.mode}
@@ -134,55 +149,49 @@ function App() {
     <>
       <ToastContainer />
       <Routes>
-        {session ? (
-          <>
-            {/* Admin Routes are checked first for authenticated users */}
-            <Route element={<AdminProtectedRoute />}>
-                <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<AdminDashboardPage />} />
-                </Route>
-            </Route>
+          <Route element={<AdminProtectedRoute />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<AdminDashboardPage />} />
+              </Route>
+          </Route>
 
-            {/* Regular App Routes */}
-            <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardView />} />
-              <Route path="trezo" element={<BudgetTracker />} />
-              <Route path="flux" element={<CashflowView />} />
-              <Route path="echeancier" element={<ScheduleView />} />
-              <Route path="scenarios" element={<ScenarioView />} />
-              <Route path="analyse" element={<ExpenseAnalysisView />} />
-              <Route path="journal-budget" element={<JournalsView type="budget" />} />
-              <Route path="journal-paiements" element={<JournalsView type="payment" />} />
-              <Route path="profil" element={<ProfilePage />} />
-              <Route path="securite" element={<SecurityPage />} />
-              <Route path="abonnement" element={<SubscriptionPage />} />
-              <Route path="display-settings" element={<DisplaySettingsPage />} />
-              <Route path="delete-account" element={<DeleteAccountPage />} />
-              <Route path="factures" element={<UnderConstructionView title="Factures" />} />
-              <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
-            </Route>
+          <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardView />} />
+            <Route path="trezo" element={<BudgetTracker />} />
+            <Route path="flux" element={<CashflowView />} />
+            <Route path="echeancier" element={<ScheduleView />} />
+            <Route path="scenarios" element={<ScenarioView />} />
+            <Route path="analyse" element={<ExpenseAnalysisView />} />
+            <Route path="journal-budget" element={<JournalsView type="budget" />} />
+            <Route path="journal-paiements" element={<JournalsView type="payment" />} />
+            <Route path="profil" element={<ProfilePage />} />
+            <Route path="securite" element={<SecurityPage />} />
+            <Route path="abonnement" element={<SubscriptionPage />} />
+            <Route path="collaborateurs" element={<CollaboratorsPage />} />
+            <Route path="comptes" element={<CashAccountsPage />} />
+            <Route path="categories" element={<CategoryManagementPage />} />
+            <Route path="tiers" element={<TiersManagementPage />} />
+            <Route path="archives" element={<ArchivesPage />} />
+            <Route path="display-settings" element={<DisplaySettingsPage />} />
+            <Route path="delete-account" element={<DeleteAccountPage />} />
+            <Route path="factures" element={<UnderConstructionView title="Factures" />} />
+            <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
+          </Route>
 
-            {/* Catch-all for logged-in users, redirects to their main dashboard */}
-            <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
-          </>
-        ) : (
-          <>
-            {/* Public routes and admin login for unauthenticated users */}
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route element={<PublicArea />}>
-              <Route path="/" element={<HomePageWithAuthTrigger />} />
-              <Route path="/a-propos" element={<AboutPage />} />
-              <Route path="/cgu" element={<LegalPage type="cgu" />} />
-              <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
-              <Route path="/cookies" element={<LegalPage type="cookies" />} />
-              <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
-              <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </>
-        )}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          
+          <Route element={<PublicArea />}>
+            <Route path="/" element={<HomePageWithAuthTrigger />} />
+            <Route path="/a-propos" element={<AboutPage />} />
+            <Route path="/cgu" element={<LegalPage type="cgu" />} />
+            <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
+            <Route path="/cookies" element={<LegalPage type="cookies" />} />
+            <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
+            <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
       </Routes>
     </>
   );
