@@ -141,7 +141,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
             return;
         }
     }
-    onSave({ ...entryData, endDate: entryData.endDate || null });
+    onSave({ ...entryData, endDate: entryData.endDate || null, projectId: editingEntry?.projectId || activeProjectId });
   };
 
   const handleGenerateProvisions = () => {
