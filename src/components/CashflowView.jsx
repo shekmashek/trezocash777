@@ -446,7 +446,8 @@ const CashflowView = ({ isFocusMode = false }) => {
             barMaxWidth: 50,
             data: inflows.map(item => item.value),
             itemStyle: {
-                color: (params) => inflows[params.dataIndex].isFuture ? '#86efac' : '#22c55e'
+                color: (params) => inflows[params.dataIndex].isFuture ? '#86efac' : '#22c55e',
+                borderRadius: [5, 5, 0, 0]
             },
             label: {
                 show: true,
@@ -463,7 +464,8 @@ const CashflowView = ({ isFocusMode = false }) => {
             barMaxWidth: 50,
             data: outflows.map(item => -item.value),
             itemStyle: {
-                color: (params) => outflows[params.dataIndex].isFuture ? '#fca5a5' : '#ef4444'
+                color: (params) => outflows[params.dataIndex].isFuture ? '#fca5a5' : '#ef4444',
+                borderRadius: [0, 0, 5, 5]
             },
             label: {
                 show: true,

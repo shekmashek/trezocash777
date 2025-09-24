@@ -555,7 +555,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 name: `Budget: ${formatCurrency(totalBudget, settings)}`,
                 type: 'bar',
                 data: budgetData,
-                itemStyle: { color: chartColors.budget },
+                itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] },
                 emphasis: { focus: 'series' },
                 label: {
                     show: true,
@@ -572,7 +572,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 name: `Réel: ${formatCurrency(totalActual, settings)}`,
                 type: 'bar',
                 data: actualData,
-                itemStyle: { color: chartColors.actual },
+                itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] },
                 emphasis: { focus: 'series' },
                 label: {
                     show: true,
@@ -617,7 +617,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             name: drillDownState.dataType === 'actual' ? 'Réel' : 'Budget',
             type: 'bar',
             data: data.map(d => d.value),
-            itemStyle: { color: barColor },
+            itemStyle: { color: barColor, borderRadius: [0, 5, 5, 0] },
             label: {
                 show: true,
                 position: 'right',
@@ -660,7 +660,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             name: drillDownState.dataType === 'actual' ? 'Réel' : 'Budget',
             type: 'bar',
             data: data.map(d => d.value),
-            itemStyle: { color: barColor },
+            itemStyle: { color: barColor, borderRadius: [0, 5, 5, 0] },
             label: {
                 show: true,
                 position: 'right',
@@ -691,8 +691,8 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: projects },
         series: [
-            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
-            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
+            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
+            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
         ]
     };
   };
@@ -713,8 +713,8 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: tiers },
         series: [
-            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
-            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
+            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
+            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
         ]
     };
   };
