@@ -312,8 +312,9 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
 
 export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
     try {
-        if (!entryProjectId) {
-            throw new Error("L'ID du projet est manquant pour la suppression.");
+        if (!entryProjectId || entryProjectId === 'consolidated' || entryProjectId.startsWith('consolidated_view_')) {
+            dispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une entrée en vue consolidée.", type: 'error' } });
+            return;
         }
 
         const unsettledStatuses = ['pending', 'partially_paid', 'partially_received'];
@@ -913,10 +914,41 @@ export const saveMainCategory = async (dispatch, { type, name, user }) => {
 
         dispatch({ type: 'ADD_MAIN_CATEGORY_SUCCESS', payload: { type, newMainCategory } });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale ajoutée.', type: 'success' } });
-
+        return newMainCategory;
     } catch (error) {
         console.error("Error saving main category:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        return null;
+    }
+};
+
+export const saveSubCategory = async (dispatch, { type, mainCategoryId, subCategoryName, user }) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_categories')
+            .insert({
+                user_id: user.id,
+                parent_id: mainCategoryId,
+                name: subCategoryName,
+                type: type,
+                is_fixed: false,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        
+        const newSubCategory = {
+            id: data.id,
+            name: data.name,
+        };
+
+        dispatch({ type: 'ADD_SUB_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newSubCategory } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Sous-catégorie ajoutée.', type: 'success' } });
+        return newSubCategory;
+    } catch (error) {
+        console.error("Error saving sub category:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        return null;
     }
 };
 

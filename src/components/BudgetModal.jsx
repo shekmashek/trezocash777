@@ -4,10 +4,11 @@ import { formatCurrency } from '../utils/formatting';
 import AddCategoryModal from './AddCategoryModal';
 import { useBudget } from '../context/BudgetContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { saveSubCategory } from '../context/actions';
 
 const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const { state, dispatch } = useBudget();
-  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects } = state;
+  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects, session } = state;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const isContextualAdd = useMemo(() => editingData && !editingData.id && editingData.category, [editingData]);
@@ -211,10 +212,27 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       default: return '';
     }
   };
-  const handleSaveNewCategory = (subCategoryName) => { 
-    dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type: formData.type, mainCategoryId: selectedMainCategoryId, subCategoryName: subCategoryName } }); 
-    setFormData(prev => ({ ...prev, category: subCategoryName })); 
-    setIsAddCategoryModalOpen(false); 
+  
+  const handleSaveNewCategory = async (subCategoryName) => {
+    const user = session.user;
+    if (!user) {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        return;
+    }
+
+    const typeForDB = formData.type === 'revenu' ? 'revenue' : 'expense';
+
+    const newSubCategory = await saveSubCategory(dispatch, {
+        type: typeForDB,
+        mainCategoryId: selectedMainCategoryId,
+        subCategoryName: subCategoryName,
+        user: user
+    });
+
+    if (newSubCategory) {
+        setFormData(prev => ({ ...prev, category: newSubCategory.name }));
+        setIsAddCategoryModalOpen(false);
+    }
   };
 
   if (!isOpen) return null;

@@ -1,81 +1,31 @@
 import React, { useState, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { X, Save, Plus, FolderPlus, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, Save, FolderPlus, Plus } from 'lucide-react';
 import { useBudget } from '../context/BudgetContext';
+import { saveMainCategory } from '../context/actions';
 
-const AddCategoryFlowModal = ({ isOpen, onClose }) => {
+const AddCategoryFlowModal = ({ isOpen, onClose, type, onCategorySelected }) => {
     const { state, dispatch } = useBudget();
-    const { categories } = state;
+    const { categories, allEntries, activeProjectId, session } = state;
 
-    const [type, setType] = useState('expense');
-    const [mainCategorySelection, setMainCategorySelection] = useState('');
     const [newMainCategoryName, setNewMainCategoryName] = useState('');
-    const [newSubCategoryName, setNewSubCategoryName] = useState('');
 
-    const availableMainCategories = useMemo(() => {
-        return type === 'expense' ? categories.expense : categories.revenue;
-    }, [type, categories]);
-
-    const resetForm = () => {
-        setType('expense');
-        setMainCategorySelection('');
-        setNewMainCategoryName('');
-        setNewSubCategoryName('');
-    };
-
-    const handleClose = () => {
-        resetForm();
-        onClose();
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
-        if (!newSubCategoryName.trim()) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom de la sous-catégorie est obligatoire.", type: 'error' } });
-            return;
-        }
-
-        let mainCatId;
-        let mainCatName;
-
-        if (mainCategorySelection === 'new') {
-            if (!newMainCategoryName.trim()) {
-                dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom de la nouvelle catégorie principale est obligatoire.", type: 'error' } });
-                return;
-            }
-            mainCatId = uuidv4();
-            mainCatName = newMainCategoryName.trim();
-            const newMainCategory = {
-                id: mainCatId,
-                name: mainCatName,
-                isFixed: false,
-                subCategories: [],
-            };
-            const categoryType = type === 'expense' ? 'expense' : 'revenue';
-            dispatch({ type: 'ADD_MAIN_CATEGORY', payload: { type: categoryType, newMainCategory } });
-        } else {
-            mainCatId = mainCategorySelection;
-            mainCatName = availableMainCategories.find(mc => mc.id === mainCatId)?.name;
-        }
-
-        if (!mainCatId) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez sélectionner ou créer une catégorie principale.", type: 'error' } });
-            return;
-        }
-
-        const categoryType = type === 'expense' ? 'expense' : 'revenue';
-        dispatch({
-            type: 'ADD_SUB_CATEGORY',
-            payload: {
-                type: categoryType,
-                mainCategoryId: mainCatId,
-                subCategoryName: newSubCategoryName.trim(),
-            }
-        });
+    const unusedMainCategories = useMemo(() => {
+        if (!type) return [];
+        const projectEntries = allEntries[activeProjectId] || [];
+        const usedSubCategoryNames = new Set(projectEntries.map(e => e.category));
         
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Sous-catégorie "${newSubCategoryName}" ajoutée à "${mainCatName}".`, type: 'success' } });
-        handleClose();
+        return categories[type === 'revenu' ? 'revenue' : 'expense'].filter(mainCat => 
+            !mainCat.subCategories.some(subCat => usedSubCategoryNames.has(subCat.name))
+        );
+    }, [type, categories, allEntries, activeProjectId]);
+
+    const handleCreateAndSelect = async (e) => {
+        e.preventDefault();
+        if (!newMainCategoryName.trim()) return;
+        const newCategory = await saveMainCategory(dispatch, { type: type === 'revenu' ? 'revenue' : 'expense', name: newMainCategoryName.trim(), user: session.user });
+        if (newCategory) {
+            onCategorySelected(newCategory.id);
+        }
     };
 
     if (!isOpen) return null;
@@ -86,70 +36,56 @@ const AddCategoryFlowModal = ({ isOpen, onClose }) => {
                 <div className="flex items-center justify-between p-4 border-b">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <FolderPlus className="w-5 h-5 text-blue-600" />
-                        Ajouter une Catégorie
+                        Ajouter une écriture
                     </h2>
-                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center"><input type="radio" name="type" value="expense" checked={type === 'expense'} onChange={(e) => setType(e.target.value)} className="mr-2" /><TrendingDown className="w-4 h-4 mr-1 text-red-600" /> Dépense</label>
-                            <label className="flex items-center"><input type="radio" name="type" value="revenue" checked={type === 'revenue'} onChange={(e) => setType(e.target.value)} className="mr-2" /><TrendingUp className="w-4 h-4 mr-1 text-green-600" /> Revenu</label>
+                        <h3 className="text-md font-semibold text-gray-800 mb-2">Choisir une catégorie existante non utilisée</h3>
+                        {unusedMainCategories.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {unusedMainCategories.map(cat => (
+                                    <button 
+                                        key={cat.id} 
+                                        onClick={() => onCategorySelected(cat.id)}
+                                        className="p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300"
+                                    >
+                                        {cat.name}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 text-center py-4">Toutes vos catégories sont déjà utilisées dans ce projet.</p>
+                        )}
+                    </div>
+                    <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="w-full border-t border-gray-300" />
+                        </div>
+                        <div className="relative flex justify-center">
+                            <span className="bg-white px-2 text-sm text-gray-500">OU</span>
                         </div>
                     </div>
-
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie Principale</label>
-                        <select
-                            value={mainCategorySelection}
-                            onChange={(e) => setMainCategorySelection(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
-                        >
-                            <option value="">Sélectionner une catégorie existante</option>
-                            {availableMainCategories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                            <option value="new">--- Créer une nouvelle catégorie principale ---</option>
-                        </select>
-                    </div>
-
-                    {mainCategorySelection === 'new' && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la nouvelle catégorie principale</label>
+                        <h3 className="text-md font-semibold text-gray-800 mb-2">Créer une nouvelle catégorie principale</h3>
+                        <form onSubmit={handleCreateAndSelect} className="flex gap-2">
                             <input
                                 type="text"
                                 value={newMainCategoryName}
                                 onChange={(e) => setNewMainCategoryName(e.target.value)}
                                 placeholder="Ex: Investissements Personnels"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                required
                             />
-                        </motion.div>
-                    )}
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la nouvelle sous-catégorie *</label>
-                        <input
-                            type="text"
-                            value={newSubCategoryName}
-                            onChange={(e) => setNewSubCategoryName(e.target.value)}
-                            placeholder="Ex: Actions, Immobilier..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                            required
-                        />
+                            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm">
+                                <Plus className="w-4 h-4" /> Créer et Sélectionner
+                            </button>
+                        </form>
                     </div>
-                    
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                        <button type="button" onClick={handleClose} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">
-                            Annuler
-                        </button>
-                        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
-                            <Save className="w-4 h-4" /> Enregistrer
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     );

@@ -10,7 +10,8 @@ const BudgetStateView = () => {
     const { state, dispatch } = useBudget();
     const { allEntries, activeProjectId, projects, categories, settings, consolidatedViews } = state;
     
-    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+    const [isAddCategoryFlowModalOpen, setIsAddCategoryFlowModalOpen] = useState(false);
+    const [addCategoryFlowType, setAddCategoryFlowType] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
     const { budgetEntries, isConsolidated } = useMemo(() => {
@@ -61,6 +62,11 @@ const BudgetStateView = () => {
         deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId });
     };
 
+    const handleCategorySelectedForNewEntry = (mainCategoryId) => {
+        setIsAddCategoryFlowModalOpen(false);
+        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: addCategoryFlowType, mainCategoryId } });
+    };
+
     const renderSection = (type) => {
         const isRevenue = type === 'revenu';
         const title = isRevenue ? 'Revenus' : 'Dépenses';
@@ -70,9 +76,9 @@ const BudgetStateView = () => {
         const sectionEntries = filteredBudgetEntries.filter(e => e.type === type);
         const totalAmount = sectionEntries.reduce((sum, e) => sum + e.amount, 0);
 
-        if (sectionEntries.length === 0) {
-            return null;
-        }
+        const hasAnyEntriesForSection = budgetEntries.some(e => e.type === type);
+
+        if (!hasAnyEntriesForSection && searchTerm) return null;
 
         return (
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
@@ -100,7 +106,9 @@ const BudgetStateView = () => {
                             const entriesForMainCat = sectionEntries.filter(entry => 
                                 mainCat.subCategories.some(sc => sc.name === entry.category)
                             );
-                            if (entriesForMainCat.length === 0) return null;
+                            
+                            if (entriesForMainCat.length === 0 && searchTerm) return null;
+                            if (entriesForMainCat.length === 0 && !searchTerm) return null;
 
                             const mainCatTotal = entriesForMainCat.reduce((sum, e) => sum + e.amount, 0);
                             const percentage = totalAmount > 0 ? (mainCatTotal / totalAmount) * 100 : 0;
@@ -116,7 +124,9 @@ const BudgetStateView = () => {
                                         </td>
                                         <td className="py-3 px-4 text-right">
                                             {formatCurrency(mainCatTotal, settings)}
-                                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">{percentage.toFixed(1)}%</span>
+                                            {totalAmount > 0 && (
+                                                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">{percentage.toFixed(1)}%</span>
+                                            )}
                                         </td>
                                         <td className="py-3 px-4"></td>
                                     </tr>
@@ -163,8 +173,8 @@ const BudgetStateView = () => {
                         })}
                         <tr className="border-b">
                             <td colSpan="9" className="py-4 px-4 text-center">
-                                <button onClick={() => setIsAddCategoryModalOpen(true)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
-                                    <Plus size={16} /> Ajouter une catégorie
+                                <button onClick={() => { setAddCategoryFlowType(type); setIsAddCategoryFlowModalOpen(true); }} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
+                                    <Plus size={16} /> Ajouter une écriture dans une autre catégorie
                                 </button>
                             </td>
                         </tr>
@@ -211,8 +221,10 @@ const BudgetStateView = () => {
             )}
             
             <AddCategoryFlowModal 
-                isOpen={isAddCategoryModalOpen}
-                onClose={() => setIsAddCategoryModalOpen(false)}
+                isOpen={isAddCategoryFlowModalOpen}
+                onClose={() => setIsAddCategoryFlowModalOpen(false)}
+                type={addCategoryFlowType}
+                onCategorySelected={handleCategorySelectedForNewEntry}
             />
         </div>
     );
