@@ -49,7 +49,7 @@ begin
   delete from public.profiles where id = user_id_to_delete;
 
   -- Finally, delete the user from the auth schema
-  -- This requires the 'supabase_auth_admin' role, which SECURITY DEFINER provides.
+  -- This requires the 'apiService_auth_admin' role, which SECURITY DEFINER provides.
   perform auth.admin_delete_user(user_id_to_delete);
 end;
 $$;

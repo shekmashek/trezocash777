@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { LogOut, LayoutDashboard, Users } from 'lucide-react';
 import TrezocashLogo from '../components/TrezocashLogo';
 
@@ -8,7 +8,7 @@ const AdminLayout = () => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        await apiService.auth.signOut();
         navigate('/admin/login');
     };
 

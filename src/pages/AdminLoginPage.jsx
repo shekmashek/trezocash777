@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { useBudget } from '../context/BudgetContext';
 import TrezocashLogo from '../components/TrezocashLogo';
 import { LogIn, Loader } from 'lucide-react';
@@ -33,7 +33,7 @@ const AdminLoginPage = () => {
         setLoading(true);
         setError('');
 
-        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        const { error: authError } = await apiService.auth.signInWithPassword({ email, password });
 
         if (authError) {
             setError('Identifiants invalides ou problème de connexion.');

@@ -3,7 +3,7 @@ import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'luci
 import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { deleteConsolidatedView } from '../context/actions';
 import Avatar from './Avatar';
 
@@ -104,7 +104,7 @@ const ProjectSwitcher = () => {
 
   const handleSaveRename = async (newName) => {
     if (editingProject) {
-      const { data, error } = await supabase
+      const { data, error } = await apiService
         .from('projects')
         .update({ name: newName })
         .eq('id', editingProject.id)

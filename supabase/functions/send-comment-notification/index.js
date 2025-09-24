@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@apiService/apiService-js@2'
 import { Resend } from 'https://esm.sh/resend@3.4.0'
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
@@ -21,13 +21,13 @@ serve(async (req) => {
       })
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const apiServiceAdmin = createClient(
+      Deno.env.get('apiService_URL'),
+      Deno.env.get('apiService_SERVICE_ROLE_KEY')
     )
 
     // 1. Get author's name
-    const { data: authorProfile, error: authorError } = await supabaseAdmin
+    const { data: authorProfile, error: authorError } = await apiServiceAdmin
       .from('profiles')
       .select('full_name')
       .eq('id', newComment.user_id)
@@ -36,7 +36,7 @@ serve(async (req) => {
     const authorName = authorProfile?.full_name || 'Un utilisateur'
 
     // 2. Get mentioned users' emails
-    const { data: mentionedProfiles, error: mentionedError } = await supabaseAdmin
+    const { data: mentionedProfiles, error: mentionedError } = await apiServiceAdmin
       .from('users', { schema: 'auth' })
       .select('id, email')
       .in('id', newComment.mentioned_users)
@@ -51,7 +51,7 @@ serve(async (req) => {
     // 3. Get project name
     let projectName = 'Vue Consolidée';
     if (newComment.project_id) {
-        const { data: project, error: projectError } = await supabaseAdmin
+        const { data: project, error: projectError } = await apiServiceAdmin
             .from('projects')
             .select('name')
             .eq('id', newComment.project_id)

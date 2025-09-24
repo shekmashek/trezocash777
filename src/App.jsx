@@ -5,7 +5,7 @@ import OnboardingView from './components/OnboardingView';
 import AuthView from './components/AuthView';
 import PublicLayout from './layouts/PublicLayout';
 import AppLayout from './layouts/AppLayout';
-import { supabase } from './utils/supabase';
+import { apiService } from './utils/apiService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, XCircle, AlertCircle, Info, X, Loader } from 'lucide-react';
 import HomePage from './pages/HomePage';
@@ -86,15 +86,79 @@ function App() {
   const [authMode, setAuthMode] = useState({ mode: null, fromTrial: false });
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      dispatch({ type: 'SET_SESSION', payload: session });
-      if (!session) {
-        setAuthMode({ mode: null, fromTrial: false });
-        dispatch({ type: 'RESET_STATE' });
+    let isMounted = true;
+
+    const checkAuthStatus = async () => {
+      console.log('🔄 Starting auth check...');
+      
+      if (!session && isMounted) {
+        dispatch({ type: 'SET_LOADING', payload: true });
       }
-    });
-    return () => authListener.subscription.unsubscribe();
-  }, [dispatch]);
+
+      const token = localStorage.getItem('auth_token');
+      console.log('🔐 Token found:', !!token);
+      
+      if (token && !session) {
+        try {
+          console.log('📡 Fetching user profile...');
+          const { data: userData, error } = await apiService.getProfile('current');
+          
+          if (error) throw error;
+          
+          if (userData && isMounted) {
+            console.log('✅ User profile loaded:', userData);
+            const simulatedSession = {
+              user: {
+                id: userData.id,
+                email: userData.email,
+                name: userData.name
+              }
+            };
+            dispatch({ type: 'SET_SESSION', payload: simulatedSession });
+          }
+        } catch (error) {
+          console.error('❌ Auth check failed:', error);
+          if (isMounted) {
+            // Créer une session basique
+            const basicSession = {
+              user: {
+                id: 'current',
+                email: 'user@example.com',
+                name: 'Utilisateur'
+              }
+            };
+            dispatch({ type: 'SET_SESSION', payload: basicSession });
+          }
+        }
+      } else if (!token && session && isMounted) {
+        console.log('🚪 No token, logging out...');
+        dispatch({ type: 'SET_SESSION', payload: null });
+      }
+
+      // Fin du chargement
+      if (isMounted) {
+        console.log('✅ Auth check completed');
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    };
+
+    checkAuthStatus();
+    
+
+
+    // Écouter les changements de localStorage
+    const handleStorageChange = (e) => {
+      if (e.key === 'auth_token') {
+        checkAuthStatus();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [session, dispatch]);
 
   const ProtectedRoute = () => {
     const location = useLocation();

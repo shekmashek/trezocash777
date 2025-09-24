@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { useBudget } from '../context/BudgetContext';
 import { Shield, Save, Loader } from 'lucide-react';
 
@@ -20,7 +20,7 @@ const SecurityPage = () => {
             return;
         }
         setLoading(true);
-        const { error } = await supabase.auth.updateUser({ password });
+        const { error } = await apiService.auth.updateUser({ password });
         if (error) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         } else {

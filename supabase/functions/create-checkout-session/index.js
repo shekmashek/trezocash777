@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@apiService/apiService-js@2'
 import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
 
 const stripe = Stripe(Deno.env.get('STRIPE_SECRET_KEY'))
@@ -19,25 +19,25 @@ serve(async (req) => {
       throw new Error("Price ID is required.");
     }
 
-    // Create a Supabase client with the user's auth token
+    // Create a apiService client with the user's auth token
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
         throw new Error("Missing authorization header");
     }
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_ANON_KEY'),
+    const apiServiceClient = createClient(
+      Deno.env.get('apiService_URL'),
+      Deno.env.get('apiService_ANON_KEY'),
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Get user data from Supabase
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    // Get user data from apiService
+    const { data: { user } } = await apiServiceClient.auth.getUser()
     if (!user) {
       return new Response(JSON.stringify({ error: 'User not found' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
     }
 
     // Get user profile to check for existing Stripe customer ID
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await apiServiceClient
       .from('profiles')
       .select('stripe_customer_id')
       .eq('id', user.id)
@@ -50,12 +50,12 @@ serve(async (req) => {
       // Create a new Stripe customer
       const customer = await stripe.customers.create({
         email: user.email,
-        metadata: { supabase_user_id: user.id },
+        metadata: { apiService_user_id: user.id },
       })
       customerId = customer.id
 
       // Update the user's profile with the new Stripe customer ID
-      const { error: updateError } = await supabaseClient
+      const { error: updateError } = await apiServiceClient
         .from('profiles')
         .update({ stripe_customer_id: customerId })
         .eq('id', user.id)

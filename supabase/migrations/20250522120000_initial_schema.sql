@@ -19,7 +19,7 @@ This is a foundational script. It does not modify existing data as it's intended
 ## Security Implications:
 - RLS Status: Enabled on all user-data tables.
 - Policy Changes: Creates all initial RLS policies to ensure users can only access their own data.
-- Auth Requirements: Relies on Supabase Auth (`auth.users`).
+- Auth Requirements: Relies on apiService Auth (`auth.users`).
 
 ## Performance Impact:
 - Indexes: Primary keys and foreign keys are indexed by default.

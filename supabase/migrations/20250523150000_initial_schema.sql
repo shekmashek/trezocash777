@@ -3,7 +3,7 @@
           This script creates all the necessary tables, relationships, and security policies for the Trezocash application.
 
           ## Query Description: 
-          This is a foundational script. It builds the entire database structure from scratch. It is safe to run on a new, empty Supabase project. DO NOT run this on a project that already has data, as it may cause conflicts.
+          This is a foundational script. It builds the entire database structure from scratch. It is safe to run on a new, empty apiService project. DO NOT run this on a project that already has data, as it may cause conflicts.
 
           ## Metadata:
           - Schema-Category: "Structural"

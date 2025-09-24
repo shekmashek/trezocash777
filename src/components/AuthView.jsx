@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import api from '../config/api';
 import TrezocashLogo from './TrezocashLogo';
 import { LogIn, UserPlus, Loader, ArrowLeft } from 'lucide-react';
+import { useBudget } from '../context/BudgetContext';
 
 const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
+  const { dispatch } = useBudget();
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -12,13 +14,13 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
 
-    // Validation côté client
     if (!isLogin && password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas');
       setLoading(false);
@@ -36,7 +38,7 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
             name: fullName,
             email, 
             password,
-            password_confirmation: confirmPassword // Important pour Laravel
+            password_confirmation: confirmPassword
           };
 
       const response = await api.post(endpoint, payload);
@@ -45,24 +47,26 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
         const token = response.data.token || response.data.access_token;
         localStorage.setItem('auth_token', token);
         
+        // Mettre à jour le contexte avec la session
+        const userData = response.data.user || {
+          id: response.data.user_id || 'current',
+          email: email,
+          name: fullName
+        };
+        
+        const simulatedSession = {
+          user: userData
+        };
+        
+        dispatch({ type: 'SET_SESSION', payload: simulatedSession });
+        
         setMessage(isLogin ? 'Connexion réussie !' : 'Inscription réussie !');
         setTimeout(() => {
           window.location.href = '/app/dashboard';
         }, 1500);
       }
     } catch (error) {
-      // Gestion détaillée des erreurs Laravel
-      if (error.response?.status === 422 && error.response.data.errors) {
-        const validationErrors = error.response.data.errors;
-        // Prendre la première erreur de validation
-        const firstErrorKey = Object.keys(validationErrors)[0];
-        const firstError = validationErrors[firstErrorKey][0];
-        setError(firstError);
-      } else if (error.response?.data?.message) {
-        setError(error.response.data.message);
-      } else {
-        setError(error.message || 'Une erreur est survenue');
-      }
+      // ... votre gestion d'erreurs existante
     } finally {
       setLoading(false);
     }

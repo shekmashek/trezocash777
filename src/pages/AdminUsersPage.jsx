@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { useBudget } from '../context/BudgetContext';
 import { Loader, UserX, UserCheck, Search, Folder, UserPlus } from 'lucide-react';
 
@@ -13,9 +13,9 @@ const AdminUsersPage = () => {
         const fetchUsersData = async () => {
             setLoading(true);
             const [usersRes, projectsRes, collaboratorsRes] = await Promise.all([
-                supabase.from('profiles').select('id, full_name, email, subscription_status, is_blocked, created_at'),
-                supabase.from('projects').select('id, user_id'),
-                supabase.from('collaborators').select('id, owner_id')
+                apiService.from('profiles').select('id, full_name, email, subscription_status, is_blocked, created_at'),
+                apiService.from('projects').select('id, user_id'),
+                apiService.from('collaborators').select('id, owner_id')
             ]);
 
             if (usersRes.error || projectsRes.error || collaboratorsRes.error) {
@@ -60,7 +60,7 @@ const AdminUsersPage = () => {
                 title: `${isBlocked ? 'Débloquer' : 'Bloquer'} l'utilisateur ?`,
                 message: `Êtes-vous sûr de vouloir ${isBlocked ? 'débloquer' : 'bloquer'} ${user.full_name} ?`,
                 onConfirm: async () => {
-                    const { data, error } = await supabase.from('profiles').update({ is_blocked: !isBlocked }).eq('id', user.id).select().single();
+                    const { data, error } = await apiService.from('profiles').update({ is_blocked: !isBlocked }).eq('id', user.id).select().single();
                     if (error) {
                         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
                     } else {
@@ -73,7 +73,7 @@ const AdminUsersPage = () => {
     };
 
     const handleSubscriptionChange = async (user, newStatus) => {
-        const { data, error } = await supabase.from('profiles').update({ subscription_status: newStatus }).eq('id', user.id).select().single();
+        const { data, error } = await apiService.from('profiles').update({ subscription_status: newStatus }).eq('id', user.id).select().single();
         if (error) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         } else {

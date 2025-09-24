@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { CreditCard, CheckCircle, Clock, Loader, Star, ShieldCheck } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -77,7 +77,7 @@ const SubscriptionPage = () => {
         }
 
         try {
-            const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+            const { data, error } = await apiService.functions.invoke('create-checkout-session', {
                 body: { priceId },
             });
 

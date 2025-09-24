@@ -1,9 +1,11 @@
+// utils/axios.js
 import axios from 'axios';
+
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const api = axios.create({
   baseURL: isLocalhost
-    ? 'http://localhost:8000/api' // Utilisez localhost au lieu de 127.0.0.1
+    ? 'http://localhost:8000/api'
     : 'https://tresocash.com/api',
   headers: {
     Accept: 'application/json',
@@ -11,7 +13,7 @@ const api = axios.create({
   },
 });
 
-
+// Interceptor pour l'authentification
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
@@ -23,6 +25,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Gestion des erreurs d'authentification
 api.interceptors.response.use(
   (response) => response,
   (error) => {

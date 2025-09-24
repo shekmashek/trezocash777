@@ -1,13 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@apiService/apiService-js@2'
 import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
 
 const stripe = Stripe(Deno.env.get('STRIPE_SECRET_KEY'))
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SIGNING_SECRET')
 
-const supabaseAdmin = createClient(
-  Deno.env.get('SUPABASE_URL'),
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const apiServiceAdmin = createClient(
+  Deno.env.get('apiService_URL'),
+  Deno.env.get('apiService_SERVICE_ROLE_KEY')
 )
 
 serve(async (req) => {
@@ -32,7 +32,7 @@ serve(async (req) => {
           const subscriptionId = session.subscription
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
           
-          await supabaseAdmin
+          await apiServiceAdmin
             .from('profiles')
             .update({
               subscription_id: subscription.id,
@@ -44,7 +44,7 @@ serve(async (req) => {
           // Handle one-time payment (Lifetime access)
           const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
           if (lineItems.data.length > 0) {
-            await supabaseAdmin
+            await apiServiceAdmin
               .from('profiles')
               .update({
                 subscription_status: 'lifetime',
@@ -58,7 +58,7 @@ serve(async (req) => {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const subscription = event.data.object
-        await supabaseAdmin
+        await apiServiceAdmin
           .from('profiles')
           .update({
             subscription_status: subscription.status,

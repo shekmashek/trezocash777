@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { Shield, AlertTriangle, Download, Mail, LogOut, Loader, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportUserDataAsJSON } from '../utils/export';
@@ -24,14 +24,14 @@ const DeleteAccountPage = () => {
         }
         setLoading(true);
         
-        const { error: deleteError } = await supabase.rpc('delete_user_account');
+        const { error: deleteError } = await apiService.rpc('delete_user_account');
 
         setLoading(false);
 
         if (deleteError) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression : ${deleteError.message}`, type: 'error' } });
         } else {
-            await supabase.auth.signOut();
+            await apiService.auth.signOut();
             // The auth listener in App.jsx will handle the redirect
         }
     };

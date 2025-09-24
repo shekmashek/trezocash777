@@ -9,7 +9,7 @@ import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../
 import { resolveScenarioEntries } from '../utils/scenarioCalculations';
 import { useTranslation } from '../utils/i18n';
 import ScenarioEntriesDrawer from './ScenarioEntriesDrawer';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { v4 as uuidv4 } from 'uuid';
 import { saveScenario, deleteScenarioEntry } from '../context/actions';
 
@@ -282,7 +282,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
             payments: entryData.payments,
         };
 
-        const { data: savedEntry, error } = await supabase
+        const { data: savedEntry, error } = await apiService
             .from('scenario_entries')
             .upsert(dataToSave, { onConflict: 'scenario_id,id' })
             .select()

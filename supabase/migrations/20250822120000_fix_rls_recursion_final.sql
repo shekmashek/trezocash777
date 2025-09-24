@@ -1,6 +1,6 @@
 /*
 # [CRITICAL] Fix RLS Infinite Recursion
-This migration script addresses a critical infinite recursion error in the Row Level Security (RLS) policies for the 'profiles' table. It replaces the problematic security function with a safer, non-recursive pattern recommended by Supabase.
+This migration script addresses a critical infinite recursion error in the Row Level Security (RLS) policies for the 'profiles' table. It replaces the problematic security function with a safer, non-recursive pattern recommended by apiService.
 
 ## Query Description:
 This operation will first drop all existing policies on the `public.profiles` table to ensure a clean state. It then creates a new helper function `get_my_role()` that safely retrieves the current user's role from `auth.users` without causing recursion. Finally, it re-creates the necessary SELECT, INSERT, UPDATE, and DELETE policies using this new function. This change is essential for the application to load user data correctly and for the admin panel to function.

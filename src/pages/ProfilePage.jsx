@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { User, Save, Loader } from 'lucide-react';
 
 const ProfilePage = () => {
@@ -24,7 +24,7 @@ const ProfilePage = () => {
         e.preventDefault();
         setLoading(true);
 
-        const { data: updatedProfile, error: profileError } = await supabase
+        const { data: updatedProfile, error: profileError } = await apiService
             .from('profiles')
             .update({ full_name: fullName })
             .eq('id', session.user.id)
@@ -38,7 +38,7 @@ const ProfilePage = () => {
         }
 
         // Also update auth metadata for consistency
-        await supabase.auth.updateUser({ data: { full_name: fullName } });
+        await apiService.auth.updateUser({ data: { full_name: fullName } });
 
         // Update local state with the full, fresh profile object
         dispatch({ 
@@ -60,7 +60,7 @@ const ProfilePage = () => {
         e.preventDefault();
         setLoading(true);
 
-        const { error } = await supabase.auth.updateUser({ email });
+        const { error } = await apiService.auth.updateUser({ email });
 
         if (error) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });

@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { deriveActualsFromEntry } from '../utils/scenarioCalculations';
 import { templates as officialTemplatesData } from '../utils/templates';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +13,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
   try {
     const { projectName, projectStartDate, projectEndDate, isEndDateIndefinite, templateId, startOption } = payload;
     
-    const { data: newProjectData, error: projectError } = await supabase
+    const { data: newProjectData, error: projectError } = await apiService
         .from('projects')
         .insert({
             user_id: user.id,
@@ -29,7 +29,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
     const projectId = newProjectData.id;
 
     if (startOption === 'blank' || templateId === 'blank') {
-        const { data: defaultAccount, error: accountError } = await supabase
+        const { data: defaultAccount, error: accountError } = await apiService
             .from('cash_accounts')
             .insert({
                 project_id: projectId, user_id: user.id, main_category_id: 'bank',
@@ -70,7 +70,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         throw new Error("Template not found");
     }
 
-    const { data: newCashAccountsData, error: cashAccountsError } = await supabase
+    const { data: newCashAccountsData, error: cashAccountsError } = await apiService
         .from('cash_accounts')
         .insert(templateData.cashAccounts.map(acc => ({
             project_id: projectId, user_id: user.id, main_category_id: acc.mainCategoryId,
@@ -86,7 +86,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
     let createdTiers = [];
     if (uniqueTiers.length > 0) {
         const tiersToInsert = uniqueTiers.map(name => ({ name, type: 'fournisseur', user_id: user.id }));
-        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(tiersToInsert, { onConflict: 'user_id,name,type' }).select();
+        const { data: insertedTiers, error: tiersError } = await apiService.from('tiers').upsert(tiersToInsert, { onConflict: 'user_id,name,type' }).select();
         if (tiersError) throw tiersError;
         createdTiers = insertedTiers;
     }
@@ -99,7 +99,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         start_date: entry.frequency !== 'ponctuel' ? (entry.startDate || today) : null,
         supplier: entry.supplier, description: entry.description,
     }));
-    const { data: newEntriesData, error: entriesError } = await supabase
+    const { data: newEntriesData, error: entriesError } = await apiService
         .from('budget_entries')
         .insert(entriesToInsert)
         .select();
@@ -112,7 +112,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
     });
 
     if (newActualsToInsert.length > 0) {
-        const { error: actualsError } = await supabase.from('actual_transactions').insert(newActualsToInsert.map(a => ({
+        const { error: actualsError } = await apiService.from('actual_transactions').insert(newActualsToInsert.map(a => ({
             id: a.id, budget_id: a.budgetId, project_id: a.projectId, user_id: user.id, type: a.type,
             category: a.category, third_party: a.thirdParty, description: a.description, date: a.date,
             amount: a.amount, status: a.status
@@ -159,7 +159,7 @@ export const updateProjectSettings = async (dispatch, { projectId, newSettings }
             end_date: newSettings.endDate,
         };
 
-        const { data, error } = await supabase
+        const { data, error } = await apiService
             .from('projects')
             .update(updates)
             .eq('id', projectId)
@@ -196,7 +196,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
         let newTierData = null;
 
         if (!existingTier && supplier) {
-            const { data: insertedTier, error: tierError } = await supabase
+            const { data: insertedTier, error: tierError } = await apiService
                 .from('tiers')
                 .upsert({ name: supplier, type: tierType, user_id: user.id }, { onConflict: 'user_id,name,type' })
                 .select()
@@ -224,7 +224,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
 
         let savedEntryFromDB;
         if (editingEntry && editingEntry.id) {
-            const { data, error } = await supabase
+            const { data, error } = await apiService
                 .from('budget_entries')
                 .update(finalEntryDataForDB)
                 .eq('id', editingEntry.id)
@@ -233,7 +233,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             if (error) throw error;
             savedEntryFromDB = data;
         } else {
-            const { data, error } = await supabase
+            const { data, error } = await apiService
                 .from('budget_entries')
                 .insert(finalEntryDataForDB)
                 .select()
@@ -243,7 +243,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
         }
         
         const unsettledStatuses = ['pending', 'partially_paid', 'partially_received'];
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await apiService
             .from('actual_transactions')
             .delete()
             .eq('budget_id', savedEntryFromDB.id)
@@ -270,7 +270,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
         const newActuals = deriveActualsFromEntry(savedEntryForClient, activeProjectId, cashAccounts);
         
         if (newActuals.length > 0) {
-            const { error: insertError } = await supabase
+            const { error: insertError } = await apiService
                 .from('actual_transactions')
                 .insert(newActuals.map(a => ({
                     id: a.id,
@@ -317,13 +317,13 @@ export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
         }
 
         const unsettledStatuses = ['pending', 'partially_paid', 'partially_received'];
-        await supabase
+        await apiService
             .from('actual_transactions')
             .delete()
             .eq('budget_id', entryId)
             .in('status', unsettledStatuses);
         
-        const { error: deleteEntryError } = await supabase
+        const { error: deleteEntryError } = await apiService
             .from('budget_entries')
             .delete()
             .eq('id', entryId);
@@ -356,7 +356,7 @@ export const updateSettings = async (dispatch, user, newSettings) => {
             timezone_offset: newSettings.timezoneOffset
         };
 
-        const { data, error } = await supabase
+        const { data, error } = await apiService
             .from('profiles')
             .update(updates)
             .eq('id', user.id)
@@ -388,7 +388,7 @@ export const updateUserCashAccount = async (dispatch, { projectId, accountId, ac
             initial_balance_date: accountData.initialBalanceDate,
         };
 
-        const { data, error } = await supabase
+        const { data, error } = await apiService
             .from('cash_accounts')
             .update(updates)
             .eq('id', accountId)
@@ -424,7 +424,7 @@ export const saveActual = async (dispatch, { actualData, editingActual, user, ti
 
     const existingTier = tiers.find(t => t.name.toLowerCase() === thirdParty.toLowerCase());
     if (!existingTier && thirdParty) {
-      const { data: insertedTier, error: tierError } = await supabase
+      const { data: insertedTier, error: tierError } = await apiService
         .from('tiers')
         .upsert({ name: thirdParty, type: tierType, user_id: user.id }, { onConflict: 'user_id,name,type' })
         .select().single();
@@ -447,11 +447,11 @@ export const saveActual = async (dispatch, { actualData, editingActual, user, ti
 
     let savedActual;
     if (editingActual) {
-      const { data, error } = await supabase.from('actual_transactions').update(dataToSave).eq('id', editingActual.id).select().single();
+      const { data, error } = await apiService.from('actual_transactions').update(dataToSave).eq('id', editingActual.id).select().single();
       if (error) throw error;
       savedActual = data;
     } else {
-      const { data, error } = await supabase.from('actual_transactions').insert(dataToSave).select().single();
+      const { data, error } = await apiService.from('actual_transactions').insert(dataToSave).select().single();
       if (error) throw error;
       savedActual = data;
     }
@@ -488,7 +488,7 @@ export const saveActual = async (dispatch, { actualData, editingActual, user, ti
 
 export const deleteActual = async (dispatch, actualId) => {
     try {
-        const { error } = await supabase.from('actual_transactions').delete().eq('id', actualId);
+        const { error } = await apiService.from('actual_transactions').delete().eq('id', actualId);
         if (error) throw error;
         dispatch({ type: 'DELETE_ACTUAL_SUCCESS', payload: actualId });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction supprimée.', type: 'success' } });
@@ -503,7 +503,7 @@ export const recordPayment = async (dispatch, { actualId, paymentData, allActual
         if (!user || !user.id) {
             throw new Error("ID utilisateur manquant.");
         }
-        const { data: payment, error: paymentError } = await supabase.from('payments').insert({
+        const { data: payment, error: paymentError } = await apiService.from('payments').insert({
             actual_id: actualId,
             user_id: user.id,
             payment_date: paymentData.paymentDate,
@@ -521,7 +521,7 @@ export const recordPayment = async (dispatch, { actualId, paymentData, allActual
             newStatus = actual.type === 'payable' ? 'partially_paid' : 'partially_received';
         }
 
-        const { data: updatedActual, error: actualError } = await supabase
+        const { data: updatedActual, error: actualError } = await apiService
             .from('actual_transactions')
             .update({ status: newStatus })
             .eq('id', actualId)
@@ -539,7 +539,7 @@ export const recordPayment = async (dispatch, { actualId, paymentData, allActual
 
 export const writeOffActual = async (dispatch, actualId) => {
     try {
-        const { data: updatedActual, error } = await supabase
+        const { data: updatedActual, error } = await apiService
             .from('actual_transactions')
             .update({ 
                 status: 'written_off',
@@ -570,7 +570,7 @@ export const saveConsolidatedView = async (dispatch, { viewData, editingView, us
 
     let savedView;
     if (editingView) {
-      const { data, error } = await supabase
+      const { data, error } = await apiService
         .from('consolidated_views')
         .update(dataToSave)
         .eq('id', editingView.id)
@@ -581,7 +581,7 @@ export const saveConsolidatedView = async (dispatch, { viewData, editingView, us
       dispatch({ type: 'UPDATE_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée mise à jour.', type: 'success' } });
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await apiService
         .from('consolidated_views')
         .insert(dataToSave)
         .select()
@@ -600,7 +600,7 @@ export const saveConsolidatedView = async (dispatch, { viewData, editingView, us
 
 export const deleteConsolidatedView = async (dispatch, viewId) => {
     try {
-        const { error } = await supabase.from('consolidated_views').delete().eq('id', viewId);
+        const { error } = await apiService.from('consolidated_views').delete().eq('id', viewId);
         if (error) throw error;
         dispatch({ type: 'DELETE_CONSOLIDATED_VIEW_SUCCESS', payload: viewId });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée supprimée.', type: 'success' } });
@@ -612,7 +612,7 @@ export const deleteConsolidatedView = async (dispatch, viewId) => {
 
 export const inviteCollaborator = async (dispatch, { email, role, permissionScope, projectIds, ownerId }) => {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await apiService
             .from('collaborators')
             .insert({
                 owner_id: ownerId,
@@ -627,8 +627,8 @@ export const inviteCollaborator = async (dispatch, { email, role, permissionScop
 
         if (error) throw error;
 
-        // Optionally, trigger a Supabase Edge Function to send an email invite
-        // await supabase.functions.invoke('send-invite-email', { body: { email, ownerName } });
+        // Optionally, trigger a apiService Edge Function to send an email invite
+        // await apiService.functions.invoke('send-invite-email', { body: { email, ownerName } });
 
         dispatch({
             type: 'INVITE_COLLABORATOR_SUCCESS',
@@ -652,7 +652,7 @@ export const inviteCollaborator = async (dispatch, { email, role, permissionScop
 
 export const revokeCollaborator = async (dispatch, collaboratorId) => {
     try {
-        const { error } = await supabase.from('collaborators').delete().eq('id', collaboratorId);
+        const { error } = await apiService.from('collaborators').delete().eq('id', collaboratorId);
         if (error) throw error;
         dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: collaboratorId });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'success' } });
@@ -676,7 +676,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 name: scenarioData.name,
                 description: scenarioData.description,
             };
-            const { data, error } = await supabase
+            const { data, error } = await apiService
                 .from('scenarios')
                 .update(dataToUpdate)
                 .eq('id', editingScenario.id)
@@ -703,7 +703,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 color: SCENARIO_COLORS[existingScenariosCount % SCENARIO_COLORS.length],
                 is_visible: true,
             };
-            const { data, error } = await supabase
+            const { data, error } = await apiService
                 .from('scenarios')
                 .insert(dataToInsert)
                 .select()
@@ -729,7 +729,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
 
 export const deleteScenarioEntry = async (dispatch, { scenarioId, entryId }) => {
     try {
-        const { error } = await supabase
+        const { error } = await apiService
             .from('scenario_entries')
             .delete()
             .eq('scenario_id', scenarioId)
@@ -767,7 +767,7 @@ export const addComment = async (dispatch, { projectId, rowId, columnId, content
             mentioned_users: mentionedUserIds,
         };
 
-        const { data: savedComment, error } = await supabase
+        const { data: savedComment, error } = await apiService
             .from('comments')
             .insert(newCommentData)
             .select()
@@ -810,7 +810,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
 
     let savedTemplate;
     if (editingTemplate) {
-      const { data, error } = await supabase
+      const { data, error } = await apiService
         .from('templates')
         .update(dataToSave)
         .eq('id', editingTemplate.id)
@@ -832,7 +832,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
       }});
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle mis à jour.', type: 'success' } });
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await apiService
         .from('templates')
         .insert(dataToSave)
         .select()
@@ -862,7 +862,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
 
 export const deleteTemplate = async (dispatch, templateId) => {
     try {
-        const { error } = await supabase.from('templates').delete().eq('id', templateId);
+        const { error } = await apiService.from('templates').delete().eq('id', templateId);
         if (error) throw error;
         dispatch({ type: 'DELETE_TEMPLATE_SUCCESS', payload: templateId });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle supprimé.', type: 'success' } });

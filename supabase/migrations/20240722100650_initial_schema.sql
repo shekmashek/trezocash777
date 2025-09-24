@@ -109,7 +109,7 @@ DROP TABLE IF EXISTS public.profiles;
 -- Step 2.1: Profiles Table
 /*
           # [Table] profiles
-          [Stores public-facing user data, linked to Supabase's internal auth.users table.]
+          [Stores public-facing user data, linked to apiService's internal auth.users table.]
 
           ## Query Description: [This table will hold user profile information like full name and subscription status. It is essential for user management.]
           

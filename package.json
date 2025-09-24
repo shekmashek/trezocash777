@@ -12,7 +12,7 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^4.0.2",
     "@stripe/stripe-js": "^7.9.0",
-    "@supabase/supabase-js": "^2.57.4",
+    "@apiService/apiService-js": "^2.57.4",
     "axios": "^1.12.2",
     "echarts": "^5.5.1",
     "echarts-for-react": "^3.0.2",

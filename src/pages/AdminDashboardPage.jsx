@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../utils/supabase';
+import { apiService } from '../utils/apiService';
 import { useBudget } from '../context/BudgetContext';
 import { Loader, Users, BarChart, ShieldCheck, Clock, UserX } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
@@ -18,7 +18,7 @@ const AdminDashboardPage = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             setLoading(true);
-            const { data: users, error } = await supabase
+            const { data: users, error } = await apiService
                 .from('profiles')
                 .select('subscription_status, is_blocked, created_at');
 
