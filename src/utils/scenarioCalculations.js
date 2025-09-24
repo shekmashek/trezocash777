@@ -61,7 +61,7 @@ export const deriveActualsFromEntry = (entry, projectId, userCashAccounts = []) 
                 budgetId: entry.id,
                 projectId: projectId,
                 type: 'payable',
-                category: 'Épargne et Provision',
+                category: 'Épargne',
                 date: payment.date,
                 amount: parseFloat(payment.amount),
                 thirdParty: `Provision vers ${userCashAccounts.find(acc => acc.id === entry.provisionDetails.provisionAccountId)?.name || 'Compte Provision'}`,

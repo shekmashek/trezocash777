@@ -11,7 +11,7 @@ const getDefaultExpenseTargets = () => ({
   'exp-main-2': 35, // Masse Salariale
   'exp-main-3': 10, // Investissement
   'exp-main-4': 0,  // Financement
-  'exp-main-5': 10, // Épargne et Provision
+  'exp-main-5': 10, // Épargne
   'exp-main-6': 5,  // Exceptionnel
   'exp-main-7': 10, // Impôts et Taxes
   'exp-main-8': 5,  // Formation
@@ -32,14 +32,14 @@ const createDefaultCashAccount = (projectId) => ({
 
 const initialCategories = {
   revenue: [
-    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: false, subCategories: [{ id: uuidv4(), name: 'Ventes de produits' }, { id: uuidv4(), name: 'Ventes de services' }] },
-    { id: 'rev-main-2', name: 'Entrées Financières', isFixed: false, subCategories: [
+    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Ventes de produits' }, { id: uuidv4(), name: 'Ventes de services' }] },
+    { id: 'rev-main-2', name: 'Entrées Financières', isFixed: true, subCategories: [
         { id: uuidv4(), name: 'Intérêts perçus' }, 
         { id: uuidv4(), name: 'Réception Emprunt' },
         { id: uuidv4(), name: 'Remboursement de prêt reçu' },
         { id: uuidv4(), name: 'Intérêts de prêt reçus' },
     ] },
-    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: false, subCategories: [{ id: uuidv4(), name: 'Subventions' }, { id: uuidv4(), name: 'Revenus Exceptionnels'}] },
+    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Subventions' }, { id: uuidv4(), name: 'Revenus Exceptionnels'}] },
   ],
   expense: [
     { id: 'exp-main-1', name: 'Exploitation', isFixed: true, subCategories: [
@@ -65,7 +65,7 @@ const initialCategories = {
         { id: uuidv4(), name: "Remboursement d'emprunt" }, 
         { id: uuidv4(), name: "Intérêts d'emprunt" },
     ] },
-    { id: 'exp-main-5', name: 'Épargne et Provision', isFixed: true, subCategories: [
+    { id: 'exp-main-5', name: 'Épargne', isFixed: true, subCategories: [
         { id: uuidv4(), name: 'Provision pour risques' },
         { id: uuidv4(), name: "Fond d'urgence" },
         { id: uuidv4(), name: 'Epargne Projet à court et moyen termes' },
@@ -676,12 +676,25 @@ const budgetReducer = (state, action) => {
         newCategories[type].push(newMainCategory);
         return { ...state, categories: newCategories };
     }
-    case 'ADD_SUB_CATEGORY': {
-        const { type, mainCategoryId, subCategoryName } = action.payload;
+    case 'UPDATE_MAIN_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId, newName } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
+        if (mainCat) mainCat.name = newName;
+        return { ...state, categories: newCategories };
+    }
+    case 'DELETE_MAIN_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        newCategories[type] = newCategories[type].filter(mc => mc.id !== mainCategoryId);
+        return { ...state, categories: newCategories };
+    }
+    case 'ADD_SUB_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId, newSubCategory } = action.payload;
         const newCategories = JSON.parse(JSON.stringify(state.categories));
         const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
         if (mainCat) {
-            mainCat.subCategories.push({ id: uuidv4(), name: subCategoryName });
+            mainCat.subCategories.push(newSubCategory);
         }
         return { ...state, categories: newCategories };
     }

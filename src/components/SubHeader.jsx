@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -104,6 +104,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { id: 'projectSettings', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
     { id: '/app/collaborateurs', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
     { id: '/app/templates', label: 'Mes Modèles', icon: LayoutTemplate, color: 'text-indigo-500' },
+    { id: '/app/provisions', label: 'Suivi des Provisions', icon: Lock, color: 'text-orange-500' },
     { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
     { id: '/app/categories', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
     { id: '/app/tiers', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },

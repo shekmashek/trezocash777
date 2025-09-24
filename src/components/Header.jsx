@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { state, dispatch } = useBudget();
-  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews, projects, collaborators, allProfiles } = state;
+  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews, projects, collaborators, allProfiles, categories } = state;
   const navigate = useNavigate();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
@@ -39,6 +39,66 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     dispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
     dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
   };
+
+  const userCashAccounts = useMemo(() => {
+    if (isConsolidated) {
+      return Object.values(allCashAccounts).flat();
+    }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(id => allCashAccounts[id] || []);
+    }
+    return allCashAccounts[activeProjectId] || [];
+  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
+
+  const relevantActuals = useMemo(() => {
+    if (isConsolidated) {
+      return Object.values(allActuals).flat();
+    }
+    if (isCustomConsolidated) {
+        const viewId = activeProjectId.replace('consolidated_view_', '');
+        const view = consolidatedViews.find(v => v.id === viewId);
+        if (!view || !view.project_ids) return [];
+        return view.project_ids.flatMap(id => allActuals[id] || []);
+    }
+    return allActuals[activeProjectId] || [];
+  }, [activeProjectId, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
+
+  const accountBalances = useMemo(() => {
+    return userCashAccounts.map(account => {
+      let currentBalance = parseFloat(account.initialBalance) || 0;
+      const accountPayments = relevantActuals
+        .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
+      
+      for (const payment of accountPayments) {
+        if (payment.type === 'receivable') {
+          currentBalance += payment.paidAmount;
+        } else if (payment.type === 'payable') {
+          currentBalance -= payment.paidAmount;
+        }
+      }
+
+      const blockedForProvision = relevantActuals
+        .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
+        .reduce((sum, actual) => {
+          const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
+          return sum + (actual.amount - paidAmount);
+        }, 0);
+
+      return { 
+        id: account.id,
+        projectId: account.projectId,
+        name: account.name,
+        mainCategoryId: account.mainCategoryId,
+        balance: currentBalance, 
+        blockedForProvision, 
+        actionableBalance: currentBalance - blockedForProvision,
+        isClosed: account.isClosed
+      };
+    });
+  }, [userCashAccounts, relevantActuals]);
 
   const headerMetrics = useMemo(() => {
     let relevantAccounts;
@@ -67,9 +127,19 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
         relevantEntries = allEntries[activeProjectId] || [];
     }
 
+    const provisionDeposits = relevantActuals
+        .filter(actual => actual.isProvision)
+        .flatMap(actual => actual.payments || [])
+        .reduce((sum, payment) => sum + payment.paidAmount, 0);
+
+    const provisionPayouts = relevantActuals
+        .filter(actual => actual.isFinalProvisionPayment)
+        .flatMap(actual => actual.payments || [])
+        .reduce((sum, payment) => sum + payment.paidAmount, 0);
+    
+    const totalProvisionsNet = provisionDeposits - provisionPayouts;
+
     let totalActionableCash = 0;
-    let totalSavings = 0;
-    let totalProvisions = 0;
 
     relevantAccounts.forEach(account => {
         let currentBalance = parseFloat(account.initialBalance) || 0;
@@ -94,13 +164,11 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
         const actionableBalance = currentBalance - blockedForProvision;
         totalActionableCash += actionableBalance;
-        if (account.mainCategoryId === 'savings') {
-            totalSavings += currentBalance;
-        }
-        if (account.mainCategoryId === 'provisions') {
-            totalProvisions += currentBalance;
-        }
     });
+
+    const totalSavings = accountBalances
+        .filter(acc => acc.mainCategoryId === 'savings')
+        .reduce((sum, acc) => sum + acc.balance, 0);
 
     const today = getTodayInTimezone(settings.timezoneOffset);
     const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
@@ -166,73 +234,13 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     return {
         actionableCash: formatCurrency(totalActionableCash, settings),
         savings: formatCurrency(totalSavings, settings),
-        provisions: formatCurrency(totalProvisions, settings),
+        provisions: formatCurrency(totalProvisionsNet, settings),
         overduePayables: formatCurrency(totalOverduePayables, settings),
         overdueReceivables: formatCurrency(totalOverdueReceivables, settings),
         totalDebts: formatCurrency(totalBorrowingPrincipalRemaining, settings),
         totalCredits: formatCurrency(totalLoanPrincipalRemaining, settings),
     };
-  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const userCashAccounts = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allCashAccounts).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(id => allCashAccounts[id] || []);
-    }
-    return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const relevantActuals = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allActuals).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(id => allActuals[id] || []);
-    }
-    return allActuals[activeProjectId] || [];
-  }, [activeProjectId, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const accountBalances = useMemo(() => {
-    return userCashAccounts.map(account => {
-      let currentBalance = parseFloat(account.initialBalance) || 0;
-      const accountPayments = relevantActuals
-        .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
-      
-      for (const payment of accountPayments) {
-        if (payment.type === 'receivable') {
-          currentBalance += payment.paidAmount;
-        } else if (payment.type === 'payable') {
-          currentBalance -= payment.paidAmount;
-        }
-      }
-
-      const blockedForProvision = relevantActuals
-        .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
-        .reduce((sum, actual) => {
-          const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-          return sum + (actual.amount - paidAmount);
-        }, 0);
-
-      return { 
-        id: account.id,
-        projectId: account.projectId,
-        name: account.name,
-        mainCategoryId: account.mainCategoryId,
-        balance: currentBalance, 
-        blockedForProvision, 
-        actionableBalance: currentBalance - blockedForProvision,
-        isClosed: account.isClosed
-      };
-    });
-  }, [userCashAccounts, relevantActuals]);
+  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, isCustomConsolidated, consolidatedViews, categories, accountBalances]);
 
   const projectTeam = useMemo(() => {
     if (!activeProjectId || !allProfiles.length) return [];
@@ -364,13 +372,15 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                   <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
                               </div>
                           </div>
-                          <div className="flex items-center gap-2" title="Total Provisions">
-                              <Lock className="w-5 h-5 shrink-0 text-gray-500" />
-                              <div className="flex justify-between items-center w-full">
-                                  <span className="font-medium text-sm text-text-secondary">Provision</span>
-                                  <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
-                              </div>
-                          </div>
+                          <button onClick={() => navigate('/app/provisions')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <div className="flex items-center gap-2" title="Total Provisions">
+                                <Lock className="w-5 h-5 shrink-0 text-gray-500" />
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium text-sm text-text-secondary">Provision</span>
+                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
+                                </div>
+                            </div>
+                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
