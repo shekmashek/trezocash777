@@ -3,6 +3,7 @@ import { X, Edit, Trash2, Plus, Save, Wallet, Calendar, DollarSign, AlertTriangl
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import { getEntryAmountForPeriod } from '../utils/budgetCalculations';
+import { recordPayment } from '../context/actions';
 
 const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLabel }) => {
   const { state, dispatch } = useBudget();
@@ -109,16 +110,15 @@ const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLa
       return;
     }
 
-    dispatch({
-      type: 'RECORD_PAYMENT',
-      payload: {
-        actualId: addForm.targetActualId,
-        paymentData: {
-          paidAmount: amount,
-          paymentDate: addForm.paymentDate,
-          cashAccount: addForm.cashAccount,
-        }
-      }
+    recordPayment(dispatch, {
+      actualId: addForm.targetActualId,
+      paymentData: {
+        paidAmount: amount,
+        paymentDate: addForm.paymentDate,
+        cashAccount: addForm.cashAccount,
+      },
+      allActuals: state.allActuals,
+      user: state.session.user,
     });
     setAddForm(prev => ({ ...prev, paidAmount: '' }));
   };

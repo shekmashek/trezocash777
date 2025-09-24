@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Layers, Plus, Edit, Trash2, Archive, ChevronLeft, ChevronRight, AreaChart } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Layers, Plus, Edit, Trash2, Archive, ChevronLeft, ChevronRight, AreaChart, ChevronDown } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import CashflowDetailDrawer from './CashflowDetailDrawer';
 import BudgetModal from './BudgetModal';
@@ -8,6 +8,7 @@ import { useBudget } from '../context/BudgetContext';
 import { generateScenarioActuals, resolveScenarioEntries } from '../utils/scenarioCalculations';
 import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
 import { useTranslation } from '../utils/i18n';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function renderBudgetLine(params, api) {
   const flowType = api.value(2);
@@ -59,6 +60,20 @@ const CashflowView = ({ isFocusMode = false }) => {
   const [activeScenarioIdForModal, setActiveScenarioIdForModal] = useState(null);
   const [drawerData, setDrawerData] = useState({ isOpen: false, transactions: [], title: '' });
   const [selectedScenarios, setSelectedScenarios] = useState({});
+  const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
+  const periodMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+        if (periodMenuRef.current && !periodMenuRef.current.contains(event.target)) {
+            setIsPeriodMenuOpen(false);
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handlePeriodChange = (direction) => {
     dispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
@@ -577,6 +592,19 @@ const CashflowView = ({ isFocusMode = false }) => {
     };
   };
 
+  const quickPeriodOptions = [
+    { id: 'today', label: 'Jour' },
+    { id: 'week', label: 'Semaine' },
+    { id: 'month', label: 'Mois' },
+    { id: 'quarter', label: 'Trimestre' },
+    { id: 'year', label: 'Année' },
+    { id: 'short_term', label: 'CT (3a)' },
+    { id: 'medium_term', label: 'MT (5a)' },
+    { id: 'long_term', label: 'LT (10a)' },
+  ];
+
+  const selectedPeriodLabel = quickPeriodOptions.find(opt => opt.id === activeQuickSelect)?.label || 'Période';
+
   const handleChartClick = (params) => {
     if (params.seriesName !== 'Entrées' && params.seriesName !== 'Sorties') return;
     const periodIndex = params.dataIndex;
@@ -607,15 +635,40 @@ const CashflowView = ({ isFocusMode = false }) => {
                         <button onClick={() => handlePeriodChange(1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-full transition-colors" title="Période suivante"><ChevronRight size={18} /></button>
                     </div>
                     <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg border">
-                        <button onClick={() => handleQuickPeriodSelect('today')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'today' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>Jour</button>
-                        <button onClick={() => handleQuickPeriodSelect('week')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'week' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>Semaine</button>
-                        <button onClick={() => handleQuickPeriodSelect('month')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'month' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>Mois</button>
-                        <button onClick={() => handleQuickPeriodSelect('quarter')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'quarter' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>Trim.</button>
-                        <button onClick={() => handleQuickPeriodSelect('year')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'year' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>Année</button>
-                        <button onClick={() => handleQuickPeriodSelect('short_term')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'short_term' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>CT (3a)</button>
-                        <button onClick={() => handleQuickPeriodSelect('medium_term')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'medium_term' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>MT (5a)</button>
-                        <button onClick={() => handleQuickPeriodSelect('long_term')} className={`px-3 py-1 text-sm rounded-md transition-colors ${activeQuickSelect === 'long_term' ? 'bg-white border border-gray-300 shadow-sm text-gray-900 font-semibold' : 'font-medium text-gray-500 hover:bg-gray-200'}`}>LT (10a)</button>
+                    <div className="relative" ref={periodMenuRef}>
+                        <button 
+                            onClick={() => setIsPeriodMenuOpen(p => !p)} 
+                            className="flex items-center gap-2 px-3 h-9 rounded-md bg-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-300 transition-colors"
+                        >
+                            <span>{selectedPeriodLabel}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isPeriodMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                            {isPeriodMenuOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-20"
+                                >
+                                    <ul className="p-1">
+                                        {quickPeriodOptions.map(option => (
+                                            <li key={option.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        handleQuickPeriodSelect(option.id);
+                                                        setIsPeriodMenuOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 text-sm rounded-md ${activeQuickSelect === option.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>

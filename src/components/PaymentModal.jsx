@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Check } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
+import { recordPayment } from '../context/actions';
 
 const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
   const { state, dispatch } = useBudget();
@@ -44,12 +45,11 @@ const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
     const paymentData = { paymentDate, paidAmount: amount, cashAccount, isFinalPayment };
 
     const doSave = () => {
-        dispatch({
-            type: 'RECORD_PAYMENT',
-            payload: {
-                actualId: actualToPay.id,
-                paymentData,
-            }
+        recordPayment(dispatch, {
+            actualId: actualToPay.id,
+            paymentData,
+            allActuals: state.allActuals,
+            user: state.session.user,
         });
         onClose();
     };

@@ -853,15 +853,6 @@ const budgetReducer = (state, action) => {
         }
         return { ...state, allActuals: newAllActuals };
     }
-    case 'RECORD_PAYMENT': {
-      const user = state.session?.user;
-      if (user) {
-        recordPayment(dispatch, { ...action.payload, allActuals: state.allActuals, user });
-      } else {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
-      }
-      return state;
-    }
     case 'RECORD_PAYMENT_SUCCESS': {
         const { updatedActual } = action.payload;
         const newAllActuals = JSON.parse(JSON.stringify(state.allActuals));

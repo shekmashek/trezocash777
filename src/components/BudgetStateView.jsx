@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder } from 'lucide-react';
+import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search } from 'lucide-react';
 import EmptyState from './EmptyState';
 import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
@@ -11,6 +11,7 @@ const BudgetStateView = () => {
     const { allEntries, activeProjectId, projects, categories, settings, consolidatedViews } = state;
     
     const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const { budgetEntries, isConsolidated } = useMemo(() => {
         const isConsolidatedView = activeProjectId === 'consolidated';
@@ -43,6 +44,15 @@ const BudgetStateView = () => {
         };
     }, [activeProjectId, projects, allEntries, consolidatedViews]);
 
+    const filteredBudgetEntries = useMemo(() => {
+        if (!searchTerm) {
+            return budgetEntries;
+        }
+        return budgetEntries.filter(entry => 
+            entry.supplier.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [budgetEntries, searchTerm]);
+
     const handleAddEntry = (categoryName, mainCategoryType, mainCategoryId) => {
         dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
@@ -64,8 +74,12 @@ const BudgetStateView = () => {
         const Icon = isRevenue ? HandCoins : TrendingDown;
         const mainCategories = isRevenue ? categories.revenue : categories.expense;
 
-        const sectionEntries = budgetEntries.filter(e => e.type === type);
+        const sectionEntries = filteredBudgetEntries.filter(e => e.type === type);
         const totalAmount = sectionEntries.reduce((sum, e) => sum + e.amount, 0);
+
+        if (sectionEntries.length === 0) {
+            return null;
+        }
 
         return (
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
@@ -166,8 +180,32 @@ const BudgetStateView = () => {
 
     return (
         <div>
-            {renderSection('revenu')}
-            {renderSection('depense')}
+            <div className="mb-6">
+                <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Rechercher par tiers..."
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                    />
+                </div>
+            </div>
+
+            {searchTerm && filteredBudgetEntries.length === 0 ? (
+                <EmptyState 
+                    icon={Search} 
+                    title="Aucun résultat" 
+                    message={`Aucune entrée trouvée pour le tiers "${searchTerm}".`} 
+                />
+            ) : (
+                <>
+                    {renderSection('revenu')}
+                    {renderSection('depense')}
+                </>
+            )}
+            
             <AddCategoryFlowModal 
                 isOpen={isAddCategoryModalOpen}
                 onClose={() => setIsAddCategoryModalOpen(false)}

@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { PieChart, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowLeft, Folder, User } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { PieChart, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowLeft, Folder, User, ChevronDown } from 'lucide-react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import ReactECharts from 'echarts-for-react';
 import EmptyState from './EmptyState';
 import { getTodayInTimezone, getEntryAmountForPeriod } from '../utils/budgetCalculations';
 import { useTranslation } from '../utils/i18n';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, rangeEnd: rangeEndProp, analysisType: analysisTypeProp, analysisMode: analysisModeProp, setAnalysisMode: setAnalysisModeProp }) => {
   const { state, dispatch } = useBudget();
@@ -27,9 +28,34 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     color: null,
   });
 
+  const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
+  const periodMenuRef = useRef(null);
+  const [isAnalysisTypeMenuOpen, setIsAnalysisTypeMenuOpen] = useState(false);
+  const analysisTypeMenuRef = useRef(null);
+  const [isAnalysisModeMenuOpen, setIsAnalysisModeMenuOpen] = useState(false);
+  const analysisModeMenuRef = useRef(null);
+
   const analysisType = isFocusMode ? analysisTypeProp : localAnalysisType;
   const analysisMode = isFocusMode ? analysisModeProp : localAnalysisMode;
   const setAnalysisMode = isFocusMode ? setAnalysisModeProp : setLocalAnalysisMode;
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+        if (periodMenuRef.current && !periodMenuRef.current.contains(event.target)) {
+            setIsPeriodMenuOpen(false);
+        }
+        if (analysisTypeMenuRef.current && !analysisTypeMenuRef.current.contains(event.target)) {
+            setIsAnalysisTypeMenuOpen(false);
+        }
+        if (analysisModeMenuRef.current && !analysisModeMenuRef.current.contains(event.target)) {
+            setIsAnalysisModeMenuOpen(false);
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (drillDownState.level > 0) {
@@ -64,24 +90,24 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     let payload;
     switch (quickSelectType) {
       case 'month':
-        payload = { timeUnit: 'month', horizonLength: 1, periodOffset: 0 };
+        payload = { timeUnit: 'month', periodOffset: 0 };
         break;
       case 'bimester':
-        payload = { timeUnit: 'bimonthly', horizonLength: 1, periodOffset: 0 };
+        payload = { timeUnit: 'bimonthly', periodOffset: 0 };
         break;
       case 'quarter':
-        payload = { timeUnit: 'quarterly', horizonLength: 1, periodOffset: 0 };
+        payload = { timeUnit: 'quarterly', periodOffset: 0 };
         break;
       case 'semester':
-        payload = { timeUnit: 'semiannually', horizonLength: 1, periodOffset: 0 };
+        payload = { timeUnit: 'semiannually', periodOffset: 0 };
         break;
       case 'year':
-        payload = { timeUnit: 'annually', horizonLength: 1, periodOffset: 0 };
+        payload = { timeUnit: 'annually', periodOffset: 0 };
         break;
       default: return;
     }
     setLocalTimeUnit(payload.timeUnit);
-    setLocalHorizonLength(payload.horizonLength);
+    setLocalHorizonLength(1);
     setLocalPeriodOffset(payload.periodOffset);
     setLocalActiveQuickSelect(quickSelectType);
   };
@@ -475,7 +501,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
 
     if (categories.length === 0) {
         return {
-            title: { text: 'Aucune donnée à afficher', left: 'center', top: 'center' },
+            title: { text: 'Aucune donnée à analyser', left: 'center', top: 'center' },
             series: []
         };
     }
@@ -708,6 +734,29 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         return tierAnalysisData.tiers.length > 0 ? <ReactECharts option={getTierChartOptions()} style={{ height: '500px', width: '100%' }} /> : <EmptyState icon={User} title="Aucune donnée par tiers" message="Aucune transaction trouvée pour la période sélectionnée." />;
     }
   };
+  
+  const quickPeriodOptions = [
+    { id: 'month', label: 'Mois' },
+    { id: 'bimester', label: 'Bimestre' },
+    { id: 'quarter', label: 'Trimestre' },
+    { id: 'semester', label: 'Semestre' },
+    { id: 'year', label: 'Année' },
+  ];
+  const selectedPeriodLabel = quickPeriodOptions.find(opt => opt.id === localActiveQuickSelect)?.label || 'Période';
+  
+  const analysisTypeOptions = [
+    { id: 'expense', label: 'Sorties', icon: TrendingDown, color: 'text-red-600' },
+    { id: 'revenue', label: 'Entrées', icon: TrendingUp, color: 'text-green-600' }
+  ];
+  const selectedAnalysisTypeOption = analysisTypeOptions.find(opt => opt.id === analysisType);
+  const SelectedIcon = selectedAnalysisTypeOption.icon;
+
+  const analysisModeOptions = [
+    { id: 'category', label: 'Par catégorie' },
+    ...(isConsolidated || isCustomConsolidated ? [{ id: 'project', label: 'Par projet' }] : []),
+    { id: 'tier', label: 'Par tiers' },
+  ];
+  const selectedAnalysisModeOption = analysisModeOptions.find(opt => opt.id === analysisMode);
 
   return (
     <div className={isFocusMode ? "h-full flex flex-col" : "container mx-auto p-6 max-w-full"}>
@@ -731,42 +780,122 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                         <div className="flex items-center gap-2">
                             <button onClick={() => handlePeriodChange(-1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-full transition-colors" title="Période précédente"><ChevronLeft size={18} /></button>
-                            <span className="text-sm font-semibold text-gray-700 w-auto min-w-[9rem] text-center" title="Période sélectionnée">{(analysisPeriodName.charAt(0).toUpperCase() + analysisPeriodName.slice(1)) || 'Période'}</span>
+                            <span className="text-sm font-semibold text-gray-700 w-auto min-w-[9rem] text-center" title="Période sélectionnée">{analysisPeriodName}</span>
                             <button onClick={() => handlePeriodChange(1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-full transition-colors" title="Période suivante"><ChevronRight size={18} /></button>
                         </div>
                         <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
-                        <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
-                            <button onClick={() => handleQuickPeriodSelect('month')} className={`px-2 py-1 text-xs rounded-md transition-colors ${localActiveQuickSelect === 'month' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'font-normal text-gray-600 hover:bg-gray-300'}`}>Mois</button>
-                            <button onClick={() => handleQuickPeriodSelect('bimester')} className={`px-2 py-1 text-xs rounded-md transition-colors ${localActiveQuickSelect === 'bimester' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'font-normal text-gray-600 hover:bg-gray-300'}`}>Bimestre</button>
-                            <button onClick={() => handleQuickPeriodSelect('quarter')} className={`px-2 py-1 text-xs rounded-md transition-colors ${localActiveQuickSelect === 'quarter' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'font-normal text-gray-600 hover:bg-gray-300'}`}>Trimestre</button>
-                            <button onClick={() => handleQuickPeriodSelect('semester')} className={`px-2 py-1 text-xs rounded-md transition-colors ${localActiveQuickSelect === 'semester' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'font-normal text-gray-600 hover:bg-gray-300'}`}>Semestre</button>
-                            <button onClick={() => handleQuickPeriodSelect('year')} className={`px-2 py-1 text-xs rounded-md transition-colors ${localActiveQuickSelect === 'year' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'font-normal text-gray-600 hover:bg-gray-300'}`}>Année</button>
+                        <div className="relative" ref={periodMenuRef}>
+                            <button 
+                                onClick={() => setIsPeriodMenuOpen(p => !p)} 
+                                className="flex items-center gap-2 px-3 h-9 rounded-md bg-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-300 transition-colors"
+                            >
+                                <span>{selectedPeriodLabel}</span>
+                                <ChevronDown className={`w-4 h-4 transition-transform ${isPeriodMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            <AnimatePresence>
+                                {isPeriodMenuOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-20"
+                                    >
+                                        <ul className="p-1">
+                                            {quickPeriodOptions.map(option => (
+                                                <li key={option.id}>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleQuickPeriodSelect(option.id);
+                                                            setIsPeriodMenuOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-3 py-1.5 text-sm rounded-md ${localActiveQuickSelect === option.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 )}
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
-                        <button onClick={() => setAnalysisMode('category')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisMode === 'category' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                            Par catégorie
+                    <div className="relative" ref={analysisModeMenuRef}>
+                        <button 
+                            onClick={() => setIsAnalysisModeMenuOpen(p => !p)} 
+                            className="flex items-center gap-2 px-3 h-9 rounded-md bg-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-300 transition-colors"
+                        >
+                            <span>{selectedAnalysisModeOption.label}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isAnalysisModeMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        {(isConsolidated || isCustomConsolidated) && (
-                            <button onClick={() => setAnalysisMode('project')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisMode === 'project' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                                Par projet
-                            </button>
-                        )}
-                        <button onClick={() => setAnalysisMode('tier')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisMode === 'tier' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                            Par tiers
-                        </button>
+                        <AnimatePresence>
+                            {isAnalysisModeMenuOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-20"
+                                >
+                                    <ul className="p-1">
+                                        {analysisModeOptions.map(option => (
+                                            <li key={option.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        setAnalysisMode(option.id);
+                                                        setIsAnalysisModeMenuOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 text-sm rounded-md ${analysisMode === option.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
-                        <button onClick={() => setLocalAnalysisType('expense')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisType === 'expense' ? 'bg-white shadow text-red-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                            <TrendingDown className="w-4 h-4" />
-                            Sorties
+                    <div className="relative" ref={analysisTypeMenuRef}>
+                        <button 
+                            onClick={() => setIsAnalysisTypeMenuOpen(p => !p)} 
+                            className="flex items-center gap-2 px-3 h-9 rounded-md bg-gray-200 font-semibold text-sm hover:bg-gray-300 transition-colors"
+                        >
+                            <SelectedIcon className={`w-4 h-4 ${selectedAnalysisTypeOption.color}`} />
+                            <span>{selectedAnalysisTypeOption.label}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isAnalysisTypeMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        <button onClick={() => setLocalAnalysisType('revenue')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${analysisType === 'revenue' ? 'bg-white shadow text-green-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                            <TrendingUp className="w-4 h-4" />
-                            Entrées
-                        </button>
+                        <AnimatePresence>
+                            {isAnalysisTypeMenuOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-20"
+                                >
+                                    <ul className="p-1">
+                                        {analysisTypeOptions.map(option => {
+                                            const Icon = option.icon;
+                                            return (
+                                                <li key={option.id}>
+                                                    <button
+                                                        onClick={() => {
+                                                            setLocalAnalysisType(option.id);
+                                                            setIsAnalysisTypeMenuOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-3 py-1.5 text-sm rounded-md flex items-center gap-2 ${analysisType === option.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                    >
+                                                        <Icon className={`w-4 h-4 ${option.color}`} />
+                                                        {option.label}
+                                                    </button>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
