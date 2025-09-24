@@ -53,45 +53,35 @@ const BudgetTracker = () => {
   };
 
   const { activeProject, budgetEntries, actualTransactions } = useMemo(() => {
+    let relevantEntries, relevantActuals, project;
+
     if (isConsolidated) {
-      return {
-        activeProject: { id: 'consolidated', name: 'Projet consolidé' },
-        budgetEntries: Object.entries(allEntries).flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId }))),
-        actualTransactions: Object.entries(allActuals).flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId }))),
-      };
-    }
-    
-    if (isCustomConsolidated) {
+        relevantEntries = Object.entries(allEntries).flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId })));
+        relevantActuals = Object.entries(allActuals).flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId })));
+        project = { id: 'consolidated', name: 'Projet consolidé' };
+    } else if (isCustomConsolidated) {
         const viewId = activeProjectId.replace('consolidated_view_', '');
         const view = consolidatedViews.find(v => v.id === viewId);
-        
         if (!view || !view.project_ids) {
             return { activeProject: { id: activeProjectId, name: 'Vue Inconnue' }, budgetEntries: [], actualTransactions: [] };
         }
-
         const projectIdsInView = view.project_ids;
-
-        const consolidatedEntries = projectIdsInView.flatMap(projectId => 
-            (allEntries[projectId] || []).map(entry => ({ ...entry, projectId }))
-        );
-
-        const consolidatedActuals = projectIdsInView.flatMap(projectId => 
-            (allActuals[projectId] || []).map(actual => ({ ...actual, projectId }))
-        );
-
-        return {
-            activeProject: { id: activeProjectId, name: view.name },
-            budgetEntries: consolidatedEntries,
-            actualTransactions: consolidatedActuals,
-        };
+        relevantEntries = projectIdsInView.flatMap(projectId => (allEntries[projectId] || []).map(entry => ({ ...entry, projectId })));
+        relevantActuals = projectIdsInView.flatMap(projectId => (allActuals[projectId] || []).map(actual => ({ ...actual, projectId })));
+        project = { id: activeProjectId, name: view.name };
+    } else {
+        project = projects.find(p => p.id === activeProjectId);
+        relevantEntries = project ? (allEntries[project.id] || []) : [];
+        relevantActuals = project ? (allActuals[project.id] || []) : [];
     }
 
-    // Single project view
-    const project = projects.find(p => p.id === activeProjectId);
+    // Filter out final provision payments from the list of actuals used by the Trezo table.
+    const filteredActuals = relevantActuals.filter(a => !a.isFinalProvisionPayment);
+
     return {
-      activeProject: project,
-      budgetEntries: project ? (allEntries[project.id] || []) : [],
-      actualTransactions: project ? (allActuals[project.id] || []) : [],
+        activeProject: project,
+        budgetEntries: relevantEntries,
+        actualTransactions: filteredActuals,
     };
   }, [activeProjectId, projects, allEntries, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
