@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search } from 'lucide-react';
+import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search, Lock } from 'lucide-react';
 import EmptyState from './EmptyState';
 import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
@@ -58,14 +58,7 @@ const BudgetStateView = () => {
     };
 
     const handleDeleteEntry = (entry) => {
-        dispatch({
-            type: 'OPEN_CONFIRMATION_MODAL',
-            payload: {
-                title: 'Supprimer cette entrée ?',
-                message: 'Cette action est irréversible et supprimera l\'entrée budgétaire.',
-                onConfirm: () => deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId }),
-            }
-        });
+        deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId });
     };
 
     const renderSection = (type) => {
@@ -91,13 +84,14 @@ const BudgetStateView = () => {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b text-left text-xs text-gray-500 uppercase">
-                            <th className="py-3 px-4 w-[18%]">Sous-catégorie</th>
-                            <th className="py-3 px-4 w-[18%]">Nom</th>
-                            <th className="py-3 px-4 w-[18%]">Tiers</th>
-                            <th className="py-3 px-4 w-[12%]">Fréquence</th>
-                            <th className="py-3 px-4 w-[10%]">Début</th>
-                            <th className="py-3 px-4 w-[10%]">Fin</th>
-                            <th className="py-3 px-4 text-right w-[10%]">Montant</th>
+                            <th className="py-3 px-4 w-[15%]">Sous-catégorie</th>
+                            <th className="py-3 px-4 w-[15%]">Description</th>
+                            <th className="py-3 px-4 w-[15%]">Tiers</th>
+                            <th className="py-3 px-4 w-[20%]">Détails</th>
+                            <th className="py-3 px-4 w-[10%]">Fréquence</th>
+                            <th className="py-3 px-4 w-[8%]">Début</th>
+                            <th className="py-3 px-4 w-[8%]">Fin</th>
+                            <th className="py-3 px-4 text-right w-[9%]">Montant</th>
                             <th className="py-3 px-4 text-right w-12">Actions</th>
                         </tr>
                     </thead>
@@ -114,7 +108,7 @@ const BudgetStateView = () => {
                             return (
                                 <React.Fragment key={mainCat.id}>
                                     <tr className="bg-gray-100 font-semibold">
-                                        <td className="py-3 px-4" colSpan="6">
+                                        <td className="py-3 px-4" colSpan="8">
                                             <div className="flex items-center gap-2">
                                                 <Folder className="w-4 h-4 text-gray-600" />
                                                 {mainCat.name}
@@ -131,6 +125,16 @@ const BudgetStateView = () => {
                                             <td className="py-3 px-4 text-blue-600 font-medium">{entry.category}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.description || '-'}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
+                                            <td className="py-3 px-4 text-gray-600">
+                                                {entry.isProvision && (
+                                                    <div className="flex items-center gap-2 text-xs text-indigo-700">
+                                                        <Lock className="w-4 h-4" />
+                                                        <span>
+                                                            Provision en {entry.payments?.length || 0} fois de {formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="py-3 px-4 text-gray-600">{entry.frequency}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.startDate ? new Date(entry.startDate).toLocaleDateString('fr-FR') : (entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-')}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : 'Indéterminée'}</td>
@@ -143,7 +147,7 @@ const BudgetStateView = () => {
                                         </tr>
                                     ))}
                                     <tr className="border-b">
-                                        <td colSpan="8" className="py-2 px-4 text-xs text-gray-500">
+                                        <td colSpan="9" className="py-2 px-4 text-xs text-gray-500">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span>Ajouter :</span>
                                                 {mainCat.subCategories.slice(0,3).map(sc => (
@@ -158,7 +162,7 @@ const BudgetStateView = () => {
                             );
                         })}
                         <tr className="border-b">
-                            <td colSpan="8" className="py-4 px-4 text-center">
+                            <td colSpan="9" className="py-4 px-4 text-center">
                                 <button onClick={() => setIsAddCategoryModalOpen(true)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
                                     <Plus size={16} /> Ajouter une catégorie
                                 </button>

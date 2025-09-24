@@ -355,7 +355,7 @@ const budgetReducer = (state, action) => {
         tempAllEntries[projectId].push(principalEntry, repaymentEntry);
 
         const tempAllActuals = { ...state.allActuals };
-        tempAllActuals[projectId] = (tempAllActuals[projectId] || []).filter(a => {
+        tempAllEntries[projectId] = (tempAllEntries[projectId] || []).filter(a => {
             const entry = (state.allEntries[projectId] || []).find(e => e.id === a.budgetId);
             return !entry || entry.loanId !== updatedLoan.id;
         });
@@ -670,7 +670,7 @@ const budgetReducer = (state, action) => {
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
-    case 'ADD_MAIN_CATEGORY': {
+    case 'ADD_MAIN_CATEGORY_SUCCESS': {
         const { type, newMainCategory } = action.payload;
         const newCategories = JSON.parse(JSON.stringify(state.categories));
         newCategories[type].push(newMainCategory);
@@ -976,7 +976,7 @@ export const BudgetProvider = ({ children }) => {
           const [
             projectsRes, tiersRes, loansRes, scenariosRes, 
             entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
-            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -991,9 +991,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('collaborators').select('*'),
             supabase.from('comments').select('*'),
             supabase.from('templates').select('*'),
+            supabase.from('user_categories').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -1053,6 +1054,7 @@ export const BudgetProvider = ({ children }) => {
               supplier: entry.supplier, description: entry.description, isOffBudget: entry.is_off_budget,
               payments: entry.payments,
               provisionDetails: entry.provision_details,
+              isProvision: entry.is_provision,
             };
             if (!acc[entry.project_id]) acc[entry.project_id] = [];
             acc[entry.project_id].push(e);
@@ -1114,6 +1116,32 @@ export const BudgetProvider = ({ children }) => {
               return acc;
           }, {});
 
+          const fetchedCategories = customCategoriesRes.data || [];
+          const customMain = fetchedCategories.filter(c => !c.parent_id);
+          const customSubs = fetchedCategories.filter(c => c.parent_id);
+          const finalCategories = JSON.parse(JSON.stringify(initialCategories));
+          
+          customMain.forEach(main => {
+              if (!finalCategories[main.type].some(m => m.id === main.id)) {
+                  finalCategories[main.type].push({
+                      id: main.id,
+                      name: main.name,
+                      isFixed: main.is_fixed,
+                      subCategories: []
+                  });
+              }
+          });
+
+          customSubs.forEach(sub => {
+              let parent = finalCategories.revenue.find(m => m.id === sub.parent_id);
+              if (!parent) {
+                  parent = finalCategories.expense.find(m => m.id === sub.parent_id);
+              }
+              if (parent && !parent.subCategories.some(s => s.id === sub.id)) {
+                  parent.subCategories.push({ id: sub.id, name: sub.name });
+              }
+          });
+
           dispatch({
             type: 'SET_INITIAL_DATA',
             payload: {
@@ -1121,13 +1149,18 @@ export const BudgetProvider = ({ children }) => {
               allProfiles: profilesData || [],
               settings,
               projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
-              allEntries, allActuals, allCashAccounts, scenarioEntries,
+              allEntries, allActuals, allCashAccounts, scenarioEntries, categories: finalCategories,
             },
           });
 
         } catch (error) {
           console.error("Error fetching initial data:", error);
-          dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur de chargement des données: ${error.message}`, type: 'error' } });
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+              dispatch({ type: 'ADD_TOAST', payload: { message: 'Problème de session détecté. Déconnexion pour réinitialiser.', type: 'error', duration: 5000 } });
+              await supabase.auth.signOut();
+          } else {
+              dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur de chargement des données: ${error.message}`, type: 'error' } });
+          }
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       };

@@ -186,8 +186,6 @@ export const updateProjectSettings = async (dispatch, { projectId, newSettings }
     }
 };
 
-// Keep other actions as they are
-// ... (rest of the file)
 export const saveEntry = async (dispatch, { entryData, editingEntry, activeProjectId, tiers, user, cashAccounts }) => {
     try {
         const { supplier, type } = entryData;
@@ -220,6 +218,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             is_off_budget: entryData.isOffBudget || false,
             payments: entryData.payments,
             provision_details: entryData.provisionDetails,
+            is_provision: entryData.isProvision,
         };
 
         let savedEntryFromDB;
@@ -265,6 +264,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             isOffBudget: savedEntryFromDB.is_off_budget,
             payments: savedEntryFromDB.payments,
             provisionDetails: savedEntryFromDB.provision_details,
+            isProvision: savedEntryFromDB.is_provision,
         };
 
         const newActuals = deriveActualsFromEntry(savedEntryForClient, activeProjectId, cashAccounts);
@@ -727,6 +727,24 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
     }
 };
 
+export const archiveScenario = async (dispatch, scenarioId) => {
+    try {
+        const { error } = await supabase
+            .from('scenarios')
+            .update({ is_archived: true })
+            .eq('id', scenarioId);
+        
+        if (error) throw error;
+
+        dispatch({ type: 'ARCHIVE_SCENARIO_SUCCESS', payload: scenarioId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario archivé.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error archiving scenario:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
 export const deleteScenarioEntry = async (dispatch, { scenarioId, entryId }) => {
     try {
         const { error } = await supabase
@@ -869,5 +887,89 @@ export const deleteTemplate = async (dispatch, templateId) => {
     } catch (error) {
         console.error("Error deleting template:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const saveMainCategory = async (dispatch, { type, name, user }) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_categories')
+            .insert({
+                user_id: user.id,
+                type: type,
+                name: name,
+                is_fixed: false,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        
+        const newMainCategory = {
+            id: data.id,
+            name: data.name,
+            isFixed: data.is_fixed,
+            subCategories: []
+        };
+
+        dispatch({ type: 'ADD_MAIN_CATEGORY_SUCCESS', payload: { type, newMainCategory } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale ajoutée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error saving main category:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const updateMainCategory = async (dispatch, { type, mainCategoryId, newName }) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_categories')
+            .update({ name: newName })
+            .eq('id', mainCategoryId)
+            .select()
+            .single();
+        if (error) throw error;
+        
+        dispatch({ type: 'UPDATE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newName: data.name } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale mise à jour.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error updating main category:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const deleteMainCategory = async (dispatch, { type, mainCategoryId }) => {
+    try {
+        const { error } = await supabase
+            .from('user_categories')
+            .delete()
+            .eq('id', mainCategoryId);
+        if (error) throw error;
+
+        dispatch({ type: 'DELETE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale supprimée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting main category:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const deleteProject = async (dispatch, projectId) => {
+    try {
+        const { error } = await supabase
+            .from('projects')
+            .delete()
+            .eq('id', projectId);
+
+        if (error) throw error;
+
+        dispatch({ type: 'DELETE_PROJECT_SUCCESS', payload: projectId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Projet supprimé.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting project:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression du projet: ${error.message}`, type: 'error' } });
     }
 };

@@ -27,13 +27,25 @@ export const getEntryAmountForMonth = (entry, monthIndex, year) => {
     const targetMonthStart = new Date(year, monthIndex, 1);
     const targetMonthEnd = new Date(year, monthIndex + 1, 0);
 
+    if (entry.isProvision) {
+        if (!entry.payments || entry.payments.length === 0) return 0;
+        return entry.payments.reduce((sum, payment) => {
+            if (!payment.date || !payment.amount) return sum;
+            const paymentDate = new Date(payment.date);
+            if (paymentDate.getFullYear() === year && paymentDate.getMonth() === monthIndex) {
+                return sum + parseFloat(payment.amount);
+            }
+            return sum;
+        }, 0);
+    }
+
     if (entry.frequency === 'ponctuel') {
       if (!entry.date) return 0;
       const entryDate = new Date(entry.date);
       return entryDate.getFullYear() === year && entryDate.getMonth() === monthIndex ? entry.amount : 0;
     }
 
-    if (entry.frequency === 'irregulier' || entry.frequency === 'provision') {
+    if (entry.frequency === 'irregulier') {
       if (!entry.payments || entry.payments.length === 0) return 0;
       return entry.payments.reduce((sum, payment) => {
         if (!payment.date || !payment.amount) return sum;
@@ -80,6 +92,19 @@ export const getEntryAmountForPeriod = (entry, periodStart, periodEnd) => {
 
     const entryAmount = parseFloat(entry.amount);
 
+    if (entry.isProvision) {
+        if (!entry.payments || entry.payments.length === 0) return 0;
+        return entry.payments.reduce((sum, payment) => {
+            if (!payment.date || !payment.amount) return sum;
+            const paymentDate = new Date(payment.date);
+            paymentDate.setHours(0, 0, 0, 0);
+            if (paymentDate >= periodStart && paymentDate < periodEnd) {
+                return sum + parseFloat(payment.amount);
+            }
+            return sum;
+        }, 0);
+    }
+
     if (entry.frequency === 'ponctuel') {
         if (!entry.date) return 0;
         const entryDate = new Date(entry.date);
@@ -87,7 +112,7 @@ export const getEntryAmountForPeriod = (entry, periodStart, periodEnd) => {
         return (entryDate >= periodStart && entryDate < periodEnd) ? entryAmount : 0;
     }
 
-    if (entry.frequency === 'irregulier' || entry.frequency === 'provision') {
+    if (entry.frequency === 'irregulier') {
         if (!entry.payments || entry.payments.length === 0) return 0;
         return entry.payments.reduce((sum, payment) => {
             if (!payment.date || !payment.amount) return sum;

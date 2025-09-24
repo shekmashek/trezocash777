@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Edit, Eye, Search, Gem, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, Maximize, Minimize, AreaChart, BarChart, Hash, ArrowRightLeft, Archive, Calendar, PieChart, FilePlus, HandCoins, Banknote, AlertTriangle, ChevronUp, MessageSquare } from 'lucide-react';
+import { Plus, Edit, Eye, Search, Gem, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, Maximize, Minimize, AreaChart, BarChart, Hash, ArrowRightLeft, Archive, Calendar, PieChart, FilePlus, HandCoins, Banknote, AlertTriangle, ChevronUp, MessageSquare, Lock } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone } from '../utils/budgetCalculations';
@@ -677,7 +677,14 @@ const BudgetTracker = () => {
                     <td className="px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10">{entry.category}</td>
                     <td className="px-4 py-1 text-gray-700 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${supplierColLeft}px` }}>
                       <div className="flex items-center justify-between">
-                        <span className="truncate" title={getFrequencyTitle(entry)}>{entry.supplier}</span>
+                        <div className="flex items-center gap-2 truncate" title={getFrequencyTitle(entry)}>
+                          {entry.isProvision && (
+                            <div title={`Provision en ${entry.payments?.length || 0} fois de ${formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}`}>
+                                <Lock className="w-4 h-4 text-indigo-500 shrink-0" />
+                            </div>
+                          )}
+                          <span className="truncate">{entry.supplier}</span>
+                        </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => handleEditEntry(entry)} className="p-1 text-blue-500 hover:text-blue-700"><Edit size={14} /></button>
                           <button onClick={() => handleDeleteEntry(entry)} className="p-1 text-red-500 hover:text-red-700"><Trash2 size={14} /></button>

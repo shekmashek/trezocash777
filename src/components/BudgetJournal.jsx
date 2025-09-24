@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Calendar, User, Building, Edit, Trash2, Clock, Repeat, ArrowRight, ListChecks, Folder, PiggyBank } from 'lucide-react';
+import { Search, Filter, Calendar, User, Building, Edit, Trash2, Clock, Repeat, ArrowRight, ListChecks, Folder, Lock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
 import EmptyState from './EmptyState';
@@ -43,14 +43,12 @@ const BudgetJournal = ({ onEditEntry }) => {
       case 'journalier': return <Clock className="w-4 h-4 text-cyan-600" />;
       case 'hebdomadaire': return <Clock className="w-4 h-4 text-blue-600" />;
       case 'irregulier': return <ListChecks className="w-4 h-4 text-purple-600" />;
-      case 'provision': return <PiggyBank className="w-4 h-4 text-indigo-600" />;
       case 'annuel': return <Calendar className="w-4 h-4 text-teal-600" />;
       default: return <Repeat className="w-4 h-4 text-green-600" />;
     }
   };
   const getFrequencyLabel = (frequency) => {
     if (frequency === 'irregulier') return 'Irrégulier';
-    if (frequency === 'provision') return 'Provisionné';
     return frequency.charAt(0).toUpperCase() + frequency.slice(1);
   };
 
@@ -101,7 +99,7 @@ const BudgetJournal = ({ onEditEntry }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="xl:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-2"><Search className="w-4 h-4 inline mr-1" />Rechercher</label><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Fournisseur, catégorie, projet..." className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" /></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-2"><Filter className="w-4 h-4 inline mr-1" />Type</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"><option value="all">Tous</option><option value="revenu">Entrées</option><option value="depense">Sorties</option></select></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-2">Fréquence</label><select value={filterFrequency} onChange={(e) => setFilterFrequency(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"><option value="all">Toutes</option><option value="ponctuel">Ponctuel</option><option value="journalier">Journalier</option><option value="hebdomadaire">Hebdomadaire</option><option value="mensuel">Mensuel</option><option value="bimestriel">Bimestriel</option><option value="trimestriel">Trimestriel</option><option value="annuel">Annuel</option><option value="irregulier">Irrégulier</option><option value="provision">Provisionné</option></select></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-2">Fréquence</label><select value={filterFrequency} onChange={(e) => setFilterFrequency(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"><option value="all">Toutes</option><option value="ponctuel">Ponctuel</option><option value="journalier">Journalier</option><option value="hebdomadaire">Hebdomadaire</option><option value="mensuel">Mensuel</option><option value="bimestriel">Bimestriel</option><option value="trimestriel">Trimestriel</option><option value="semestriel">Semestriel</option><option value="annuel">Annuel</option><option value="irregulier">Irrégulier</option></select></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-2">Trier par</label><select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"><option value="date">Date</option><option value="amount">Montant</option>{isConsolidated && <option value="project">Projet</option>}<option value="supplier">Fournisseur</option><option value="category">Catégorie</option></select></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-2">Ordre</label><select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"><option value="desc">Décroissant</option><option value="asc">Croissant</option></select></div>
         </div>
@@ -128,8 +126,15 @@ const BudgetJournal = ({ onEditEntry }) => {
                       <td className="px-6 py-4"><div className="flex items-center">{isRevenue ? <Building className="w-5 h-5 text-green-600 mr-3" /> : <Calendar className="w-5 h-5 text-red-600 mr-3" />}<div><div className={`text-sm font-medium ${isRevenue ? 'text-green-700' : 'text-red-700'}`}>{isRevenue ? 'Entrée' : 'Sortie'}</div><div className="text-sm text-gray-500">{entry.category}</div></div></div></td>
                       {isConsolidated && (<td className="px-6 py-4"><div className="flex items-center gap-2"><Folder className="w-4 h-4 text-blue-500" /><span className="text-sm font-medium text-gray-800">{entryProject?.name || 'N/A'}</span></div></td>)}
                       <td className="px-6 py-4"><div className="text-sm font-medium text-gray-900">{entry.supplier}</div>{entry.description && <div className="text-sm text-gray-500 truncate max-w-xs">{entry.description}</div>}</td>
-                      <td className="px-6 py-4"><div className="flex items-center gap-2 text-sm text-gray-900">{getFrequencyIcon(entry.frequency)}<span>{getFrequencyLabel(entry.frequency)}</span></div><div className="text-xs text-gray-500 mt-1 flex items-center gap-1">{entry.frequency === 'ponctuel' ? (<span>{formatDate(entry.date)}</span>) : (entry.frequency === 'irregulier' || entry.frequency === 'provision') ? (<span>{entry.payments?.length || 0} paiements</span>) : (<><span>{formatDate(entry.startDate)}</span><ArrowRight className="w-3 h-3" /><span>{formatDate(entry.endDate)}</span></>)}</div></td>
-                      <td className="px-6 py-4"><div className={`text-lg font-semibold ${isRevenue ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(entry.amount, currencySettings)}</div>{entry.frequency === 'hebdomadaire' && <div className="text-xs text-gray-500">par semaine</div>}{(entry.frequency === 'irregulier' || entry.frequency === 'provision') && <div className="text-xs text-gray-500">Total</div>}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          {getFrequencyIcon(entry.frequency)}
+                          <span>{getFrequencyLabel(entry.frequency)}</span>
+                          {entry.isProvision && <span className="flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full"><Lock size={12} />Provisionné</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">{entry.frequency === 'ponctuel' ? (<span>{formatDate(entry.date)}</span>) : (entry.frequency === 'irregulier' || entry.isProvision) ? (<span>{entry.payments?.length || 0} paiements</span>) : (<><span>{formatDate(entry.startDate)}</span><ArrowRight className="w-3 h-3" /><span>{entry.endDate ? formatDate(entry.endDate) : '...'}</span></>)}</div>
+                      </td>
+                      <td className="px-6 py-4"><div className={`text-lg font-semibold ${isRevenue ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(entry.amount, currencySettings)}</div>{entry.frequency === 'hebdomadaire' && <div className="text-xs text-gray-500">par semaine</div>}{(entry.frequency === 'irregulier' || entry.isProvision) && <div className="text-xs text-gray-500">Total</div>}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onEditEntry(entry)} className="text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>

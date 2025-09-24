@@ -3,10 +3,11 @@ import { Edit, Trash2, Plus, Save, X, FolderKanban, Folder, Filter } from 'lucid
 import { useBudget } from '../context/BudgetContext';
 import { v4 as uuidv4 } from 'uuid';
 import EmptyState from '../components/EmptyState';
+import { saveMainCategory } from '../context/actions';
 
 const CategoryManagementPage = () => {
   const { state, dispatch } = useBudget();
-  const { categories, allEntries, allActuals, projects } = state;
+  const { categories, allEntries, allActuals, projects, session } = state;
 
   const [editingSubCategory, setEditingSubCategory] = useState(null);
   const [newSubCategory, setNewSubCategory] = useState({});
@@ -101,13 +102,7 @@ const CategoryManagementPage = () => {
   const handleAddMainCategory = (type) => {
     const name = newMainCategoryName[type].trim();
     if (name) {
-      const newMainCategory = {
-        id: uuidv4(),
-        name,
-        isFixed: false,
-        subCategories: []
-      };
-      dispatch({ type: 'ADD_MAIN_CATEGORY', payload: { type, newMainCategory } });
+      saveMainCategory(dispatch, { type, name, user: session.user });
       setNewMainCategoryName(prev => ({ ...prev, [type]: '' }));
     } else {
       dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });

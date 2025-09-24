@@ -4,7 +4,7 @@ import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
 import { supabase } from '../utils/supabase';
-import { deleteConsolidatedView } from '../context/actions';
+import { deleteConsolidatedView, deleteProject } from '../context/actions';
 import Avatar from './Avatar';
 
 const ProjectSwitcher = () => {
@@ -135,7 +135,7 @@ const ProjectSwitcher = () => {
       payload: {
         title: `Supprimer le projet "${projectToDelete.name}" ?`,
         message: "Cette action est irréversible. Toutes les données associées à ce projet (budgets, transactions, scénarios) seront définitivement perdues. Pour conserver les données, vous pouvez plutôt l'archiver.",
-        onConfirm: () => dispatch({ type: 'DELETE_PROJECT', payload: projectId }),
+        onConfirm: () => deleteProject(dispatch, projectId),
       }
     });
   };
