@@ -165,6 +165,9 @@ const BudgetStateView = () => {
                                                         <Plus size={12} /> {sc.name}
                                                     </button>
                                                 ))}
+                                                <button onClick={() => handleAddEntry(null, type, mainCat.id)} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 font-semibold">
+                                                  <Plus size={12} /> Nouvelle sous-catégorie
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
