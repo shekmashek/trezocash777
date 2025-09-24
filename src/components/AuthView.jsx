@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../utils/supabase';
+import api from '../config/api';
 import TrezocashLogo from './TrezocashLogo';
 import { LogIn, UserPlus, Loader, ArrowLeft } from 'lucide-react';
 
@@ -7,6 +7,7 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // Nouveau champ
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -17,46 +18,56 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
     setError('');
     setMessage('');
 
+    // Validation côté client
+    if (!isLogin && password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const nameFromEmail = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim();
-        let fullName = nameFromEmail.split(' ').filter(Boolean).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const endpoint = isLogin ? '/auth/login' : '/auth/register';
+      const nameFromEmail = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim();
+      const fullName = nameFromEmail || 'Nouvel utilisateur';
 
-        if (!fullName) {
-            fullName = 'Nouvel utilisateur';
-        }
+      const payload = isLogin 
+        ? { email, password }
+        : { 
+            name: fullName,
+            email, 
+            password,
+            password_confirmation: confirmPassword // Important pour Laravel
+          };
 
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName
-            }
-          }
-        });
+      const response = await api.post(endpoint, payload);
+      
+      if (response.data.token || response.data.access_token) {
+        const token = response.data.token || response.data.access_token;
+        localStorage.setItem('auth_token', token);
         
-        if (error) {
-            if (error.message.includes("duplicate key value violates unique constraint")) {
-                throw new Error("Un utilisateur avec cet e-mail existe déjà.");
-            }
-            if (error.message.includes("Password should be at least 6 characters")) {
-                throw new Error("Le mot de passe doit contenir au moins 6 caractères.");
-            }
-            throw error;
-        }
-        setMessage('Inscription réussie ! Veuillez vérifier votre e-mail pour confirmer votre compte.');
+        setMessage(isLogin ? 'Connexion réussie !' : 'Inscription réussie !');
+        setTimeout(() => {
+          window.location.href = '/app/dashboard';
+        }, 1500);
       }
     } catch (error) {
-      setError(error.message);
+      // Gestion détaillée des erreurs Laravel
+      if (error.response?.status === 422 && error.response.data.errors) {
+        const validationErrors = error.response.data.errors;
+        // Prendre la première erreur de validation
+        const firstErrorKey = Object.keys(validationErrors)[0];
+        const firstError = validationErrors[firstErrorKey][0];
+        setError(firstError);
+      } else if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else {
+        setError(error.message || 'Une erreur est survenue');
+      }
     } finally {
       setLoading(false);
     }
   };
-  
+
   const signUpTitle = fromTrial ? "Démarrer votre essai de 14 jours" : "Créer un compte";
   const signUpSubtitle = fromTrial ? "Créez votre compte pour commencer votre essai gratuit." : "Rejoignez-nous pour commencer à piloter votre trésorerie.";
 
@@ -72,9 +83,11 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
         </div>
         
         <div className="bg-white p-8 rounded-xl shadow-lg border relative">
-          <button onClick={onBack} className="absolute top-4 left-4 text-gray-500 hover:text-gray-800 transition-colors">
-            <ArrowLeft size={20} />
-          </button>
+          {onBack && (
+            <button onClick={onBack} className="absolute top-4 left-4 text-gray-500 hover:text-gray-800 transition-colors">
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <div className="flex border-b mb-6">
             <button
               onClick={() => setIsLogin(true)}
@@ -94,40 +107,79 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
           <p className="text-sm text-gray-500 text-center mb-6">{isLogin ? 'Connectez-vous pour accéder à votre espace.' : signUpSubtitle}</p>
 
           <form onSubmit={handleAuth} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Nom</label>
+                <input
+                  type="text"
+                  value={email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'Nouvel utilisateur'}
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-100 text-gray-500"
+                  readOnly
+                />
+                <p className="text-xs text-gray-400 mt-1">Ce nom sera utilisé pour votre profil</p>
+              </div>
+            )}
+            
             <div>
               <label className="text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="vous@exemple.com"
                 required
               />
             </div>
+            
             <div>
               <label className="text-sm font-medium text-gray-700">Mot de passe</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="********"
                 required
+                minLength={6}
               />
             </div>
+
+            {!isLogin && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="********"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:bg-gray-400"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader className="animate-spin" /> : (isLogin ? <LogIn size={18} /> : <UserPlus size={18} />)}
+              {loading ? <Loader className="animate-spin" size={18} /> : (isLogin ? <LogIn size={18} /> : <UserPlus size={18} />)}
               <span>{loading ? 'Chargement...' : (isLogin ? 'Se Connecter' : 'S\'inscrire')}</span>
             </button>
           </form>
 
-          {error && <p className="mt-4 text-xs text-center text-red-600 bg-red-50 p-2 rounded-md">{error}</p>}
-          {message && <p className="mt-4 text-xs text-center text-green-600 bg-green-50 p-2 rounded-md">{message}</p>}
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-center text-red-600">{error}</p>
+            </div>
+          )}
+          {message && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-center text-green-600">{message}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
