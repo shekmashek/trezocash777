@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../utils/supabase';
-import { saveEntry, updateSettings, updateUserCashAccount } from '../context/actions';
+import { saveEntry, updateSettings, updateUserCashAccount, recordPayment } from '../context/actions';
 
 // --- Helper Functions & Constants ---
 
@@ -160,6 +160,9 @@ const getInitialState = () => ({
     commentDrawerContext: null,
     consolidatedViews: [],
     collaborators: [],
+    templates: [],
+    isSaveTemplateModalOpen: false,
+    editingTemplate: null,
     infoModal: { isOpen: false, title: '', message: '' },
     confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
     inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
@@ -179,6 +182,7 @@ const getInitialState = () => ({
     isConsolidatedViewModalOpen: false,
     editingConsolidatedView: null,
     activeProjectId: null,
+    activeTrezoView: sessionStorage.getItem('activeTrezoView') || 'tableau',
     displayYear: new Date().getFullYear(),
     timeUnit: 'week',
     horizonLength: 6,
@@ -221,6 +225,9 @@ const budgetReducer = (state, action) => {
             isOnboarding: action.payload.projects.length === 0,
             activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
         };
+    case 'SET_ACTIVE_TREZO_VIEW':
+        sessionStorage.setItem('activeTrezoView', action.payload);
+        return { ...state, activeTrezoView: action.payload };
     case 'OPEN_COMMENT_DRAWER':
         return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
     case 'CLOSE_COMMENT_DRAWER':
@@ -568,7 +575,7 @@ const budgetReducer = (state, action) => {
     }
 
     case 'INITIALIZE_PROJECT_SUCCESS': {
-        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans } = action.payload;
+        const { newProject, finalCashAccounts, newAllEntries, newAllActuals, newTiers, newLoans, newCategories } = action.payload;
         return {
             ...state,
             projects: [...state.projects, newProject],
@@ -577,6 +584,7 @@ const budgetReducer = (state, action) => {
             allCashAccounts: { ...state.allCashAccounts, [newProject.id]: finalCashAccounts },
             tiers: newTiers,
             loans: [...state.loans, ...newLoans],
+            categories: newCategories || state.categories,
             activeProjectId: newProject.id,
             isOnboarding: false,
         };
@@ -662,12 +670,18 @@ const budgetReducer = (state, action) => {
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
-    case 'ADD_SUB_CATEGORY_SUCCESS': {
-        const { type, mainCategoryId, newSubCategory } = action.payload;
+    case 'ADD_MAIN_CATEGORY': {
+        const { type, newMainCategory } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        newCategories[type].push(newMainCategory);
+        return { ...state, categories: newCategories };
+    }
+    case 'ADD_SUB_CATEGORY': {
+        const { type, mainCategoryId, subCategoryName } = action.payload;
         const newCategories = JSON.parse(JSON.stringify(state.categories));
         const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
         if (mainCat) {
-            mainCat.subCategories.push(newSubCategory);
+            mainCat.subCategories.push({ id: uuidv4(), name: subCategoryName });
         }
         return { ...state, categories: newCategories };
     }
@@ -839,6 +853,15 @@ const budgetReducer = (state, action) => {
         }
         return { ...state, allActuals: newAllActuals };
     }
+    case 'RECORD_PAYMENT': {
+      const user = state.session?.user;
+      if (user) {
+        recordPayment(dispatch, { ...action.payload, allActuals: state.allActuals, user });
+      } else {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+      }
+      return state;
+    }
     case 'RECORD_PAYMENT_SUCCESS': {
         const { updatedActual } = action.payload;
         const newAllActuals = JSON.parse(JSON.stringify(state.allActuals));
@@ -892,6 +915,22 @@ const budgetReducer = (state, action) => {
         const newSettings = action.payload;
         return { ...state, settings: { ...state.settings, ...newSettings } };
     }
+    case 'OPEN_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: true, editingTemplate: action.payload };
+    case 'CLOSE_SAVE_TEMPLATE_MODAL':
+      return { ...state, isSaveTemplateModalOpen: false, editingTemplate: null };
+    case 'SAVE_TEMPLATE_SUCCESS':
+      return { ...state, templates: [...state.templates, action.payload] };
+    case 'UPDATE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.map(t => t.id === action.payload.id ? action.payload : t),
+      };
+    case 'DELETE_TEMPLATE_SUCCESS':
+      return {
+        ...state,
+        templates: state.templates.filter(t => t.id !== action.payload),
+      };
 
     default:
       return state;
@@ -913,7 +952,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email')
             .eq('id', user.id)
             .single();
 
@@ -925,12 +964,13 @@ export const BudgetProvider = ({ children }) => {
             subscriptionStatus: profileData.subscription_status,
             trialEndsAt: profileData.trial_ends_at,
             planId: profileData.plan_id,
+            role: profileData.role,
           } : null;
 
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {} } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [] } });
              return;
           }
 
@@ -944,7 +984,8 @@ export const BudgetProvider = ({ children }) => {
 
           const [
             projectsRes, tiersRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -958,9 +999,10 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('consolidated_views').select('*'),
             supabase.from('collaborators').select('*'),
             supabase.from('comments').select('*'),
+            supabase.from('templates').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -979,6 +1021,9 @@ export const BudgetProvider = ({ children }) => {
            if (commentsRes.data) {
               commentsRes.data.forEach(c => userIds.add(c.user_id));
           }
+          if (templatesRes.data) {
+              templatesRes.data.forEach(t => userIds.add(t.user_id));
+          }
 
           const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
@@ -988,7 +1033,7 @@ export const BudgetProvider = ({ children }) => {
           if (profilesError) throw profilesError;
 
           const projects = (projectsRes.data || []).map(p => ({
-            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived, user_id: p.user_id,
+            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id,
             annualGoals: p.annual_goals, expenseTargets: p.expense_targets
           }));
           
@@ -1005,6 +1050,9 @@ export const BudgetProvider = ({ children }) => {
           }));
           const collaborators = (collaboratorsRes.data || []).map(c => ({
             id: c.id, ownerId: c.owner_id, userId: c.user_id, email: c.email, role: c.role, status: c.status, projectIds: c.project_ids, permissionScope: c.permission_scope
+          }));
+          const templates = (templatesRes.data || []).map(t => ({
+            id: t.id, userId: t.user_id, name: t.name, description: t.description, structure: t.structure, isPublic: t.is_public, tags: t.tags, icon: t.icon, color: t.color, purpose: t.purpose
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1081,7 +1129,7 @@ export const BudgetProvider = ({ children }) => {
               profile,
               allProfiles: profilesData || [],
               settings,
-              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

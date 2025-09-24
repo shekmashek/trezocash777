@@ -1,27 +1,25 @@
 import React, { useState } from 'react';
-import { X, Save, FolderPlus } from 'lucide-react';
+import { X, Save, PlusCircle } from 'lucide-react';
 
 const AddCategoryModal = ({ isOpen, onClose, onSave, mainCategoryName }) => {
-  const [subCategoryName, setSubCategoryName] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!subCategoryName.trim()) {
-      alert("Veuillez donner un nom à la sous-catégorie.");
-      return;
-    }
-    onSave(subCategoryName.trim());
-  };
+  const [name, setName] = useState('');
 
   if (!isOpen) return null;
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (name.trim()) {
+      onSave(name.trim());
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <FolderPlus className="w-5 h-5 text-blue-600" />
-            Ajouter une nouvelle sous-catégorie
+            <PlusCircle className="w-5 h-5 text-orange-500" />
+            Nouvelle sous-catégorie
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
@@ -30,22 +28,24 @@ const AddCategoryModal = ({ isOpen, onClose, onSave, mainCategoryName }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Dans la catégorie principale :
+              Catégorie Principale
             </label>
-            <p className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg font-semibold">{mainCategoryName}</p>
+            <p className="w-full px-3 py-2 bg-gray-100 rounded-lg text-gray-700 font-medium">
+              {mainCategoryName}
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nom de la nouvelle sous-catégorie :
+              Nom de la nouvelle sous-catégorie *
             </label>
             <input
               type="text"
-              value={subCategoryName}
-              onChange={(e) => setSubCategoryName(e.target.value)}
-              placeholder="Ex: Fournitures de bureau"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              autoFocus
+              placeholder="Ex: Salaire, Loyer..."
               required
+              autoFocus
             />
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t">

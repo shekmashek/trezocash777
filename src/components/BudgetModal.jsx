@@ -9,6 +9,8 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const { categories, tiers, settings, allCashAccounts, activeProjectId, projects } = state;
   const isConsolidated = activeProjectId === 'consolidated';
 
+  const isContextualAdd = useMemo(() => editingData && !editingData.id && editingData.category, [editingData]);
+
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
 
   const userCashAccounts = useMemo(() => {
@@ -52,31 +54,36 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   ];
 
   useEffect(() => {
-    if (isOpen && editingData && editingData.id) { // Editing existing entry
-      const mainCategoryType = categories.revenue.some(mc => mc.subCategories.some(sc => sc.name === editingData.category)) ? 'revenu' : 'depense';
-      const availableCategories = mainCategoryType === 'revenu' ? categories.revenue : categories.expense;
-      const mainCat = availableCategories.find(mc => mc.subCategories.some(sc => sc.name === editingData.category));
-      
-      setSelectedMainCategoryId(mainCat ? mainCat.id : '');
+    if (isOpen) {
+      if (editingData) {
+        const mainCategoryType = editingData.type === 'revenu' ? 'revenue' : 'expense';
+        const availableCategories = categories[mainCategoryType] || [];
+        
+        let mainCatIdToSet = '';
+        if (editingData.mainCategoryId) {
+            mainCatIdToSet = editingData.mainCategoryId;
+        } else if (editingData.category) {
+            const mainCat = availableCategories.find(mc => mc.subCategories.some(sc => sc.name === editingData.category));
+            if (mainCat) {
+                mainCatIdToSet = mainCat.id;
+            }
+        }
+        setSelectedMainCategoryId(mainCatIdToSet);
 
-      setFormData({
-        ...getInitialFormData(),
-        type: mainCategoryType,
-        ...editingData,
-        payments: editingData.payments && editingData.payments.length > 0
-          ? editingData.payments.map(p => ({ date: p.date || '', amount: p.amount || '' }))
-          : [{ date: new Date().toISOString().split('T')[0], amount: '' }],
-      });
+        setFormData({
+          ...getInitialFormData(),
+          ...editingData,
+          type: editingData.type || 'revenu',
+          payments: editingData.payments && editingData.payments.length > 0
+            ? editingData.payments.map(p => ({ date: p.date || '', amount: p.amount || '' }))
+            : [{ date: new Date().toISOString().split('T')[0], amount: '' }],
+        });
+      } else {
+        setFormData(getInitialFormData());
+        setSelectedMainCategoryId('');
+      }
     }
-  }, [isOpen, editingData, categories.revenue, categories.expense]);
-
-  useEffect(() => {
-    if (isOpen && (!editingData || !editingData.id)) { // New entry
-      const newFormData = editingData && editingData.type ? { ...getInitialFormData(), type: editingData.type } : getInitialFormData();
-      setFormData(newFormData);
-      setSelectedMainCategoryId('');
-    }
-  }, [isOpen, editingData]);
+  }, [isOpen, editingData, categories]);
   
   useEffect(() => {
     if (formData.frequency === 'provision') {
@@ -134,7 +141,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
             return;
         }
     }
-    onSave({ ...entryData, endDate: entryData.endDate || null });
+    onSave({ ...entryData, endDate: entryData.endDate || null, projectId: editingEntry?.projectId || activeProjectId });
   };
 
   const handleGenerateProvisions = () => {
@@ -182,7 +189,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
     }
   };
   const handleSaveNewCategory = (subCategoryName) => { 
-    dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type: formData.type, mainCategoryId: selectedMainCategoryId, subCategoryName } }); 
+    dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type: formData.type, mainCategoryId: selectedMainCategoryId, subCategoryName: subCategoryName } }); 
     setFormData(prev => ({ ...prev, category: subCategoryName })); 
     setIsAddCategoryModalOpen(false); 
   };
@@ -194,64 +201,74 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">{editingData ? "Modifier l'entrée prévisionnelle" : 'Nouvelle entrée budgétaire prévisionnelle'}</h2>
+            <h2 className="text-xl font-semibold text-gray-900">{editingData && editingData.id ? "Modifier l'entrée prévisionnelle" : 'Nouvelle entrée budgétaire prévisionnelle'}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X className="w-6 h-6" /></button>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type *</label>
-              <div className="flex gap-4">
-                <label className="flex items-center"><input type="radio" name="type" value="revenu" checked={formData.type === 'revenu'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" disabled={formData.frequency === 'provision'} /><Building className="w-4 h-4 mr-1 text-green-600" /> Entrée</label>
-                <label className="flex items-center"><input type="radio" name="type" value="depense" checked={formData.type === 'depense'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" /><Calendar className="w-4 h-4 mr-1 text-red-600" /> Sortie</label>
+            {isContextualAdd ? (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-gray-600">Ajout d'une nouvelle écriture pour :</p>
+                <p className="font-semibold text-blue-800">{getAvailableCategories().find(mc => mc.id === selectedMainCategoryId)?.name} &gt; {formData.category}</p>
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ) : (
+              <>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie Principale *</label>
-                    <select 
-                        value={selectedMainCategoryId} 
-                        onChange={(e) => {
-                            setSelectedMainCategoryId(e.target.value);
-                            setFormData(prev => ({ ...prev, category: '' }));
-                        }} 
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                        required
-                    >
-                        <option value="">Sélectionner</option>
-                        {getAvailableCategories().map(mainCat => (
-                            <option key={mainCat.id} value={mainCat.id}>{mainCat.name}</option>
-                        ))}
-                    </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Type *</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center"><input type="radio" name="type" value="revenu" checked={formData.type === 'revenu'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" disabled={formData.frequency === 'provision'} /><Building className="w-4 h-4 mr-1 text-green-600" /> Entrée</label>
+                    <label className="flex items-center"><input type="radio" name="type" value="depense" checked={formData.type === 'depense'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" /><Calendar className="w-4 h-4 mr-1 text-red-600" /> Sortie</label>
+                  </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sous-catégorie *</label>
-                    <div className="flex gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie Principale *</label>
                         <select 
-                            value={formData.category || ''} 
-                            onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))} 
+                            value={selectedMainCategoryId} 
+                            onChange={(e) => {
+                                setSelectedMainCategoryId(e.target.value);
+                                setFormData(prev => ({ ...prev, category: '' }));
+                            }} 
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                            required 
-                            disabled={!selectedMainCategoryId}
+                            required
                         >
                             <option value="">Sélectionner</option>
-                            {selectedMainCategoryId && 
-                                getAvailableCategories().find(mc => mc.id === selectedMainCategoryId)?.subCategories.map(subCat => (
-                                    <option key={subCat.id} value={subCat.name}>{subCat.name}</option>
-                                ))
-                            }
+                            {getAvailableCategories().map(mainCat => (
+                                <option key={mainCat.id} value={mainCat.id}>{mainCat.name}</option>
+                            ))}
                         </select>
-                        <button 
-                            type="button" 
-                            onClick={() => setIsAddCategoryModalOpen(true)} 
-                            className="p-2 border rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!selectedMainCategoryId}
-                            title="Ajouter une nouvelle sous-catégorie"
-                        >
-                            <PlusCircle className="w-5 h-5 text-gray-600" />
-                        </button>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Sous-catégorie *</label>
+                        <div className="flex gap-2">
+                            <select 
+                                value={formData.category || ''} 
+                                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                required 
+                                disabled={!selectedMainCategoryId}
+                            >
+                                <option value="">Sélectionner</option>
+                                {selectedMainCategoryId && 
+                                    getAvailableCategories().find(mc => mc.id === selectedMainCategoryId)?.subCategories.map(subCat => (
+                                        <option key={subCat.id} value={subCat.name}>{subCat.name}</option>
+                                    ))
+                                }
+                            </select>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsAddCategoryModalOpen(true)} 
+                                className="p-2 border rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!selectedMainCategoryId}
+                                title="Ajouter une nouvelle sous-catégorie"
+                            >
+                                <PlusCircle className="w-5 h-5 text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+              </>
+            )}
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">Fréquence *</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -302,8 +319,8 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
             <div><label className="block text-sm font-medium text-gray-700 mb-2">Description (optionnel)</label><textarea value={formData.description || ''} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" rows="3" placeholder="Détails supplémentaires..." /></div>
             
             <div className="flex justify-between items-center pt-4 border-t">
-              <div>{editingData && (<button type="button" onClick={handleDeleteClick} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"><Trash2 className="w-4 h-4" /> Supprimer</button>)}</div>
-              <div className="flex gap-3"><button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Annuler</button><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"><Edit className="w-4 h-4" /> {editingData ? 'Modifier' : 'Enregistrer'}</button></div>
+              <div>{editingData && editingData.id && (<button type="button" onClick={handleDeleteClick} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"><Trash2 className="w-4 h-4" /> Supprimer</button>)}</div>
+              <div className="flex gap-3"><button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Annuler</button><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"><Edit className="w-4 h-4" /> {editingData && editingData.id ? 'Modifier' : 'Enregistrer'}</button></div>
             </div>
           </form>
         </div>

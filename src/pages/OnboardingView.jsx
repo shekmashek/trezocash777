@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Sparkles, Loader, Search, Star, Users, LayoutTemplate, FilePlus } from 'lucide-react';
-import TrezocashLogo from './TrezocashLogo';
+import { ArrowRight, ArrowLeft, User, Briefcase, Sparkles, Loader } from 'lucide-react';
+import TrezocashLogo from '../components/TrezocashLogo';
 import { initializeProject } from '../context/actions';
-import { templates as officialTemplates } from '../utils/templates';
-import TemplateIcon from './TemplateIcon';
+import { templates } from '../utils/templates';
+import TemplateIcon from '../components/TemplateIcon';
 
 const OnboardingProgress = ({ current, total }) => (
   <div className="flex items-center gap-2">
@@ -17,45 +17,33 @@ const OnboardingProgress = ({ current, total }) => (
 
 const OnboardingView = () => {
   const { state: budgetState, dispatch } = useBudget();
-  const { projects, session, tiers, templates: userAndCommunityTemplates } = budgetState;
+  const { projects, session, tiers } = budgetState;
   const hasExistingProjects = useMemo(() => projects.filter(p => !p.isArchived).length > 0, [projects]);
 
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState({
+    purpose: null, // 'personal' or 'professional'
+    templateId: null,
     projectName: '',
     projectStartDate: new Date().toISOString().split('T')[0],
-    projectEndDate: '',
-    isEndDateIndefinite: true,
-    templateId: 'blank',
-    startOption: 'blank',
+    startOption: null, // 'blank' or 'populated'
   });
 
-  const [activeTab, setActiveTab] = useState('official');
-  const [searchTerm, setSearchTerm] = useState('');
-
   const steps = [
-    { id: 'details', title: 'Détails de votre projet' },
-    { id: 'template', title: 'Choisissez un modèle' },
+    { id: 'purpose', title: 'À quoi servira ce projet ?' },
+    { id: 'details', title: 'Détails du projet' },
     { id: 'start', title: 'Comment voulez-vous commencer ?' },
     { id: 'finish', title: 'Finalisation' },
   ];
   const currentStepInfo = steps[step];
 
   const handleNext = () => {
-    if (step === 0 && !data.projectName.trim()) {
+    if (step === 1 && !data.projectName.trim()) {
       dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du projet est obligatoire.", type: 'error' } });
       return;
     }
-    
-    if (step === 1 && data.templateId === 'blank') {
-      setData(prev => ({ ...prev, startOption: 'blank' }));
-      setDirection(1);
-      setStep(3); // Skip to 'finish' step
-      return;
-    }
-
     if (step < steps.length - 1) {
       setDirection(1);
       setStep(step + 1);
@@ -63,11 +51,6 @@ const OnboardingView = () => {
   };
 
   const handleBack = () => {
-    if (step === 3 && data.templateId === 'blank') {
-        setDirection(-1);
-        setStep(1); // Go back to template selection
-        return;
-    }
     if (step > 0) {
       setDirection(-1);
       setStep(step - 1);
@@ -79,35 +62,11 @@ const OnboardingView = () => {
   const handleFinish = async () => {
     setIsLoading(true);
     try {
-      await initializeProject(dispatch, data, session.user, tiers, userAndCommunityTemplates);
+      await initializeProject(dispatch, data, session.user, tiers);
     } catch (error) {
       setIsLoading(false);
     }
   };
-
-  const allOfficialTemplates = useMemo(() => {
-    const blankTemplate = {
-        id: 'blank',
-        name: 'Projet Vierge',
-        description: 'Commencez avec une structure de base sans aucune donnée pré-remplie.',
-        icon: 'FilePlus',
-        color: 'gray',
-    };
-    return [blankTemplate, ...officialTemplates.personal, ...officialTemplates.professional];
-  }, []);
-
-  const communityTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.isPublic), [userAndCommunityTemplates]);
-  const myTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.userId === session.user.id), [userAndCommunityTemplates, session.user.id]);
-
-  const filteredTemplates = useMemo(() => {
-    let currentList = [];
-    if (activeTab === 'official') currentList = allOfficialTemplates;
-    else if (activeTab === 'community') currentList = communityTemplates;
-    else currentList = myTemplates;
-
-    if (!searchTerm) return currentList;
-    return currentList.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.description.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [activeTab, searchTerm, allOfficialTemplates, communityTemplates, myTemplates]);
 
   const variants = {
     enter: (direction) => ({ x: direction > 0 ? 100 : -100, opacity: 0 }),
@@ -117,51 +76,32 @@ const OnboardingView = () => {
 
   const renderStepContent = () => {
     switch (currentStepInfo.id) {
-      case 'details':
+      case 'purpose':
         return (
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">{currentStepInfo.title}</h2>
-            <div className="space-y-6 max-w-md mx-auto">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 text-left mb-1">Nom du projet *</label>
-                <input type="text" value={data.projectName} onChange={(e) => setData(prev => ({ ...prev, projectName: e.target.value }))} placeholder="Ex: Mon Budget 2025" className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" autoFocus required />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de début</label>
-                    <input type="date" value={data.projectStartDate} onChange={(e) => setData(prev => ({ ...prev, projectStartDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de fin</label>
-                    <input type="date" value={data.projectEndDate} onChange={(e) => setData(prev => ({ ...prev, projectEndDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent disabled:bg-gray-100" disabled={data.isEndDateIndefinite} min={data.projectStartDate} />
-                </div>
-              </div>
-              <div className="flex items-center justify-end">
-                <input type="checkbox" id="indefinite-date" checked={data.isEndDateIndefinite} onChange={(e) => setData(prev => ({ ...prev, isEndDateIndefinite: e.target.checked, projectEndDate: e.target.checked ? '' : prev.projectEndDate }))} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                <label htmlFor="indefinite-date" className="ml-2 block text-sm text-gray-900">Durée indéterminée</label>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              <button onClick={() => { setData(prev => ({...prev, purpose: 'personal'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all text-left">
+                <User className="w-8 h-8 text-blue-500 mb-2" />
+                <h3 className="font-semibold text-lg">Projet Personnel</h3>
+                <p className="text-sm text-gray-600">Pour gérer mon budget, mes vacances, un mariage...</p>
+              </button>
+              <button onClick={() => { setData(prev => ({...prev, purpose: 'professional'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-indigo-50 hover:border-indigo-400 transition-all text-left">
+                <Briefcase className="w-8 h-8 text-indigo-500 mb-2" />
+                <h3 className="font-semibold text-lg">Projet Professionnel</h3>
+                <p className="text-sm text-gray-600">Pour piloter la trésorerie de mon activité, freelance, TPE...</p>
+              </button>
             </div>
           </div>
         );
-      case 'template':
+      case 'details':
+        const availableTemplates = templates[data.purpose] || [];
         return (
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{currentStepInfo.title}</h2>
-            <p className="text-gray-600 mb-6">Commencez avec un projet vierge ou choisissez un modèle pour démarrer plus rapidement.</p>
-            
-            <div className="flex justify-center border-b mb-6">
-              <button onClick={() => setActiveTab('official')} className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 ${activeTab === 'official' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}><Star className="w-4 h-4"/>Modèles Officiels</button>
-              <button onClick={() => setActiveTab('community')} className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 ${activeTab === 'community' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}><Users className="w-4 h-4"/>Communauté</button>
-              <button onClick={() => setActiveTab('my-templates')} className={`px-4 py-2 text-sm font-semibold flex items-center gap-2 ${activeTab === 'my-templates' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}><LayoutTemplate className="w-4 h-4"/>Mes Modèles</button>
-            </div>
-
-            <div className="relative max-w-md mx-auto mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input type="text" placeholder="Rechercher un modèle..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-full" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 max-h-[300px] overflow-y-auto p-2">
-              {filteredTemplates.map(template => {
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Quel type de projet ?</h2>
+            <p className="text-gray-600 mb-6">Choisissez un modèle pour commencer. Vous pourrez tout personnaliser plus tard.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {availableTemplates.map(template => {
                 const isSelected = data.templateId === template.id;
                 return (
                   <button key={template.id} onClick={() => setData(prev => ({...prev, templateId: template.id}))} className={`p-4 border-2 rounded-lg text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-400'}`}>
@@ -172,6 +112,18 @@ const OnboardingView = () => {
                 );
               })}
             </div>
+            {data.templateId && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-md mx-auto">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 text-left mb-1">Nom du projet *</label>
+                  <input type="text" value={data.projectName} onChange={(e) => setData(prev => ({ ...prev, projectName: e.target.value }))} placeholder="Ex: Mon Budget 2025" className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" autoFocus required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 text-left mb-1">Date de début du projet</label>
+                  <input type="date" value={data.projectStartDate} onChange={(e) => setData(prev => ({ ...prev, projectStartDate: e.target.value }))} className="w-full text-lg p-2 border-b-2 focus:border-blue-500 outline-none transition bg-transparent" />
+                </div>
+              </motion.div>
+            )}
           </div>
         );
       case 'start':
@@ -180,11 +132,11 @@ const OnboardingView = () => {
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Comment voulez-vous commencer ?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
               <button onClick={() => { setData(prev => ({...prev, startOption: 'populated'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all text-left">
-                <h3 className="font-semibold text-lg">Avec des données d'exemple</h3>
+                <h3 className="font-semibold text-lg">Avec un modèle pré-rempli</h3>
                 <p className="text-sm text-gray-600">Idéal pour démarrer vite avec des exemples concrets que vous pourrez modifier.</p>
               </button>
               <button onClick={() => { setData(prev => ({...prev, startOption: 'blank'})); handleNext(); }} className="p-6 border rounded-lg hover:bg-gray-100 hover:border-gray-400 transition-all text-left">
-                <h3 className="font-semibold text-lg">Avec une structure vierge</h3>
+                <h3 className="font-semibold text-lg">Avec un projet vierge</h3>
                 <p className="text-sm text-gray-600">Parfait si vous préférez tout configurer vous-même de A à Z.</p>
               </button>
             </div>
@@ -235,7 +187,7 @@ const OnboardingView = () => {
             </button>
           )}
           {step < steps.length - 1 && (
-            <button onClick={handleNext} disabled={isLoading || (step === 0 && !data.projectName.trim()) || (step === 1 && !data.templateId)} className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold disabled:bg-gray-400">
+            <button onClick={handleNext} disabled={isLoading || (step === 1 && !data.templateId)} className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold disabled:bg-gray-400">
               Suivant <ArrowRight className="w-4 h-4" />
             </button>
           )}
