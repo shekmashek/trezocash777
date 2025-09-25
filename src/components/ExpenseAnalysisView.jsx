@@ -79,7 +79,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
   }, [settings.timezoneOffset, rangeStartProp]);
 
   const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const isCustomConsolidated = String (activeProjectId)?.startsWith('consolidated_view_');
 
   const handlePeriodChange = (direction) => {
     setLocalPeriodOffset(prev => prev + direction);

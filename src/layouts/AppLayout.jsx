@@ -43,7 +43,10 @@ const AppLayout = () => {
     
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-    const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
+    const isConsolidated = 
+  activeProjectId === 'consolidated' || 
+  (typeof activeProjectId === 'string' && activeProjectId.startsWith('consolidated_view_'));
+
 
     const { activeEntries, activeActuals } = useMemo(() => {
         if (isConsolidated) {

@@ -94,7 +94,8 @@ const BudgetStateView = ({ mode = 'edition' }) => {
 
     const { budgetEntries, isConsolidated } = useMemo(() => {
         const isConsolidatedView = activeProjectId === 'consolidated';
-        const isCustomConsolidatedView = activeProjectId?.startsWith('consolidated_view_');
+   const isCustomConsolidatedView = String(activeProjectId)?.startsWith('consolidated_view_');
+
 
         if (isConsolidatedView) {
             return {

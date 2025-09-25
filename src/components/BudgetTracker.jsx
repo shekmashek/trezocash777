@@ -114,8 +114,9 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, allComments } = state;
   const { t } = useTranslation();
 
-  const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+const isConsolidated = activeProjectId === 'consolidated';
+const isCustomConsolidated = String(activeProjectId)?.startsWith('consolidated_view_');
+
 
   const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
   const periodMenuRef = useRef(null);
@@ -125,7 +126,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     const { allComments: budgetAllComments, activeProjectId: budgetActiveProjectId } = budgetState;
 
     const commentsForCell = useMemo(() => {
-        const projectId = budgetActiveProjectId === 'consolidated' || budgetActiveProjectId.startsWith('consolidated_view_') ? null : budgetActiveProjectId;
+        const projectId = budgetActiveProjectId === 'consolidated' || String (budgetActiveProjectId).startsWith('consolidated_view_') ? null : budgetActiveProjectId;
         return (budgetAllComments[projectId] || []).filter(c => c.rowId === rowId && c.columnId === columnId);
     }, [budgetAllComments, budgetActiveProjectId, rowId, columnId]);
 

@@ -35,7 +35,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
   const periodMenuRef = useRef(null);
 
   const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const isCustomConsolidated = String (activeProjectId)?.startsWith('consolidated_view_');
 
   useEffect(() => {
     const handleClickOutside = (event) => {

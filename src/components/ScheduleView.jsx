@@ -107,7 +107,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
     const viewMode = isFocusMode ? propViewMode : localViewMode;
     
     const isConsolidated = activeProjectId === 'consolidated';
-    const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+    const isCustomConsolidated = String(activeProjectId)?.startsWith('consolidated_view_');
 
     const today = getTodayInTimezone(settings.timezoneOffset);
 

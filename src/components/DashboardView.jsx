@@ -33,7 +33,7 @@ const DashboardView = () => {
     const fetchOverdueItems = async () => {
       if (!token) return;
       try {
-        const response = await api.get('/auth/overdue-items'); // endpoint Laravel qui renvoie les actions prioritaires
+        const response = await api.get('/projects'); // endpoint Laravel qui renvoie les actions prioritaires
         setOverdueItems(response.data.overdueItems || []);
       } catch (err) {
         console.error('Erreur récupération overdueItems:', err);

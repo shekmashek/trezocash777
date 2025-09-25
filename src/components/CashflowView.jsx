@@ -53,7 +53,7 @@ const CashflowView = ({ isFocusMode = false }) => {
   const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews } = state;
   const { t } = useTranslation();
   const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const isCustomConsolidated = String (activeProjectId)?.startsWith('consolidated_view_');
 
   const [isScenarioBudgetModalOpen, setIsScenarioBudgetModalOpen] = useState(false);
   const [editingScenarioEntry, setEditingScenarioEntry] = useState(null);

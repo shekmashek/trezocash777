@@ -3,13 +3,8 @@ import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'luci
 import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
-<<<<<<< HEAD
 import { apiService } from '../utils/apiService';
 import { deleteConsolidatedView } from '../context/actions';
-=======
-import { supabase } from '../utils/supabase';
-import { deleteConsolidatedView, deleteProject } from '../context/actions';
->>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
 import Avatar from './Avatar';
 
 const ProjectSwitcher = () => {
@@ -17,9 +12,10 @@ const ProjectSwitcher = () => {
   const { projects, activeProjectId, consolidatedViews, collaborators, allProfiles } = state;
   const { t } = useTranslation();
   const activeProjects = projects.filter(p => !p.isArchived);
-  
+
   const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const isCustomConsolidated = typeof activeProjectId === 'string' && activeProjectId.startsWith('consolidated_view_');
+
 
   const activeProject = useMemo(() => {
     if (isConsolidated) {
@@ -36,7 +32,7 @@ const ProjectSwitcher = () => {
   const [isListOpen, setIsListOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  
+
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -144,7 +140,7 @@ const ProjectSwitcher = () => {
       }
     });
   };
-  
+
   const handleArchiveProject = (projectId) => {
     const projectToArchive = projects.find(p => p.id === projectId);
     if (!projectToArchive) return;
@@ -177,7 +173,7 @@ const ProjectSwitcher = () => {
       }
     });
   };
-  
+
   const displayName = activeProject ? (activeProject.id === 'consolidated' ? `Mes projets consolidé` : activeProject.name) : 'Sélectionner un projet';
 
   return (
@@ -190,7 +186,7 @@ const ProjectSwitcher = () => {
         <div className="absolute z-30 w-full mt-1 bg-white border rounded-lg shadow-lg">
           <ul className="py-1 max-h-60 overflow-y-auto">
             <li><button onClick={() => handleSelectProject('consolidated')} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-purple-50"><span className="font-semibold">Mes projets consolidé</span>{isConsolidated && <Check className="w-4 h-4 text-purple-600" />}</button></li>
-            
+
             {consolidatedViews && consolidatedViews.length > 0 && (
               <>
                 <li><hr className="my-1" /></li>
@@ -228,23 +224,23 @@ const ProjectSwitcher = () => {
               const projectUsers = getUsersForProject(project.id);
               return (
                 <li key={project.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 group">
-                    <button onClick={() => handleSelectProject(project.id)} className="flex items-center gap-2 flex-grow truncate">
-                        <span className="truncate">{project.name}</span>
-                        {projectUsers.length > 1 && (
-                          <div className="flex -space-x-3">
-                            {projectUsers.slice(0, 3).map(user => (
-                              <Avatar key={user.id} name={user.full_name} role={user.role} />
-                            ))}
-                            {projectUsers.length > 3 && <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 border-white bg-gray-200 text-gray-600">+{projectUsers.length - 3}</div>}
-                          </div>
-                        )}
-                    </button>
-                    <div className="flex items-center gap-1 pl-2">
-                      {project.id === activeProjectId && <Check className="w-4 h-4 text-blue-600" />}
-                      <button onClick={(e) => { e.stopPropagation(); handleOpenRenameModal(project); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Renommer"><Edit className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id); }} className="p-1 text-gray-400 hover:text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Archiver"><Archive className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
-                    </div>
+                  <button onClick={() => handleSelectProject(project.id)} className="flex items-center gap-2 flex-grow truncate">
+                    <span className="truncate">{project.name}</span>
+                    {projectUsers.length > 1 && (
+                      <div className="flex -space-x-3">
+                        {projectUsers.slice(0, 3).map(user => (
+                          <Avatar key={user.id} name={user.full_name} role={user.role} />
+                        ))}
+                        {projectUsers.length > 3 && <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 border-white bg-gray-200 text-gray-600">+{projectUsers.length - 3}</div>}
+                      </div>
+                    )}
+                  </button>
+                  <div className="flex items-center gap-1 pl-2">
+                    {project.id === activeProjectId && <Check className="w-4 h-4 text-blue-600" />}
+                    <button onClick={(e) => { e.stopPropagation(); handleOpenRenameModal(project); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Renommer"><Edit className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id); }} className="p-1 text-gray-400 hover:text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Archiver"><Archive className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
+                  </div>
                 </li>
               );
             })}

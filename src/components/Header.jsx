@@ -27,8 +27,11 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const isConsolidated = String(activeProjectId) === 'consolidated' || String(activeProjectId).startsWith('consolidated_view_');
+ const isCustomConsolidated =
+  typeof activeProjectId === "string" &&
+  activeProjectId.startsWith("consolidated_view_");
+
 
   const handleNavigate = (view) => {
     dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
