@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, User, Building, Trash2, Edit, Clock, Repeat, AlertCircle, ListChecks, PlusCircle, PiggyBank } from 'lucide-react';
+import { X, Calendar, User, Building, Trash2, Edit, Clock, Repeat, AlertCircle, ListChecks, PlusCircle, Lock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import AddCategoryModal from './AddCategoryModal';
 import { useBudget } from '../context/BudgetContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import { saveSubCategory } from '../context/actions';
 
 const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const { state, dispatch } = useBudget();
-  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects } = state;
+  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects, session } = state;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const isContextualAdd = useMemo(() => editingData && !editingData.id && editingData.category, [editingData]);
@@ -21,15 +23,15 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const getInitialFormData = () => ({
     type: 'revenu',
     category: '',
-    frequency: 'ponctuel',
+    frequency: 'mensuel',
     amount: '',
     date: new Date().toISOString().split('T')[0],
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     supplier: '',
     description: '',
+    isProvision: false,
     payments: [{ date: new Date().toISOString().split('T')[0], amount: '' }],
-    totalProvisionAmount: '',
     numProvisions: '',
     provisionDetails: {
         finalPaymentDate: '',
@@ -42,16 +44,19 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
 
   const frequencyOptions = [
-    { value: 'ponctuel', label: 'Ponctuel', icon: Calendar },
-    { value: 'journalier', label: 'Journalier', icon: Clock },
-    { value: 'hebdomadaire', label: 'Hebdomadaire', icon: Clock },
-    { value: 'mensuel', label: 'Mensuel', icon: Repeat },
-    { value: 'bimestriel', label: 'Bimestriel', icon: Repeat },
-    { value: 'trimestriel', label: 'Trimestriel', icon: Repeat },
-    { value: 'annuel', label: 'Annuel', icon: Calendar },
-    { value: 'irregulier', label: 'Paiements Irréguliers', icon: ListChecks },
-    { value: 'provision', label: 'À Provisionner', icon: PiggyBank, type: 'depense' }
+    { value: 'ponctuel', label: 'Ponctuel' },
+    { value: 'journalier', label: 'Journalier' },
+    { value: 'hebdomadaire', label: 'Hebdomadaire' },
+    { value: 'mensuel', label: 'Mensuel' },
+    { value: 'bimestriel', label: 'Bimestriel' },
+    { value: 'trimestriel', label: 'Trimestriel' },
+    { value: 'semestriel', label: 'Semestriel' },
+    { value: 'annuel', label: 'Annuel' },
+    { value: 'irregulier', label: 'Paiements Irréguliers' },
   ];
+  
+  const showProvisionButton = formData.type === 'depense' && ['ponctuel', 'bimestriel', 'trimestriel', 'semestriel', 'annuel'].includes(formData.frequency);
+  const isAutoProvision = formData.isProvision && ['annuel', 'semestriel', 'trimestriel', 'bimestriel'].includes(formData.frequency);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,10 +75,15 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
         }
         setSelectedMainCategoryId(mainCatIdToSet);
 
+        const provisionMap = { annuel: 12, semestriel: 6, trimestriel: 3, bimestriel: 2 };
+        const num = provisionMap[editingData.frequency];
+
         setFormData({
           ...getInitialFormData(),
           ...editingData,
           type: editingData.type || 'revenu',
+          isProvision: editingData.isProvision || false,
+          numProvisions: editingData.isProvision && num ? num : (editingData.numProvisions || ''),
           payments: editingData.payments && editingData.payments.length > 0
             ? editingData.payments.map(p => ({ date: p.date || '', amount: p.amount || '' }))
             : [{ date: new Date().toISOString().split('T')[0], amount: '' }],
@@ -84,12 +94,21 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       }
     }
   }, [isOpen, editingData, categories]);
-  
+
   useEffect(() => {
-    if (formData.frequency === 'provision') {
-      setFormData(prev => ({ ...prev, type: 'depense' }));
+    if (formData.isProvision) {
+        const provisionMap = { annuel: 12, semestriel: 6, trimestriel: 3, bimestriel: 2 };
+        const num = provisionMap[formData.frequency];
+        if (num) {
+            setFormData(prev => ({ ...prev, numProvisions: num }));
+        } else if (formData.frequency === 'ponctuel') {
+            setFormData(prev => ({ ...prev, numProvisions: prev.numProvisions || '' }));
+        }
+    } else {
+        setFormData(prev => ({ ...prev, numProvisions: '' }));
     }
-  }, [formData.frequency]);
+  }, [formData.isProvision, formData.frequency]);
+
 
   const handlePaymentChange = (index, field, value) => {
     const newPayments = [...formData.payments];
@@ -107,14 +126,18 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       return;
     }
     let entryData = { ...formData };
-    if (entryData.frequency === 'irregulier' || entryData.frequency === 'provision') {
+    if (entryData.frequency === 'irregulier' || entryData.isProvision) {
       const validPayments = entryData.payments.filter(p => p.date && p.amount);
-      if (validPayments.length === 0) {
+      if (validPayments.length === 0 && entryData.frequency !== 'irregulier' && !entryData.isProvision) {
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez ajouter au moins un paiement.', type: 'error' } });
         return;
       }
       entryData.payments = validPayments;
-      entryData.amount = validPayments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      if (entryData.isProvision) {
+        entryData.amount = parseFloat(formData.amount);
+      } else {
+        entryData.amount = validPayments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      }
     } else {
       if (!formData.amount) {
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir le montant.', type: 'error' } });
@@ -127,7 +150,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date pour une transaction ponctuelle.', type: 'error' } });
       return;
     }
-    if (formData.frequency !== 'ponctuel' && formData.frequency !== 'irregulier' && formData.frequency !== 'provision' && !formData.startDate) {
+    if (formData.frequency !== 'ponctuel' && formData.frequency !== 'irregulier' && !formData.startDate) {
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date de début pour une transaction récurrente.', type: 'error' } });
       return;
     }
@@ -135,17 +158,17 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       dispatch({ type: 'ADD_TOAST', payload: { message: 'La date de fin ne peut pas être antérieure à la date de début.', type: 'error' } });
       return;
     }
-    if (formData.frequency === 'provision') {
+    if (formData.isProvision) {
         if (!formData.provisionDetails.finalPaymentDate || !formData.provisionDetails.provisionAccountId) {
             dispatch({ type: 'ADD_TOAST', payload: { message: "Pour une provision, veuillez spécifier la date du paiement final et le compte de provision.", type: 'error' } });
             return;
         }
     }
-    onSave({ ...entryData, endDate: entryData.endDate || null, projectId: editingEntry?.projectId || activeProjectId });
+    onSave({ ...entryData, endDate: entryData.endDate || null, projectId: editingData?.projectId || activeProjectId });
   };
 
   const handleGenerateProvisions = () => {
-    const total = parseFloat(formData.totalProvisionAmount);
+    const total = parseFloat(formData.amount);
     const num = parseInt(formData.numProvisions, 10);
     if (!total || !num || total <= 0 || num <= 0) {
       dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez entrer un montant total et un nombre de provisions valides.", type: 'error' } });
@@ -183,15 +206,33 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       case 'mensuel': return `${formattedAmount} chaque mois`;
       case 'bimestriel': return `${formattedAmount} tous les 2 mois`;
       case 'trimestriel': return `${formattedAmount} tous les 3 mois`;
+      case 'semestriel': return `${formattedAmount} tous les 6 mois`;
       case 'annuel': return `${formattedAmount} chaque année`;
       case 'ponctuel': return `${formattedAmount} une seule fois`;
       default: return '';
     }
   };
-  const handleSaveNewCategory = (subCategoryName) => { 
-    dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type: formData.type, mainCategoryId: selectedMainCategoryId, subCategoryName: subCategoryName } }); 
-    setFormData(prev => ({ ...prev, category: subCategoryName })); 
-    setIsAddCategoryModalOpen(false); 
+  
+  const handleSaveNewCategory = async (subCategoryName) => {
+    const user = session.user;
+    if (!user) {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        return;
+    }
+
+    const typeForDB = formData.type === 'revenu' ? 'revenue' : 'expense';
+
+    const newSubCategory = await saveSubCategory(dispatch, {
+        type: typeForDB,
+        mainCategoryId: selectedMainCategoryId,
+        subCategoryName: subCategoryName,
+        user: user
+    });
+
+    if (newSubCategory) {
+        setFormData(prev => ({ ...prev, category: newSubCategory.name }));
+        setIsAddCategoryModalOpen(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -215,7 +256,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Type *</label>
                   <div className="flex gap-4">
-                    <label className="flex items-center"><input type="radio" name="type" value="revenu" checked={formData.type === 'revenu'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" disabled={formData.frequency === 'provision'} /><Building className="w-4 h-4 mr-1 text-green-600" /> Entrée</label>
+                    <label className="flex items-center"><input type="radio" name="type" value="revenu" checked={formData.type === 'revenu'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '', isProvision: false })); setSelectedMainCategoryId(''); }} className="mr-2" /><Building className="w-4 h-4 mr-1 text-green-600" /> Entrée</label>
                     <label className="flex items-center"><input type="radio" name="type" value="depense" checked={formData.type === 'depense'} onChange={(e) => { setFormData(prev => ({ ...prev, type: e.target.value, category: '' })); setSelectedMainCategoryId(''); }} className="mr-2" /><Calendar className="w-4 h-4 mr-1 text-red-600" /> Sortie</label>
                   </div>
                 </div>
@@ -237,84 +278,113 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Sous-catégorie *</label>
-                        <div className="flex gap-2">
-                            <select 
-                                value={formData.category || ''} 
-                                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))} 
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                                required 
-                                disabled={!selectedMainCategoryId}
-                            >
-                                <option value="">Sélectionner</option>
-                                {selectedMainCategoryId && 
-                                    getAvailableCategories().find(mc => mc.id === selectedMainCategoryId)?.subCategories.map(subCat => (
+                    {selectedMainCategoryId && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Sous-catégorie *</label>
+                            <div className="flex gap-2">
+                                <select 
+                                    value={formData.category || ''} 
+                                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))} 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                    required 
+                                >
+                                    <option value="">Sélectionner</option>
+                                    {getAvailableCategories().find(mc => mc.id === selectedMainCategoryId)?.subCategories.map(subCat => (
                                         <option key={subCat.id} value={subCat.name}>{subCat.name}</option>
-                                    ))
-                                }
-                            </select>
-                            <button 
-                                type="button" 
-                                onClick={() => setIsAddCategoryModalOpen(true)} 
-                                className="p-2 border rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!selectedMainCategoryId}
-                                title="Ajouter une nouvelle sous-catégorie"
-                            >
-                                <PlusCircle className="w-5 h-5 text-gray-600" />
-                            </button>
+                                    ))}
+                                </select>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsAddCategoryModalOpen(true)} 
+                                    className="p-2 border rounded-lg bg-gray-100 hover:bg-gray-200"
+                                    title="Ajouter une nouvelle sous-catégorie"
+                                >
+                                    <PlusCircle className="w-5 h-5 text-gray-600" />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
               </>
             )}
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Fréquence *</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {frequencyOptions.filter(opt => formData.type === 'depense' || opt.type !== 'depense').map(opt => { const Icon = opt.icon; return (<label key={opt.value} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.frequency === opt.value ? 'bg-blue-50 border-blue-300' : 'hover:bg-gray-50'}`}><input type="radio" name="frequency" value={opt.value} checked={formData.frequency === opt.value} onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))} className="mr-3" /><Icon className="w-4 h-4 mr-2 text-blue-600" /><span className="font-medium">{opt.label}</span></label>); })}
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fréquence *</label>
+              <select 
+                value={formData.frequency} 
+                onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {frequencyOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
+
             {formData.frequency === 'ponctuel' && (<div><label className="block text-sm font-medium text-gray-700 mb-2">Date du paiement *</label><input type="date" value={formData.date || ''} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required min={activeProject?.startDate} /></div>)}
-            {formData.frequency !== 'ponctuel' && formData.frequency !== 'irregulier' && formData.frequency !== 'provision' && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50"><div><label className="block text-sm font-medium text-gray-700 mb-2">Date de début *</label><input type="date" value={formData.startDate || ''} onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required min={activeProject?.startDate} /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Date de fin (optionnel)</label><input type="date" value={formData.endDate || ''} onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" min={formData.startDate || activeProject?.startDate} /></div></div>)}
+            {formData.frequency !== 'ponctuel' && formData.frequency !== 'irregulier' && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50"><div><label className="block text-sm font-medium text-gray-700 mb-2">Date de début *</label><input type="date" value={formData.startDate || ''} onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required min={activeProject?.startDate} /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Date de fin (optionnel)</label><input type="date" value={formData.endDate || ''} onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" min={formData.startDate || activeProject?.startDate} /></div></div>)}
             
-            {formData.frequency === 'provision' && (
-              <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-                <h4 className="font-medium text-gray-800">Détails de la provision</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Date du paiement final *</label>
-                    <input type="date" value={formData.provisionDetails.finalPaymentDate || ''} onChange={e => setFormData(prev => ({ ...prev, provisionDetails: { ...prev.provisionDetails, finalPaymentDate: e.target.value } }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required min={activeProject?.startDate} />
-                  </div>
-                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Compte de provision *</label>
-                    <select value={formData.provisionDetails.provisionAccountId || ''} onChange={e => setFormData(prev => ({ ...prev, provisionDetails: { ...prev.provisionDetails, provisionAccountId: e.target.value } }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
-                      <option value="">Sélectionner un compte</option>
-                      {userCashAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Montant Total ({settings.currency})</label>
-                    <input type="number" value={formData.totalProvisionAmount || ''} onChange={e => setFormData(prev => ({ ...prev, totalProvisionAmount: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="100000" />
-                  </div>
-                  <div className="sm:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nb. de provisions</label>
-                    <input type="number" value={formData.numProvisions || ''} onChange={e => setFormData(prev => ({ ...prev, numProvisions: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="10" />
-                  </div>
-                  <div className="sm:col-span-1 flex items-end">
-                    <button type="button" onClick={handleGenerateProvisions} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm">Générer</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {(formData.frequency === 'irregulier' || formData.frequency === 'provision') && (<div className="space-y-4 p-4 border rounded-lg bg-gray-50"><h4 className="font-medium text-gray-800">Liste des paiements</h4>{formData.payments.map((payment, index) => (<div key={index} className="flex items-center gap-2"><input type="date" value={payment.date || ''} onChange={(e) => handlePaymentChange(index, 'date', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required min={activeProject?.startDate} /><input type="number" value={payment.amount || ''} onChange={(e) => handlePaymentChange(index, 'amount', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Montant (${settings.currency})`} min="0" step="0.01" required readOnly={formData.frequency === 'provision'} />{formData.payments.length > 1 && (<button type="button" onClick={() => removePayment(index)} className="p-2 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>)}</div>))}{formData.frequency === 'irregulier' && <button type="button" onClick={addPayment} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"><PlusCircle className="w-4 h-4" />Ajouter un paiement</button>}</div>)}
+            {formData.frequency === 'irregulier' && (<div className="space-y-4 p-4 border rounded-lg bg-gray-50"><h4 className="font-medium text-gray-800">Liste des paiements</h4>{formData.payments.map((payment, index) => (<div key={index} className="flex items-center gap-2"><input type="date" value={payment.date || ''} onChange={(e) => handlePaymentChange(index, 'date', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required min={activeProject?.startDate} /><input type="number" value={payment.amount || ''} onChange={(e) => handlePaymentChange(index, 'amount', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder={`Montant (${settings.currency})`} min="0" step="0.01" required />{formData.payments.length > 1 && (<button type="button" onClick={() => removePayment(index)} className="p-2 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>)}</div>))}<button type="button" onClick={addPayment} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"><PlusCircle className="w-4 h-4" />Ajouter un paiement</button></div>)}
             
             <div><label htmlFor="tier-input" className="block text-sm font-medium text-gray-700 mb-2"><User className="w-4 h-4 inline mr-1" /> {formData.type === 'revenu' ? 'Client' : 'Fournisseur'} *</label><input id="tier-input" type="text" list="tiers-list" value={formData.supplier || ''} onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Saisir ou sélectionner..." required /><datalist id="tiers-list">{getAvailableTiers().map(tier => (<option key={tier.id} value={tier.name} />))}</datalist></div>
             
-            {formData.frequency !== 'irregulier' && formData.frequency !== 'provision' && (<div><label className="block text-sm font-medium text-gray-700 mb-2">Montant ({settings.currency}) *</label><input type="number" value={formData.amount || ''} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0.00" step="0.01" min="0" required />{formData.amount && (<p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-start gap-2"><AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /><span><strong>Aperçu:</strong> {getFrequencyDescription(formData.frequency, formData.amount)} {formData.frequency !== 'ponctuel' && ` du ${new Date(formData.startDate).toLocaleDateString('fr-FR')} ${formData.endDate ? `au ${new Date(formData.endDate).toLocaleDateString('fr-FR')}` : 'indéfiniment'}.`}</span></p>)}</div>)}
+            {formData.frequency !== 'irregulier' && (
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Montant ({settings.currency}) *</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" value={formData.amount || ''} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0.00" step="0.01" min="0" required disabled={formData.isProvision} />
+                  {showProvisionButton && (
+                    <button 
+                      type="button" 
+                      onClick={() => setFormData(p => ({ ...p, isProvision: !p.isProvision }))} 
+                      className={`px-3 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${formData.isProvision ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`} 
+                      title="Provisionner cette dépense pour lisser son impact sur votre trésorerie."
+                    >
+                      <Lock className="w-4 h-4" />
+                      Fonds à provisionner
+                    </button>
+                  )}
+                </div>
+                {formData.amount && !formData.isProvision && (<p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-start gap-2"><AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /><span><strong>Aperçu:</strong> {getFrequencyDescription(formData.frequency, formData.amount)} {formData.frequency !== 'ponctuel' && ` du ${new Date(formData.startDate).toLocaleDateString('fr-FR')} ${formData.endDate ? `au ${new Date(formData.endDate).toLocaleDateString('fr-FR')}` : 'indéfiniment'}.`}</span></p>)}
+              </div>
+            )}
+
+            <AnimatePresence>
+              {formData.isProvision && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="space-y-4 p-4 mt-4 border rounded-lg bg-gray-50">
+                    <h4 className="font-medium text-gray-800">Détails de la provision</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Date du paiement final *</label>
+                        <input type="date" value={formData.provisionDetails.finalPaymentDate || ''} onChange={e => setFormData(prev => ({ ...prev, provisionDetails: { ...prev.provisionDetails, finalPaymentDate: e.target.value } }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required min={activeProject?.startDate} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Compte de provision *</label>
+                        <select value={formData.provisionDetails.provisionAccountId || ''} onChange={e => setFormData(prev => ({ ...prev, provisionDetails: { ...prev.provisionDetails, provisionAccountId: e.target.value } }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                          <option value="">Sélectionner un compte</option>
+                          {userCashAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nb. de provisions mensuelles</label>
+                        <input type="number" value={formData.numProvisions || ''} onChange={e => setFormData(prev => ({ ...prev, numProvisions: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="12" disabled={isAutoProvision} />
+                      </div>
+                      <div className="flex items-end">
+                        <button type="button" onClick={handleGenerateProvisions} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm">Générer les versements</button>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-2 border-t max-h-40 overflow-y-auto">
+                      <h5 className="text-sm font-medium text-gray-600">Versements prévisionnels</h5>
+                      {formData.payments.map((payment, index) => (<div key={index} className="flex items-center gap-2"><input type="date" value={payment.date || ''} onChange={(e) => handlePaymentChange(index, 'date', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required min={activeProject?.startDate} /><input type="number" value={payment.amount || ''} onChange={(e) => handlePaymentChange(index, 'amount', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder={`Montant (${settings.currency})`} min="0" step="0.01" required />{formData.payments.length > 1 && (<button type="button" onClick={() => removePayment(index)} className="p-2 text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>)}</div>))}
+                      <button type="button" onClick={addPayment} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"><PlusCircle className="w-4 h-4" />Ajouter un versement</button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             <div><label className="block text-sm font-medium text-gray-700 mb-2">Description (optionnel)</label><textarea value={formData.description || ''} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" rows="3" placeholder="Détails supplémentaires..." /></div>
             

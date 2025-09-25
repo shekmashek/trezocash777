@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings, todayDate, viewMode, onTransactionClick }) => {
     const dayNumber = day.getDate();
@@ -86,6 +87,21 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
 
     const [localCurrentDate, setLocalCurrentDate] = useState(new Date());
     const [localViewMode, setLocalViewMode] = useState('month');
+
+    const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
+    const viewModeMenuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (viewModeMenuRef.current && !viewModeMenuRef.current.contains(event.target)) {
+                setIsViewModeMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     const currentDate = isFocusMode ? propCurrentDate : localCurrentDate;
     const viewMode = isFocusMode ? propViewMode : localViewMode;
@@ -244,13 +260,43 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
-                                    <button onClick={() => setLocalViewMode('month')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${viewMode === 'month' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                                        Mois
+                                <div className="relative" ref={viewModeMenuRef}>
+                                    <button 
+                                        onClick={() => setIsViewModeMenuOpen(p => !p)} 
+                                        className="flex items-center gap-2 px-3 h-9 rounded-md bg-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-300 transition-colors"
+                                    >
+                                        <span>{viewMode === 'month' ? 'Mois' : 'Semaine'}</span>
+                                        <ChevronDown className={`w-4 h-4 transition-transform ${isViewModeMenuOpen ? 'rotate-180' : ''}`} />
                                     </button>
-                                    <button onClick={() => setLocalViewMode('week')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${viewMode === 'week' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}>
-                                        Semaine
-                                    </button>
+                                    <AnimatePresence>
+                                        {isViewModeMenuOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg border z-20"
+                                            >
+                                                <ul className="p-1">
+                                                    <li>
+                                                        <button
+                                                            onClick={() => { setLocalViewMode('month'); setIsViewModeMenuOpen(false); }}
+                                                            className={`w-full text-left px-3 py-1.5 text-sm rounded-md ${viewMode === 'month' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                        >
+                                                            Mois
+                                                        </button>
+                                                    </li>
+                                                    <li>
+                                                        <button
+                                                            onClick={() => { setLocalViewMode('week'); setIsViewModeMenuOpen(false); }}
+                                                            className={`w-full text-left px-3 py-1.5 text-sm rounded-md ${viewMode === 'week' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                        >
+                                                            Semaine
+                                                        </button>
+                                                    </li>
+                                                </ul>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button onClick={goToToday} className="px-3 py-1.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">

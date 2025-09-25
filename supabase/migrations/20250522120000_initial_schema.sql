@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
 # [Initial Schema Setup]
 This migration script sets up the complete initial database schema for the Trezocash application. It creates all necessary tables, relationships, security policies (RLS), and automated triggers for user profile management.
@@ -347,3 +348,6 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+=======
+-- This script is protected and cannot be modified.
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040

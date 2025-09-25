@@ -1,16 +1,96 @@
 import React, { useMemo, useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder } from 'lucide-react';
+import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search, Lock } from 'lucide-react';
 import EmptyState from './EmptyState';
 import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
 
-const BudgetStateView = () => {
+const LectureView = ({ entries, settings }) => {
+    const sortedEntries = useMemo(() => {
+        return [...entries].sort((a, b) => {
+            const dateA = a.startDate || a.date;
+            const dateB = b.startDate || b.date;
+            return new Date(dateA) - new Date(dateB);
+        });
+    }, [entries]);
+
+    const renderSection = (type) => {
+        const sectionEntries = sortedEntries.filter(e => e.type === type);
+        if (sectionEntries.length === 0) return null;
+
+        const title = type === 'revenu' ? 'Revenus' : 'Dépenses';
+        const Icon = type === 'revenu' ? HandCoins : TrendingDown;
+
+        return (
+            <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                    <Icon className={`w-7 h-7 ${type === 'revenu' ? 'text-green-500' : 'text-red-500'}`} />
+                    {title}
+                </h2>
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b text-left text-xs text-gray-500 uppercase">
+                            <th className="py-3 px-4 w-[15%]">Sous-catégorie</th>
+                            <th className="py-3 px-4 w-[15%]">Tiers</th>
+                            <th className="py-3 px-4 w-[20%]">Description</th>
+                            <th className="py-3 px-4 w-[15%]">Détails</th>
+                            <th className="py-3 px-4 w-[10%]">Fréquence</th>
+                            <th className="py-3 px-4 w-[10%]">Période</th>
+                            <th className="py-3 px-4 text-right w-[15%]">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sectionEntries.map(entry => (
+                            <tr key={entry.id} className="border-b hover:bg-gray-50">
+                                <td className={`py-3 px-4 font-medium ${entry.type === 'revenu' ? 'text-green-700' : 'text-red-700'}`}>
+                                    {entry.category}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
+                                <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
+                                <td className="py-3 px-4 text-gray-600">
+                                    {entry.isProvision && (
+                                        <div className="flex items-center gap-2 text-xs text-indigo-700">
+                                            <Lock className="w-4 h-4" />
+                                            <span>
+                                                Provision en {entry.payments?.length || 0} fois de {formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}
+                                            </span>
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">{entry.frequency}</td>
+                                <td className="py-3 px-4 text-gray-600">
+                                    {entry.frequency === 'ponctuel' 
+                                        ? new Date(entry.date).toLocaleDateString('fr-FR')
+                                        : `${entry.startDate ? new Date(entry.startDate).toLocaleDateString('fr-FR') : ''} - ${entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : '...'}`
+                                    }
+                                </td>
+                                <td className="py-3 px-4 text-right font-medium text-gray-700">
+                                    {formatCurrency(entry.amount, settings)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+    
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+            {renderSection('revenu')}
+            {renderSection('depense')}
+        </div>
+    );
+};
+
+const BudgetStateView = ({ mode = 'edition' }) => {
     const { state, dispatch } = useBudget();
     const { allEntries, activeProjectId, projects, categories, settings, consolidatedViews } = state;
     
-    const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+    const [isAddCategoryFlowModalOpen, setIsAddCategoryFlowModalOpen] = useState(false);
+    const [addCategoryFlowType, setAddCategoryFlowType] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const { budgetEntries, isConsolidated } = useMemo(() => {
         const isConsolidatedView = activeProjectId === 'consolidated';
@@ -35,7 +115,6 @@ const BudgetStateView = () => {
                 isConsolidated: true,
             };
         }
-        // Single project view
         const project = projects.find(p => p.id === activeProjectId);
         return {
             budgetEntries: project ? (allEntries[project.id] || []).map(entry => ({ ...entry, projectId: activeProjectId })) : [],
@@ -43,19 +122,26 @@ const BudgetStateView = () => {
         };
     }, [activeProjectId, projects, allEntries, consolidatedViews]);
 
+    const filteredBudgetEntries = useMemo(() => {
+        if (!searchTerm) {
+            return budgetEntries;
+        }
+        return budgetEntries.filter(entry => 
+            entry.supplier.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [budgetEntries, searchTerm]);
+
     const handleAddEntry = (categoryName, mainCategoryType, mainCategoryId) => {
         dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
 
     const handleDeleteEntry = (entry) => {
-        dispatch({
-            type: 'OPEN_CONFIRMATION_MODAL',
-            payload: {
-                title: 'Supprimer cette entrée ?',
-                message: 'Cette action est irréversible et supprimera l\'entrée budgétaire.',
-                onConfirm: () => deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId }),
-            }
-        });
+        deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId });
+    };
+
+    const handleCategorySelectedForNewEntry = (mainCategoryId) => {
+        setIsAddCategoryFlowModalOpen(false);
+        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: addCategoryFlowType, mainCategoryId } });
     };
 
     const renderSection = (type) => {
@@ -64,8 +150,18 @@ const BudgetStateView = () => {
         const Icon = isRevenue ? HandCoins : TrendingDown;
         const mainCategories = isRevenue ? categories.revenue : categories.expense;
 
-        const sectionEntries = budgetEntries.filter(e => e.type === type);
+        const sectionEntries = filteredBudgetEntries.filter(e => e.type === type);
         const totalAmount = sectionEntries.reduce((sum, e) => sum + e.amount, 0);
+
+        const hasAnyEntriesForSection = budgetEntries.some(e => e.type === type);
+
+        if (!hasAnyEntriesForSection && !searchTerm) return null;
+
+        const visibleMainCategories = mainCategories.filter(mainCat => 
+            sectionEntries.some(entry => mainCat.subCategories.some(sc => sc.name === entry.category))
+        );
+        
+        if (visibleMainCategories.length === 0 && !searchTerm) return null;
 
         return (
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
@@ -77,46 +173,69 @@ const BudgetStateView = () => {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b text-left text-xs text-gray-500 uppercase">
-                            <th className="py-3 px-4 w-[18%]">Sous-catégorie</th>
-                            <th className="py-3 px-4 w-[18%]">Nom</th>
-                            <th className="py-3 px-4 w-[18%]">Tiers</th>
-                            <th className="py-3 px-4 w-[12%]">Fréquence</th>
-                            <th className="py-3 px-4 w-[10%]">Début</th>
-                            <th className="py-3 px-4 w-[10%]">Fin</th>
-                            <th className="py-3 px-4 text-right w-[10%]">Montant</th>
+                            <th className="py-3 px-4 w-[15%]">Sous-catégorie</th>
+                            <th className="py-3 px-4 w-[15%]">Description</th>
+                            <th className="py-3 px-4 w-[15%]">Tiers</th>
+                            <th className="py-3 px-4 w-[20%]">Détails</th>
+                            <th className="py-3 px-4 w-[10%]">Fréquence</th>
+                            <th className="py-3 px-4 w-[8%]">Début</th>
+                            <th className="py-3 px-4 w-[8%]">Fin</th>
+                            <th className="py-3 px-4 text-right w-[9%]">Montant</th>
                             <th className="py-3 px-4 text-right w-12">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {mainCategories.map(mainCat => {
+                        {visibleMainCategories.map(mainCat => {
                             const entriesForMainCat = sectionEntries.filter(entry => 
                                 mainCat.subCategories.some(sc => sc.name === entry.category)
                             );
-                            if (entriesForMainCat.length === 0) return null;
-
+                            
                             const mainCatTotal = entriesForMainCat.reduce((sum, e) => sum + e.amount, 0);
                             const percentage = totalAmount > 0 ? (mainCatTotal / totalAmount) * 100 : 0;
 
                             return (
                                 <React.Fragment key={mainCat.id}>
                                     <tr className="bg-gray-100 font-semibold">
-                                        <td className="py-3 px-4" colSpan="6">
-                                            <div className="flex items-center gap-2">
-                                                <Folder className="w-4 h-4 text-gray-600" />
-                                                {mainCat.name}
+                                        <td className="py-3 px-4" colSpan="8">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Folder className="w-4 h-4 text-gray-600" />
+                                                    {mainCat.name}
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-wrap justify-end">
+                                                    {mainCat.subCategories.map(sc => (
+                                                        <button key={sc.id} onClick={(e) => { e.stopPropagation(); handleAddEntry(sc.name, type, mainCat.id); }} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300 text-xs font-normal">
+                                                            <Plus size={12} /> {sc.name}
+                                                        </button>
+                                                    ))}
+                                                    <button onClick={(e) => { e.stopPropagation(); handleAddEntry(null, type, mainCat.id); }} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 font-semibold text-xs">
+                                                      <Plus size={12} /> Nouvelle sous-catégorie
+                                                    </button>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-right">
                                             {formatCurrency(mainCatTotal, settings)}
-                                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">{percentage.toFixed(1)}%</span>
+                                            {totalAmount > 0 && mainCatTotal > 0 && (
+                                                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">{percentage.toFixed(1)}%</span>
+                                            )}
                                         </td>
-                                        <td className="py-3 px-4"></td>
                                     </tr>
                                     {entriesForMainCat.map(entry => (
                                         <tr key={entry.id} className="border-b hover:bg-gray-50 group">
                                             <td className="py-3 px-4 text-blue-600 font-medium">{entry.category}</td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.description || '-'}</td>
+                                            <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
+                                            <td className="py-3 px-4 text-gray-600">
+                                                {entry.isProvision && (
+                                                    <div className="flex items-center gap-2 text-xs text-indigo-700">
+                                                        <Lock className="w-4 h-4" />
+                                                        <span>
+                                                            Provision en {entry.payments?.length || 0} fois de {formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="py-3 px-4 text-gray-600">{entry.frequency}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.startDate ? new Date(entry.startDate).toLocaleDateString('fr-FR') : (entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-')}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : 'Indéterminée'}</td>
@@ -128,25 +247,13 @@ const BudgetStateView = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    <tr className="border-b">
-                                        <td colSpan="8" className="py-2 px-4 text-xs text-gray-500">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span>Ajouter :</span>
-                                                {mainCat.subCategories.slice(0,3).map(sc => (
-                                                    <button key={sc.id} onClick={() => handleAddEntry(sc.name, type, mainCat.id)} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300">
-                                                        <Plus size={12} /> {sc.name}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </td>
-                                    </tr>
                                 </React.Fragment>
                             );
                         })}
                         <tr className="border-b">
-                            <td colSpan="8" className="py-4 px-4 text-center">
-                                <button onClick={() => setIsAddCategoryModalOpen(true)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
-                                    <Plus size={16} /> Ajouter une catégorie
+                            <td colSpan="10" className="py-4 px-4 text-center">
+                                <button onClick={() => { setAddCategoryFlowType(type); setIsAddCategoryFlowModalOpen(true); }} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium mx-auto">
+                                    <Plus size={16} /> Ajouter une écriture dans une autre catégorie
                                 </button>
                             </td>
                         </tr>
@@ -163,14 +270,44 @@ const BudgetStateView = () => {
     if (!budgetEntries || budgetEntries.length === 0) {
         return <EmptyState icon={Briefcase} title="Aucune entrée budgétaire" message="Commencez par ajouter des revenus et des dépenses pour voir l'état des lieux de votre budget." />;
     }
+    
+    if (mode === 'lecture') {
+        return <LectureView entries={filteredBudgetEntries} settings={settings} />;
+    }
 
     return (
         <div>
-            {renderSection('revenu')}
-            {renderSection('depense')}
+            <div className="mb-6">
+                <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Rechercher par tiers..."
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                    />
+                </div>
+            </div>
+
+            {searchTerm && filteredBudgetEntries.length === 0 ? (
+                <EmptyState 
+                    icon={Search} 
+                    title="Aucun résultat" 
+                    message={`Aucune entrée trouvée pour le tiers "${searchTerm}".`} 
+                />
+            ) : (
+                <>
+                    {renderSection('revenu')}
+                    {renderSection('depense')}
+                </>
+            )}
+            
             <AddCategoryFlowModal 
-                isOpen={isAddCategoryModalOpen}
-                onClose={() => setIsAddCategoryModalOpen(false)}
+                isOpen={isAddCategoryFlowModalOpen}
+                onClose={() => setIsAddCategoryFlowModalOpen(false)}
+                type={addCategoryFlowType}
+                onCategorySelected={handleCategorySelectedForNewEntry}
             />
         </div>
     );

@@ -3,8 +3,13 @@ import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'luci
 import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
+<<<<<<< HEAD
 import { apiService } from '../utils/apiService';
 import { deleteConsolidatedView } from '../context/actions';
+=======
+import { supabase } from '../utils/supabase';
+import { deleteConsolidatedView, deleteProject } from '../context/actions';
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
 import Avatar from './Avatar';
 
 const ProjectSwitcher = () => {
@@ -135,7 +140,7 @@ const ProjectSwitcher = () => {
       payload: {
         title: `Supprimer le projet "${projectToDelete.name}" ?`,
         message: "Cette action est irréversible. Toutes les données associées à ce projet (budgets, transactions, scénarios) seront définitivement perdues. Pour conserver les données, vous pouvez plutôt l'archiver.",
-        onConfirm: () => dispatch({ type: 'DELETE_PROJECT', payload: projectId }),
+        onConfirm: () => deleteProject(dispatch, projectId),
       }
     });
   };

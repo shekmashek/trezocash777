@@ -12,7 +12,7 @@ const getDefaultExpenseTargets = () => ({
   'exp-main-2': 35, // Masse Salariale
   'exp-main-3': 10, // Investissement
   'exp-main-4': 0,  // Financement
-  'exp-main-5': 10, // Épargne et Provision
+  'exp-main-5': 10, // Épargne
   'exp-main-6': 5,  // Exceptionnel
   'exp-main-7': 10, // Impôts et Taxes
   'exp-main-8': 5,  // Formation
@@ -33,6 +33,7 @@ const createDefaultCashAccount = (projectId) => ({
 
 const initialCategories = {
   revenue: [
+<<<<<<< HEAD
     { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: false, subCategories: [{ id: uuidv4(), name: 'Ventes de produits' }, { id: uuidv4(), name: 'Ventes de services' }] },
     {
       id: 'rev-main-2', name: 'Entrées Financières', isFixed: false, subCategories: [
@@ -43,6 +44,16 @@ const initialCategories = {
       ]
     },
     { id: 'rev-main-3', name: 'Autres Entrées', isFixed: false, subCategories: [{ id: uuidv4(), name: 'Subventions' }, { id: uuidv4(), name: 'Revenus Exceptionnels' }] },
+=======
+    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Ventes de produits' }, { id: uuidv4(), name: 'Ventes de services' }] },
+    { id: 'rev-main-2', name: 'Entrées Financières', isFixed: true, subCategories: [
+        { id: uuidv4(), name: 'Intérêts perçus' }, 
+        { id: uuidv4(), name: 'Réception Emprunt' },
+        { id: uuidv4(), name: 'Remboursement de prêt reçu' },
+        { id: uuidv4(), name: 'Intérêts de prêt reçus' },
+    ] },
+    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Subventions' }, { id: uuidv4(), name: 'Revenus Exceptionnels'}] },
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
   ],
   expense: [
     {
@@ -72,10 +83,15 @@ const initialCategories = {
         { id: uuidv4(), name: 'Octroi de Prêt' },
         { id: uuidv4(), name: "Remboursement d'emprunt" },
         { id: uuidv4(), name: "Intérêts d'emprunt" },
+<<<<<<< HEAD
       ]
     },
     {
       id: 'exp-main-5', name: 'Épargne et Provision', isFixed: true, subCategories: [
+=======
+    ] },
+    { id: 'exp-main-5', name: 'Épargne', isFixed: true, subCategories: [
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
         { id: uuidv4(), name: 'Provision pour risques' },
         { id: uuidv4(), name: "Fond d'urgence" },
         { id: uuidv4(), name: 'Epargne Projet à court et moyen termes' },
@@ -163,6 +179,7 @@ const CONSOLIDATED_PROJECT_ID = 'consolidated';
 const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef']; // violet, orange, fuchsia
 
 const getInitialState = () => ({
+<<<<<<< HEAD
   session: null,
   profile: null,
   allProfiles: [],
@@ -221,6 +238,65 @@ const getInitialState = () => ({
   isTourActive: false,
   tourHighlightId: null,
   isLoading: true,
+=======
+    session: null,
+    profile: null,
+    allProfiles: [],
+    projects: [],
+    categories: initialCategories,
+    allEntries: {},
+    allActuals: {},
+    allCashAccounts: {},
+    tiers: [],
+    settings: initialSettings,
+    scenarios: [],
+    scenarioEntries: {},
+    loans: [],
+    allComments: {},
+    isCommentDrawerOpen: false,
+    commentDrawerContext: null,
+    consolidatedViews: [],
+    collaborators: [],
+    templates: [],
+    isSaveTemplateModalOpen: false,
+    editingTemplate: null,
+    infoModal: { isOpen: false, title: '', message: '' },
+    confirmationModal: { isOpen: false, title: '', message: '', onConfirm: () => {} },
+    inlinePaymentDrawer: { isOpen: false, actuals: [], entry: null, period: null, periodLabel: '' },
+    toasts: [],
+    isTransferModalOpen: false,
+    isCloseAccountModalOpen: false,
+    accountToClose: null,
+    isActualTransactionModalOpen: false,
+    editingActual: null,
+    isPaymentModalOpen: false,
+    payingActual: null,
+    isDirectPaymentModalOpen: false,
+    directPaymentType: null,
+    isActionPriorityModalOpen: false,
+    actionPriorityTransaction: null,
+    transactionMenu: { isOpen: false, x: 0, y: 0, transaction: null },
+    isConsolidatedViewModalOpen: false,
+    editingConsolidatedView: null,
+    activeProjectId: null,
+    activeTrezoView: sessionStorage.getItem('activeTrezoView') || 'tableau',
+    displayYear: new Date().getFullYear(),
+    timeUnit: 'week',
+    horizonLength: 6,
+    periodOffset: 0,
+    activeSettingsDrawer: null,
+    isBudgetModalOpen: false,
+    editingEntry: null,
+    isOnboarding: false,
+    actualsSearchTerm: '',
+    actualsViewFilter: null,
+    activeQuickSelect: null,
+    isScenarioModalOpen: false,
+    editingScenario: null,
+    isTourActive: false,
+    tourHighlightId: null,
+    isLoading: true,
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
 });
 
 // --- Reducer Function ---
@@ -371,9 +447,18 @@ const budgetReducer = (state, action) => {
 
       const tempLoans = state.loans.filter(l => l.id !== updatedLoan.id);
 
+<<<<<<< HEAD
       const tempAllEntries = { ...state.allEntries };
       tempAllEntries[projectId] = (tempAllEntries[projectId] || []).filter(e => e.loanId !== updatedLoan.id);
       tempAllEntries[projectId].push(principalEntry, repaymentEntry);
+=======
+        const tempAllActuals = { ...state.allActuals };
+        tempAllEntries[projectId] = (tempAllEntries[projectId] || []).filter(a => {
+            const entry = (state.allEntries[projectId] || []).find(e => e.id === a.budgetId);
+            return !entry || entry.loanId !== updatedLoan.id;
+        });
+        tempAllActuals[projectId].push(...principalActuals, ...repaymentActuals);
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
 
       const tempAllActuals = { ...state.allActuals };
       tempAllActuals[projectId] = (tempAllActuals[projectId] || []).filter(a => {
@@ -437,8 +522,6 @@ const budgetReducer = (state, action) => {
         isTransferModalOpen: false,
       };
     }
-    case 'SET_FOCUS_VIEW':
-      return { ...state, focusView: action.payload };
     case 'ADD_TOAST':
       return {
         ...state,
@@ -691,6 +774,7 @@ const budgetReducer = (state, action) => {
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
 
+<<<<<<< HEAD
     case 'ADD_MAIN_CATEGORY': {
       const { type, newMainCategory } = action.payload;
       const newCategories = JSON.parse(JSON.stringify(state.categories));
@@ -705,6 +789,35 @@ const budgetReducer = (state, action) => {
         mainCat.subCategories.push({ id: uuidv4(), name: subCategoryName });
       }
       return { ...state, categories: newCategories };
+=======
+    case 'ADD_MAIN_CATEGORY_SUCCESS': {
+        const { type, newMainCategory } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        newCategories[type].push(newMainCategory);
+        return { ...state, categories: newCategories };
+    }
+    case 'UPDATE_MAIN_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId, newName } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
+        if (mainCat) mainCat.name = newName;
+        return { ...state, categories: newCategories };
+    }
+    case 'DELETE_MAIN_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        newCategories[type] = newCategories[type].filter(mc => mc.id !== mainCategoryId);
+        return { ...state, categories: newCategories };
+    }
+    case 'ADD_SUB_CATEGORY_SUCCESS': {
+        const { type, mainCategoryId, newSubCategory } = action.payload;
+        const newCategories = JSON.parse(JSON.stringify(state.categories));
+        const mainCat = newCategories[type]?.find(mc => mc.id === mainCategoryId);
+        if (mainCat) {
+            mainCat.subCategories.push(newSubCategory);
+        }
+        return { ...state, categories: newCategories };
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
     }
     case 'UPDATE_SUB_CATEGORY_SUCCESS': {
       const { type, mainCategoryId, subCategoryId, newName, oldName } = action.payload;
@@ -874,15 +987,6 @@ const budgetReducer = (state, action) => {
       }
       return { ...state, allActuals: newAllActuals };
     }
-    case 'RECORD_PAYMENT': {
-      const user = state.session?.user;
-      if (user) {
-        recordPayment(dispatch, { ...action.payload, allActuals: state.allActuals, user });
-      } else {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
-      }
-      return state;
-    }
     case 'RECORD_PAYMENT_SUCCESS': {
       const { updatedActual } = action.payload;
       const newAllActuals = JSON.parse(JSON.stringify(state.allActuals));
@@ -1005,12 +1109,102 @@ useEffect(() => {
   'consolidated_views', 'collaborators', 'comments', 'templates', 'profiles'
 ];
           
+<<<<<<< HEAD
           const requests = endpoints.map(endpoint => 
             api.get(`/${endpoint}`).catch(err => {
               console.warn(`Failed to load ${endpoint}:`, err);
               return { data: [] }; // Retourne un tableau vide en cas d'erreur
             })
           );
+=======
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError && profileError.code !== 'PGRST116') throw profileError;
+
+          const profile = profileData ? {
+            id: profileData.id,
+            fullName: profileData.full_name,
+            subscriptionStatus: profileData.subscription_status,
+            trialEndsAt: profileData.trial_ends_at,
+            planId: profileData.plan_id,
+            role: profileData.role,
+          } : null;
+
+          if (!profile) {
+             console.warn("Profile not found for user, might be a new user.");
+             dispatch({ type: 'SET_LOADING', payload: false });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [] } });
+             return;
+          }
+
+          const settings = {
+            currency: profileData.currency || '€',
+            displayUnit: profileData.display_unit || 'standard',
+            decimalPlaces: profileData.decimal_places ?? 2,
+            language: profileData.language || 'fr',
+            timezoneOffset: profileData.timezone_offset ?? 0,
+          };
+
+          const [
+            projectsRes, tiersRes, loansRes, scenariosRes, 
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes
+          ] = await Promise.all([
+            supabase.from('projects').select('*'),
+            supabase.from('tiers').select('*'),
+            supabase.from('loans').select('*'),
+            supabase.from('scenarios').select('*'),
+            supabase.from('budget_entries').select('*'),
+            supabase.from('actual_transactions').select('*'),
+            supabase.from('payments').select('*'),
+            supabase.from('cash_accounts').select('*'),
+            supabase.from('scenario_entries').select('*'),
+            supabase.from('consolidated_views').select('*'),
+            supabase.from('collaborators').select('*'),
+            supabase.from('comments').select('*'),
+            supabase.from('templates').select('*'),
+            supabase.from('user_categories').select('*'),
+          ]);
+
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes };
+          for (const key in responses) {
+            if (responses[key].error) throw responses[key].error;
+          }
+
+          const userIds = new Set();
+          userIds.add(user.id);
+          if (projectsRes.data) {
+              projectsRes.data.forEach(p => userIds.add(p.user_id));
+          }
+          if (collaboratorsRes.data) {
+              collaboratorsRes.data.forEach(c => {
+                  userIds.add(c.owner_id);
+                  if (c.user_id) userIds.add(c.user_id);
+              });
+          }
+           if (commentsRes.data) {
+              commentsRes.data.forEach(c => userIds.add(c.user_id));
+          }
+          if (templatesRes.data) {
+              templatesRes.data.forEach(t => userIds.add(t.user_id));
+          }
+
+          const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name')
+              .in('id', Array.from(userIds));
+
+          if (profilesError) throw profilesError;
+
+          const projects = (projectsRes.data || []).map(p => ({
+            id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id,
+            annualGoals: p.annual_goals, expenseTargets: p.expense_targets
+          }));
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
           
           const results = await Promise.all(requests);
           
@@ -1067,11 +1261,20 @@ useEffect(() => {
 
         const allEntries = (initialData.scenario_entries || []).reduce((acc, entry) => {
             const e = {
+<<<<<<< HEAD
                 id: entry.id, loanId: entry.loan_id || entry.loanId, type: entry.type, category: entry.category,
                 frequency: entry.frequency, amount: entry.amount, date: entry.date, startDate: entry.start_date || entry.startDate,
                 endDate: entry.end_date || entry.endDate, supplier: entry.supplier, description: entry.description,
                 isOffBudget: entry.is_off_budget || entry.isOffBudget || false, payments: entry.payments || [],
                 provisionDetails: entry.provision_details || entry.provisionDetails || null,
+=======
+              id: entry.id, loanId: entry.loan_id, type: entry.type, category: entry.category, frequency: entry.frequency,
+              amount: entry.amount, date: entry.date, startDate: entry.start_date, endDate: entry.end_date,
+              supplier: entry.supplier, description: entry.description, isOffBudget: entry.is_off_budget,
+              payments: entry.payments,
+              provisionDetails: entry.provision_details,
+              isProvision: entry.is_provision,
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
             };
             const projectId = entry.project_id || entry.projectId;
             if (!acc[projectId]) acc[projectId] = [];
@@ -1173,6 +1376,7 @@ useEffect(() => {
       }
     };
 
+<<<<<<< HEAD
     fetchInitialData();
   } else if (!state.session && state.profile) {
     dispatch({ type: 'RESET_STATE' });
@@ -1190,6 +1394,61 @@ useEffect(() => {
 
     return () => clearTimeout(timer);
   }, [state.isLoading, dispatch]);
+=======
+          const fetchedCategories = customCategoriesRes.data || [];
+          const customMain = fetchedCategories.filter(c => !c.parent_id);
+          const customSubs = fetchedCategories.filter(c => c.parent_id);
+          const finalCategories = JSON.parse(JSON.stringify(initialCategories));
+          
+          customMain.forEach(main => {
+              if (!finalCategories[main.type].some(m => m.id === main.id)) {
+                  finalCategories[main.type].push({
+                      id: main.id,
+                      name: main.name,
+                      isFixed: main.is_fixed,
+                      subCategories: []
+                  });
+              }
+          });
+
+          customSubs.forEach(sub => {
+              let parent = finalCategories.revenue.find(m => m.id === sub.parent_id);
+              if (!parent) {
+                  parent = finalCategories.expense.find(m => m.id === sub.parent_id);
+              }
+              if (parent && !parent.subCategories.some(s => s.id === sub.id)) {
+                  parent.subCategories.push({ id: sub.id, name: sub.name });
+              }
+          });
+
+          dispatch({
+            type: 'SET_INITIAL_DATA',
+            payload: {
+              profile,
+              allProfiles: profilesData || [],
+              settings,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
+              allEntries, allActuals, allCashAccounts, scenarioEntries, categories: finalCategories,
+            },
+          });
+
+        } catch (error) {
+          console.error("Error fetching initial data:", error);
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+              dispatch({ type: 'ADD_TOAST', payload: { message: 'Problème de session détecté. Déconnexion pour réinitialiser.', type: 'error', duration: 5000 } });
+              await supabase.auth.signOut();
+          } else {
+              dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur de chargement des données: ${error.message}`, type: 'error' } });
+          }
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      };
+      fetchInitialData();
+    } else if (!state.session && state.profile) {
+      dispatch({ type: 'RESET_STATE' });
+    }
+  }, [state.session, state.profile, dispatch]);
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040
 
   return (
     <BudgetContext.Provider value={{ state, dispatch }}>

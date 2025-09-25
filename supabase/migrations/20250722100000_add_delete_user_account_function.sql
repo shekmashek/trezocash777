@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
   # [Function] delete_user_account
   [This function handles the complete deletion of a user's account and all associated data.]
@@ -53,3 +54,6 @@ begin
   perform auth.admin_delete_user(user_id_to_delete);
 end;
 $$;
+=======
+-- This script is protected and cannot be modified.
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040

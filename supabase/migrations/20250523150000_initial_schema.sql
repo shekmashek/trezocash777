@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
           # Initial Schema Setup
           This script creates all the necessary tables, relationships, and security policies for the Trezocash application.
@@ -232,3 +233,6 @@ CREATE TABLE public.notes (
 );
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage their own notes." ON public.notes FOR ALL USING (auth.uid() = user_id);
+=======
+-- This script is protected and cannot be modified.
+>>>>>>> 6aa97f03da2f3baafdf26877917b0fc397621040

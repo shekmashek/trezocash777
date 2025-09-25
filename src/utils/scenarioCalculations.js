@@ -50,46 +50,9 @@ export const deriveActualsFromEntry = (entry, projectId, userCashAccounts = []) 
         payments: []
     };
     
-    const frequency = entry.frequency;
     const isLoanPrincipal = entry.category === 'Réception Emprunt' || entry.category === 'Octroi de Prêt';
 
-    if (frequency === 'ponctuel') {
-        if (!entry.date) return [];
-        const actual = {
-            ...commonActualData,
-            id: uuidv4(),
-            date: entry.date,
-            amount: entry.amount,
-        };
-
-        // For loan principals, automatically create a paid/received transaction
-        // as the cash is moved immediately. It uses the first available cash account.
-        if (isLoanPrincipal) {
-            const firstAccount = userCashAccounts.find(acc => !acc.isClosed);
-            if (firstAccount) {
-                actual.status = actual.type === 'payable' ? 'paid' : 'received';
-                actual.payments = [{
-                    id: uuidv4(),
-                    paymentDate: entry.date,
-                    paidAmount: entry.amount,
-                    cashAccount: firstAccount.id,
-                }];
-            }
-        }
-        newActualsList.push(actual);
-
-    } else if (frequency === 'irregulier') {
-        (entry.payments || []).forEach(payment => {
-            if (payment.date && payment.amount) {
-                newActualsList.push({
-                    ...commonActualData,
-                    id: uuidv4(),
-                    date: payment.date,
-                    amount: parseFloat(payment.amount),
-                });
-            }
-        });
-    } else if (frequency === 'provision') {
+    if (entry.isProvision) {
         if (!entry.provisionDetails || !entry.payments) return [];
         
         entry.payments.forEach(payment => {
@@ -98,7 +61,7 @@ export const deriveActualsFromEntry = (entry, projectId, userCashAccounts = []) 
                 budgetId: entry.id,
                 projectId: projectId,
                 type: 'payable',
-                category: 'Épargne et Provision',
+                category: 'Épargne',
                 date: payment.date,
                 amount: parseFloat(payment.amount),
                 thirdParty: `Provision vers ${userCashAccounts.find(acc => acc.id === entry.provisionDetails.provisionAccountId)?.name || 'Compte Provision'}`,
@@ -129,6 +92,41 @@ export const deriveActualsFromEntry = (entry, projectId, userCashAccounts = []) 
             isFinalProvisionPayment: true,
             provisionDetails: entry.provisionDetails
         });
+
+    } else if (entry.frequency === 'ponctuel') {
+        if (!entry.date) return [];
+        const actual = {
+            ...commonActualData,
+            id: uuidv4(),
+            date: entry.date,
+            amount: entry.amount,
+        };
+
+        if (isLoanPrincipal) {
+            const firstAccount = userCashAccounts.find(acc => !acc.isClosed);
+            if (firstAccount) {
+                actual.status = actual.type === 'payable' ? 'paid' : 'received';
+                actual.payments = [{
+                    id: uuidv4(),
+                    paymentDate: entry.date,
+                    paidAmount: entry.amount,
+                    cashAccount: firstAccount.id,
+                }];
+            }
+        }
+        newActualsList.push(actual);
+
+    } else if (entry.frequency === 'irregulier') {
+        (entry.payments || []).forEach(payment => {
+            if (payment.date && payment.amount) {
+                newActualsList.push({
+                    ...commonActualData,
+                    id: uuidv4(),
+                    date: payment.date,
+                    amount: parseFloat(payment.amount),
+                });
+            }
+        });
     } else { // Recurring entries
         if (!entry.startDate) return [];
 
@@ -146,11 +144,10 @@ export const deriveActualsFromEntry = (entry, projectId, userCashAccounts = []) 
             annuel: (d) => addMonths(d, 12),
         };
         
-        const incrementFn = incrementFns[frequency];
+        const incrementFn = incrementFns[entry.frequency];
         if (!incrementFn) return [];
 
         while (currentDate <= endDate) {
-            // Create a new date object for the push to avoid mutation issues
             const actualDate = new Date(currentDate);
             newActualsList.push({
                 ...commonActualData,
