@@ -248,6 +248,23 @@ const budgetReducer = (state, action) => {
         return { ...state, collaborators: [...state.collaborators, action.payload] };
     case 'REVOKE_COLLABORATOR_SUCCESS':
         return { ...state, collaborators: state.collaborators.filter(c => c.id !== action.payload) };
+    case 'ACCEPT_INVITE_SUCCESS': {
+        const acceptedInvite = action.payload;
+        return {
+            ...state,
+            collaborators: state.collaborators.map(c => 
+                c.id === acceptedInvite.id ? acceptedInvite : c
+            ),
+        };
+    }
+    case 'UPDATE_PROFILE_NOTIFICATIONS':
+        return {
+            ...state,
+            profile: {
+                ...state.profile,
+                notifications: action.payload,
+            },
+        };
     case 'OPEN_TRANSACTION_ACTION_MENU':
       return { ...state, transactionMenu: { isOpen: true, ...action.payload } };
     case 'CLOSE_TRANSACTION_ACTION_MENU':
@@ -354,7 +371,7 @@ const budgetReducer = (state, action) => {
         tempAllEntries[projectId].push(principalEntry, repaymentEntry);
 
         const tempAllActuals = { ...state.allActuals };
-        tempAllEntries[projectId] = (tempAllEntries[projectId] || []).filter(a => {
+        tempAllActuals[projectId] = (tempAllEntries[projectId] || []).filter(a => {
             const entry = (state.allEntries[projectId] || []).find(e => e.id === a.budgetId);
             return !entry || entry.loanId !== updatedLoan.id;
         });
@@ -889,7 +906,7 @@ const budgetReducer = (state, action) => {
                         infoModal: {
                             isOpen: true,
                             title: 'Provision Terminée !',
-                            message: `La provision pour "${finalPaymentActual.description.replace('Paiement final pour: ', '')}" est maintenant complète. Vous pouvez procéder au paiement final auprès de ${finalPaymentActual.thirdParty}.`
+                            message: `La provision pour "${finalPaymentActual.description.replace('Paiement final pour: ', '')}" est maintenant complète. Vous pouvez procéder au paiement final auprès de ${finalPaymentActual.third_party}.`
                         }
                     };
                 }
@@ -953,7 +970,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email, notifications')
             .eq('id', user.id)
             .single();
 
@@ -966,6 +983,7 @@ export const BudgetProvider = ({ children }) => {
             trialEndsAt: profileData.trial_ends_at,
             planId: profileData.plan_id,
             role: profileData.role,
+            notifications: profileData.notifications || [],
           } : null;
 
           if (!profile) {
@@ -1029,7 +1047,7 @@ export const BudgetProvider = ({ children }) => {
 
           const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
-              .select('id, full_name')
+              .select('id, full_name, email')
               .in('id', Array.from(userIds));
 
           if (profilesError) throw profilesError;

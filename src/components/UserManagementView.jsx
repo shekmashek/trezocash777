@@ -73,11 +73,14 @@ const UserManagementView = () => {
         });
     };
 
-    const getProjectNames = (projectIds) => {
+    const getProjectsByIds = (projectIds) => {
         if (!projectIds) return [];
         return projectIds.map(id => {
             const project = projects.find(p => p.id === id);
-            return project ? project.name : 'Projet Inconnu';
+            return {
+                id: id,
+                name: project ? project.name : 'Projet Inconnu'
+            };
         });
     };
     
@@ -93,7 +96,7 @@ const UserManagementView = () => {
             {list.length > 0 ? (
                 <ul className="divide-y divide-gray-200">
                     {list.map(collab => {
-                        const projectNames = getProjectNames(collab.projectIds);
+                        const projectsForCollab = getProjectsByIds(collab.projectIds);
                         const currentScope = scopeConfig[collab.permissionScope] || scopeConfig.all;
                         const ScopeIcon = currentScope.icon;
                         return (
@@ -110,12 +113,12 @@ const UserManagementView = () => {
                                             {currentScope.text}
                                         </span>
                                     </div>
-                                    {projectNames.length > 0 && (
+                                    {projectsForCollab.length > 0 && (
                                         <div className="mt-2 flex flex-wrap gap-2">
-                                            {projectNames.map(name => (
-                                                <span key={name} className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
+                                            {projectsForCollab.map(proj => (
+                                                <span key={proj.id} className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
                                                     <Folder className="w-3 h-3 text-gray-500" />
-                                                    {name}
+                                                    {proj.name}
                                                 </span>
                                             ))}
                                         </div>

@@ -656,9 +656,138 @@ export const revokeCollaborator = async (dispatch, collaboratorId) => {
         const { error } = await supabase.from('collaborators').delete().eq('id', collaboratorId);
         if (error) throw error;
         dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: collaboratorId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'success' } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'info' } });
     } catch (error) {
         console.error("Error revoking collaborator access:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const acceptInvite = async (dispatch, invite, user) => {
+    try {
+        const { error: updateError } = await supabase
+            .from('collaborators')
+            .update({ status: 'accepted', user_id: user.id })
+            .eq('id', invite.id);
+
+        if (updateError) throw updateError;
+        
+        const { data: updatedData, error: selectError } = await supabase
+            .from('collaborators')
+            .select('*')
+            .eq('id', invite.id)
+            .single();
+        
+        if (selectError) throw selectError;
+
+        const { data: ownerProfile, error: ownerError } = await supabase
+            .from('profiles')
+            .select('notifications')
+            .eq('id', invite.ownerId)
+            .single();
+        if (ownerError) throw ownerError;
+
+        const firstProjectId = invite.projectIds?.[0];
+        const { data: project, error: projectError } = await supabase
+            .from('projects')
+            .select('name')
+            .eq('id', firstProjectId)
+            .single();
+        if (projectError) throw projectError;
+
+        const newNotification = {
+            id: uuidv4(),
+            type: 'invite_response',
+            status: 'accepted',
+            collaboratorName: user.user_metadata.full_name || user.email,
+            collaboratorEmail: user.email,
+            projectName: project.name,
+            timestamp: new Date().toISOString(),
+        };
+
+        const updatedNotifications = [...(ownerProfile.notifications || []), newNotification];
+        await supabase.from('profiles').update({ notifications: updatedNotifications }).eq('id', invite.ownerId);
+
+        const acceptedInvite = {
+            id: updatedData.id,
+            ownerId: updatedData.owner_id,
+            userId: updatedData.user_id,
+            email: updatedData.email,
+            role: updatedData.role,
+            status: updatedData.status,
+            projectIds: updatedData.project_ids,
+            permissionScope: updatedData.permission_scope,
+        };
+
+        dispatch({ type: 'ACCEPT_INVITE_SUCCESS', payload: acceptedInvite });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation acceptée !', type: 'success' } });
+    } catch (error) {
+        console.error("Error accepting invite:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const declineInvite = async (dispatch, invite, user) => {
+    try {
+        const { data: ownerProfile, error: ownerError } = await supabase
+            .from('profiles')
+            .select('notifications')
+            .eq('id', invite.ownerId)
+            .single();
+        if (ownerError) throw ownerError;
+
+        const firstProjectId = invite.projectIds?.[0];
+        const { data: project, error: projectError } = await supabase
+            .from('projects')
+            .select('name')
+            .eq('id', firstProjectId)
+            .single();
+        if (projectError) throw projectError;
+
+        const newNotification = {
+            id: uuidv4(),
+            type: 'invite_response',
+            status: 'declined',
+            collaboratorName: user.user_metadata.full_name || user.email,
+            collaboratorEmail: user.email,
+            projectName: project.name,
+            timestamp: new Date().toISOString(),
+        };
+
+        const updatedNotifications = [...(ownerProfile.notifications || []), newNotification];
+        await supabase.from('profiles').update({ notifications: updatedNotifications }).eq('id', invite.ownerId);
+
+        const { error } = await supabase.from('collaborators').delete().eq('id', invite.id);
+        if (error) throw error;
+        
+        dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: invite.id });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation refusée.', type: 'info' } });
+    } catch (error) {
+        console.error("Error declining invite:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const dismissNotification = async (dispatch, notificationId, user) => {
+    try {
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('notifications')
+            .eq('id', user.id)
+            .single();
+        if (error) throw error;
+
+        const updatedNotifications = (profile.notifications || []).filter(n => n.id !== notificationId);
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ notifications: updatedNotifications })
+            .eq('id', user.id);
+        if (updateError) throw updateError;
+
+        dispatch({ type: 'UPDATE_PROFILE_NOTIFICATIONS', payload: updatedNotifications });
+    } catch (error) {
+        console.error("Error dismissing notification:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

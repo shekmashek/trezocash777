@@ -19,6 +19,7 @@ import TransactionActionMenu from '../components/TransactionActionMenu';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
 import SaveTemplateModal from '../components/SaveTemplateModal';
+import CollaborationBanner from '../components/CollaborationBanner';
 import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, deleteEntry } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
@@ -357,6 +358,7 @@ const AppLayout = () => {
                     onNewScenario={handleNewScenario}
                     isConsolidated={isConsolidated}
                 />
+                <CollaborationBanner />
                 <main className="flex-grow bg-gray-50">
                     <Outlet />
                 </main>
