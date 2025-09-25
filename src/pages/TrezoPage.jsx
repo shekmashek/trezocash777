@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Edit, Printer } from 'lucide-react';
+import { Table, TableProperties } from 'lucide-react';
 import BudgetTracker from '../components/BudgetTracker';
 
 const TrezoPage = () => {
@@ -19,15 +19,15 @@ const TrezoPage = () => {
                         onClick={() => setTableauMode('edition')}
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${tableauMode === 'edition' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
                     >
-                        <Edit size={16} />
-                        Édition
+                        <TableProperties size={16} />
+                        TCD
                     </button>
                     <button 
                         onClick={() => setTableauMode('lecture')}
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${tableauMode === 'lecture' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
                     >
-                        <Printer size={16} />
-                        Lecture
+                        <Table size={16} />
+                        Table
                     </button>
                 </div>
             </div>

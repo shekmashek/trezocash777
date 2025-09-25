@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { ListChecks, Edit, Printer } from 'lucide-react';
+import { ListChecks, Edit, List } from 'lucide-react';
 import BudgetStateView from '../components/BudgetStateView';
 
 const BudgetPage = () => {
-    const [mode, setMode] = useState('edition');
+    const [mode, setMode] = useState('lecture');
 
     return (
         <div className="container mx-auto p-6 max-w-full">
@@ -16,18 +16,18 @@ const BudgetPage = () => {
                 </div>
                 <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
                     <button 
+                        onClick={() => setMode('lecture')}
+                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${mode === 'lecture' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
+                    >
+                        <List size={16} />
+                        Liste
+                    </button>
+                    <button 
                         onClick={() => setMode('edition')}
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${mode === 'edition' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
                     >
                         <Edit size={16} />
                         Édition
-                    </button>
-                    <button 
-                        onClick={() => setMode('lecture')}
-                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${mode === 'lecture' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
-                    >
-                        <Printer size={16} />
-                        Lecture
                     </button>
                 </div>
             </div>
