@@ -194,7 +194,6 @@ const getInitialState = () => ({
     actualsSearchTerm: '',
     actualsViewFilter: null,
     activeQuickSelect: null,
-    focusView: 'none',
     isScenarioModalOpen: false,
     editingScenario: null,
     isTourActive: false,
@@ -416,8 +415,6 @@ const budgetReducer = (state, action) => {
         isTransferModalOpen: false,
       };
     }
-    case 'SET_FOCUS_VIEW':
-      return { ...state, focusView: action.payload };
     case 'ADD_TOAST':
       return {
         ...state,

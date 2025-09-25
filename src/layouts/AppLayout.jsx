@@ -16,7 +16,6 @@ import PaymentModal from '../components/PaymentModal';
 import DirectPaymentModal from '../components/DirectPaymentModal';
 import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
-import FocusView from '../components/FocusView';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
 import SaveTemplateModal from '../components/SaveTemplateModal';
@@ -33,7 +32,7 @@ const AppLayout = () => {
 
     const { 
         projects, activeProjectId, activeSettingsDrawer, isBudgetModalOpen, editingEntry, 
-        infoModal, confirmationModal, inlinePaymentDrawer, isTransferModalOpen, focusView, 
+        infoModal, confirmationModal, inlinePaymentDrawer, isTransferModalOpen, 
         isCloseAccountModalOpen, accountToClose, isScenarioModalOpen, editingScenario, 
         isActualTransactionModalOpen, editingActual, isPaymentModalOpen, payingActual, 
         isDirectPaymentModalOpen, directPaymentType, timeUnit, horizonLength, periodOffset, 
@@ -363,10 +362,6 @@ const AppLayout = () => {
                 </main>
             </div>
             
-            <AnimatePresence>
-                {focusView !== 'none' && <FocusView />}
-            </AnimatePresence>
-
             <SettingsDrawerWrapper activeDrawer={activeSettingsDrawer} onClose={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: null })} />
             
             {isBudgetModalOpen && (

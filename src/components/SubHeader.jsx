@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock, ListChecks } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock, ListChecks } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -41,15 +41,12 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   const avatarMenuRef = useRef(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsPopoverRef = useRef(null);
-  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
-  const newMenuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (langPopoverRef.current && !langPopoverRef.current.contains(event.target)) setIsLangPopoverOpen(false);
       if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target)) setIsAvatarMenuOpen(false);
       if (settingsPopoverRef.current && !settingsPopoverRef.current.contains(event.target)) setIsSettingsOpen(false);
-      if (newMenuRef.current && !newMenuRef.current.contains(event.target)) setIsNewMenuOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -71,19 +68,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     navigate(path);
     setIsSettingsOpen(false);
     setIsAvatarMenuOpen(false);
-  };
-
-  const handleFocusClick = () => {
-    const currentView = location.pathname.split('/')[2] || 'dashboard';
-    let focusTarget;
-    switch (currentView) {
-        case 'analyse': focusTarget = 'expenseAnalysis'; break;
-        case 'echeancier': focusTarget = 'schedule'; break;
-        case 'flux': focusTarget = 'chart'; break;
-        case 'scenarios': focusTarget = 'scenarios'; break;
-        default: focusTarget = 'table'; break;
-    }
-    dispatch({ type: 'SET_FOCUS_VIEW', payload: focusTarget });
   };
 
   const menuItems = [
@@ -111,14 +95,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { id: '/app/comptes', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
     { id: 'timezoneSettings', label: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500' },
     { id: '/app/archives', label: t('advancedSettings.archives'), icon: Archive, color: 'text-slate-500' },
-  ];
-
-  const newMenuItems = [
-    { label: 'Budget prévisionnel', icon: FilePlus, action: onNewBudgetEntry, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter une nouvelle entrée ou sortie prévisionnelle" },
-    { label: 'Entrée reçue', icon: HandCoins, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'receivable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Encaisser directement des entrées" },
-    { label: 'Sortie payée', icon: Banknote, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" },
-    { label: 'Scénario', icon: Layers, action: onNewScenario, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Créer une nouvelle simulation financière" },
-    { label: 'Compte de liquidité', icon: Wallet, action: () => navigate('/app/comptes'), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
   ];
 
   const handleSettingsItemClick = (itemId) => {
@@ -198,42 +174,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
             {/* Right Group */}
             <div className="flex items-center gap-4">
-                <div className="relative" ref={newMenuRef}>
-                    <button
-                        onClick={() => setIsNewMenuOpen(p => !p)}
-                        className="flex items-center gap-2 px-3 h-9 rounded-md bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
-                        title="Créer"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Nouveau
-                    </button>
-                    <AnimatePresence>
-                        {isNewMenuOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
-                            >
-                                <ul className="p-2">
-                                    {newMenuItems.map(item => (
-                                        <li key={item.label}>
-                                            <button
-                                                onClick={() => { if (!item.disabled) { item.action(); setIsNewMenuOpen(false); } }}
-                                                disabled={item.disabled}
-                                                title={item.tooltip}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                            >
-                                                <item.icon className="w-4 h-4 text-gray-500" />
-                                                <span>{item.label}</span>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
                 <div className="flex items-center gap-2">
                     <div className="relative" ref={langPopoverRef}>
                         <button
@@ -356,13 +296,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                           </AnimatePresence>
                       </div>
                     </div>
-                    <button
-                        onClick={handleFocusClick}
-                        className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                        title="Focus"
-                    >
-                        <Maximize className="w-5 h-5" />
-                    </button>
                 </div>
             </div>
           </div>
