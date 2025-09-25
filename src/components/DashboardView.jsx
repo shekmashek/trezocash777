@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Compass, Calendar, ArrowUp, ArrowDown } from 'lucide-react';
+import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Compass, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { getTodayInTimezone, getEntryAmountForPeriod } from '../utils/budgetCalculations';
 import SparklineChart from './SparklineChart';
 import ReactECharts from 'echarts-for-react';
@@ -283,6 +283,25 @@ const DashboardView = () => {
     exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
   };
 
+  const tutorials = [
+    { id: 'L_jWHffIx5E', title: 'Prise en main de Trezocash' },
+    { id: '3qHkcs3kG44', title: 'Créer votre premier projet' },
+    { id: 'g_t-s23-4U4', title: 'Maîtriser le tableau de trésorerie' },
+    { id: 'm_u6m3-L0gA', title: 'Utiliser les scénarios pour anticiper' },
+    { id: 'a_p5-VvF-sI', title: 'Analyser vos dépenses efficacement' },
+    { id: 'k-rN9t_g-iA', title: 'Gérer vos comptes de trésorerie' },
+    { id: 'r6-p_c-3_sI', title: 'Collaborer en équipe sur un projet' },
+    { id: 's_k9-t_g-iA', title: 'Comprendre l\'échéancier' },
+    { id: 't_g-iA_r6-p', title: 'Créer et utiliser des modèles' },
+    { id: 'u_sI-k-rN9t', title: 'Gérer les fonds à provisionner' },
+    { id: 'v_m3-L0gA_a', title: 'Consolider plusieurs projets' },
+    { id: 'w_4U4-s23-g', title: 'Personnaliser vos catégories' },
+    { id: 'x_g-iA_k-rN', title: 'Suivre vos dettes et prêts' },
+    { id: 'y_p5-VvF-sI', title: 'Astuces pour le mode "État des lieux"' },
+    { id: 'z_L0gA_m_u6', title: 'Paramètres avancés et personnalisation' },
+    { id: 'A_k-rN9t_g-i', title: 'Comprendre l\'analyse des soldes' }
+  ];
+
   return (
     <div className="container mx-auto p-6 max-w-full space-y-8">
       <div className="flex justify-between items-start">
@@ -425,6 +444,35 @@ const DashboardView = () => {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <section id="tutoriels" className="pt-8">
+        <div className="text-left mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+            <BookOpen className="w-6 h-6 text-blue-600" />
+            Tutoriels Vidéo
+          </h2>
+          <p className="mt-2 text-gray-600">Apprenez à maîtriser Trezocash avec nos guides pas à pas.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {tutorials.map((video) => (
+            <div key={video.id} className="bg-white rounded-lg shadow-sm border overflow-hidden group">
+              <div className="w-full h-40 bg-black flex items-center justify-center">
+                <iframe
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed/${video.id}`}
+                  title={video.title}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+              <div className="p-4">
+                <h4 className="font-semibold text-sm text-gray-800 truncate group-hover:text-blue-600 transition-colors">{video.title}</h4>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };
