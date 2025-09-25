@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock, ListChecks } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -132,6 +132,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', path: '/app/dashboard' },
+    { id: 'budget', label: 'Budget', path: '/app/budget' },
     { id: 'trezo', label: 'Trezo', path: '/app/trezo' },
     { id: 'flux', label: 'Flux', path: '/app/flux' },
     { id: 'echeancier', label: 'Echeancier', path: '/app/echeancier' },

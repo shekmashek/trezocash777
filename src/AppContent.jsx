@@ -13,6 +13,7 @@ import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
 import DashboardView from './components/DashboardView';
 import TrezoPage from './pages/TrezoPage';
+import BudgetPage from './pages/BudgetPage';
 import CashflowView from './components/CashflowView';
 import ScheduleView from './components/ScheduleView';
 import ScenarioView from './components/ScenarioView';
@@ -165,6 +166,7 @@ function AppContent() {
               <Route path="/app" element={<AppLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
+                <Route path="budget" element={<BudgetPage />} />
                 <Route path="trezo" element={<TrezoPage />} />
                 <Route path="flux" element={<CashflowView />} />
                 <Route path="echeancier" element={<ScheduleView />} />
