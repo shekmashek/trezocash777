@@ -6,6 +6,8 @@ import TrezocashLogo from './TrezocashLogo';
 import { initializeProject } from '../context/actions';
 import { templates as officialTemplates } from '../utils/templates';
 import TemplateIcon from './TemplateIcon';
+import api from '../config/api'; 
+import { useNavigate } from 'react-router-dom'; // Importer useNavigate
 
 const OnboardingProgress = ({ current, total }) => (
   <div className="flex items-center gap-2">
@@ -34,6 +36,8 @@ const OnboardingView = () => {
 
   const [activeTab, setActiveTab] = useState('official');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const navigate = useNavigate(); // Créer l'instance de navigate
 
   const steps = [
     { id: 'details', title: 'Détails de votre projet' },
@@ -76,28 +80,79 @@ const OnboardingView = () => {
   
   const handleCancel = () => dispatch({ type: 'CANCEL_ONBOARDING' });
 
-  const handleFinish = async () => {
-    setIsLoading(true);
-    try {
-      await initializeProject(dispatch, data, session.user, tiers, userAndCommunityTemplates);
-    } catch (error) {
-      setIsLoading(false);
+const handleFinish = async () => {
+  console.log("=== DÉBUT CRÉATION PROJET ===");
+
+  setIsLoading(true);
+
+  try {
+    const payload = {
+      name: data.projectName,
+      start_date: data.projectStartDate,
+      end_date: data.isEndDateIndefinite ? null : data.projectEndDate,
+      currency: '€',
+      template_id: data.templateId,
+      start_option: data.startOption
+    };
+
+    const response = await api.post('/projects', payload);
+    
+    if (response.data.success) {
+      console.log("🎉 PROJET CRÉÉ AVEC SUCCÈS");
+      
+      // Mettre à jour le state
+      dispatch({
+        type: 'PROJECT_CREATED',
+        payload: {
+          project: response.data.project,
+          cashAccounts: response.data.cash_accounts || [],
+          categories: response.data.categories || [],
+          entries: response.data.entries || []
+        }
+      });
+
+      // Attendre que React ait traité la mise à jour du state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Fermer l'onboarding et naviguer
+      dispatch({ type: 'CANCEL_ONBOARDING' });
+      navigate('/app/dashboard', { replace: true });
+
+    } else {
+      throw new Error(response.data.message || "Erreur inconnue du serveur");
     }
-  };
+
+  } catch (error) {
+    console.error("❌ Erreur création projet:", error);
+    dispatch({
+      type: 'ADD_TOAST',
+      payload: { 
+        message: error.response?.data?.message || "Erreur lors de la création du projet", 
+        type: 'error' 
+      }
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const allOfficialTemplates = useMemo(() => {
     const blankTemplate = {
-        id: 'blank',
-        name: 'Projet Vierge',
-        description: 'Commencez avec une structure de base sans aucune donnée pré-remplie.',
-        icon: 'FilePlus',
-        color: 'gray',
+      id: 'blank',
+      name: 'Projet Vierge',
+      description: 'Commencez avec une structure de base sans aucune donnée pré-remplie.',
+      icon: 'FilePlus',
+      color: 'gray',
     };
     return [blankTemplate, ...officialTemplates.personal, ...officialTemplates.professional];
   }, []);
 
   const communityTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.isPublic), [userAndCommunityTemplates]);
-  const myTemplates = useMemo(() => userAndCommunityTemplates.filter(t => t.userId === session.user.id), [userAndCommunityTemplates, session.user.id]);
+  
+  const myTemplates = useMemo(() => {
+    if (!session || !session.user) return [];
+    return userAndCommunityTemplates.filter(t => t.userId === session.user.id);
+  }, [userAndCommunityTemplates, session]);
 
   const filteredTemplates = useMemo(() => {
     let currentList = [];

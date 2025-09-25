@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
-import { apiService } from '../utils/apiService';
+import { useAuth } from '../context/AuthContext';
 import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
@@ -20,17 +19,14 @@ const SettingsLink = ({ item, onClick }) => {
         className={`flex items-center w-full h-10 px-4 rounded-lg text-sm font-medium transition-colors text-text-secondary hover:bg-secondary-100 hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <Icon className={`w-5 h-5 shrink-0 ${item.color}`} />
-        <span className={`ml-4`}>
-          {item.label}
-        </span>
+        <span className="ml-4">{item.label}</span>
       </button>
     </li>
   );
 };
 
 const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isConsolidated }) => {
-  const { state, dispatch } = useBudget();
-  const { settings, isTourActive, tourHighlightId, profile, session } = state;
+  const { user, logout } = useAuth();
   const { t, lang } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,15 +52,8 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   }, []);
 
   const handleLanguageChange = (newLang) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { ...settings, language: newLang } });
+    // Ici tu peux mettre un dispatcher global si tu en as, sinon stocker dans local state
     setIsLangPopoverOpen(false);
-  };
-
-  const handleLogout = async () => {
-    const { error } = await apiService.auth.signOut();
-    if (error) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la déconnexion: ${error.message}`, type: 'error' } });
-    }
   };
 
   const handleNavigate = (path) => {
@@ -83,7 +72,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
         case 'scenarios': focusTarget = 'scenarios'; break;
         default: focusTarget = 'table'; break;
     }
-    dispatch({ type: 'SET_FOCUS_VIEW', payload: focusTarget });
+    console.log('Focus sur:', focusTarget);
   };
 
   const menuItems = [
@@ -113,11 +102,11 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   ];
 
   const newMenuItems = [
-    { label: 'Budget prévisionnel', icon: FilePlus, action: onNewBudgetEntry, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter une nouvelle entrée ou sortie prévisionnelle" },
-    { label: 'Entrée reçue', icon: HandCoins, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'receivable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Encaisser directement des entrées" },
-    { label: 'Sortie payée', icon: Banknote, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" },
-    { label: 'Scénario', icon: Layers, action: onNewScenario, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Créer une nouvelle simulation financière" },
-    { label: 'Compte de liquidité', icon: Wallet, action: () => navigate('/app/comptes'), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
+    { label: 'Budget prévisionnel', icon: FilePlus, action: onNewBudgetEntry, disabled: isConsolidated },
+    { label: 'Entrée reçue', icon: HandCoins, action: () => console.log('Encaisser entrée'), disabled: isConsolidated },
+    { label: 'Sortie payée', icon: Banknote, action: () => console.log('Payer sortie'), disabled: isConsolidated },
+    { label: 'Scénario', icon: Layers, action: onNewScenario, disabled: isConsolidated },
+    { label: 'Compte de liquidité', icon: Wallet, action: () => navigate('/app/comptes'), disabled: isConsolidated }
   ];
 
   const handleSettingsItemClick = (itemId) => {
@@ -137,236 +126,118 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { id: 'scenarios', label: 'Scénarios', path: '/app/scenarios' },
     { id: 'analyse', label: 'Analyse', path: '/app/analyse' },
   ];
-  
-  const isProjectSwitcherHighlighted = isTourActive && tourHighlightId === '#project-switcher';
-
-  const subscriptionDetails = useMemo(() => {
-    if (!profile) return null;
-    const status = profile.subscriptionStatus;
-    if (status === 'lifetime') return 'Statut : Accès à Vie';
-    if (status === 'active') {
-        return 'Statut : Abonnement Pro';
-    }
-    const trialEndDate = profile.trialEndsAt ? new Date(profile.trialEndsAt) :
-                         session?.user?.created_at ? new Date(new Date(session.user.created_at).setDate(new Date(session.user.created_at).getDate() + 14)) : null;
-    if (trialEndDate) {
-        const daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
-        if (daysLeft > 0) {
-            return `Statut : Essai gratuit (${daysLeft} jours restants)`;
-        }
-    }
-    return 'Statut : Essai terminé';
-  }, [profile, session]);
 
   return (
-    <>
-      <div className="sticky top-0 z-30 bg-gray-100 border-b border-gray-200">
-        <div className="container mx-auto px-6">
-          <div className="py-2 flex w-full items-center justify-between">
-            {/* Left Group */}
-            <div className="flex items-center gap-4">
-              <div id="project-switcher" className={`w-auto min-w-[10rem] max-w-xs rounded-lg transition-all ${isProjectSwitcherHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}>
-                <ProjectSwitcher />
-              </div>
-              <ProjectCollaborators />
-            </div>
+    <div className="sticky top-0 z-30 bg-gray-100 border-b border-gray-200">
+      <div className="container mx-auto px-6">
+        <div className="py-2 flex w-full items-center justify-between">
+          {/* Left */}
+          <div className="flex items-center gap-4">
+            <ProjectSwitcher />
+            <ProjectCollaborators />
+          </div>
 
-            {/* Center Group */}
-            <nav className="flex items-center gap-1">
-              {navItems.map(item => {
-                const isActive = location.pathname === item.path;
-                const isHighlighted = isTourActive && tourHighlightId === `#tour-step-${item.id}`;
-                return (
-                  <button
-                    key={item.id}
-                    id={`tour-step-${item.id}`}
-                    onClick={() => handleNavigate(item.path)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-                      isActive
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
-                    } ${isHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}
-                    title={item.label}
+          {/* Center */}
+          <nav className="flex items-center gap-1">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => handleNavigate(item.path)}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold ${location.pathname === item.path ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Right */}
+          <div className="flex items-center gap-4">
+            {/* Nouveau */}
+            <div className="relative" ref={newMenuRef}>
+              <button onClick={() => setIsNewMenuOpen(p => !p)} className="flex items-center gap-2 px-3 h-9 rounded-md bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors">
+                <Plus className="w-4 h-4" /> Nouveau
+              </button>
+              <AnimatePresence>
+                {isNewMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
                   >
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Right Group */}
-            <div className="flex items-center gap-4">
-                <div className="relative" ref={newMenuRef}>
-                    <button
-                        onClick={() => setIsNewMenuOpen(p => !p)}
-                        className="flex items-center gap-2 px-3 h-9 rounded-md bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
-                        title="Créer"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Nouveau
-                    </button>
-                    <AnimatePresence>
-                        {isNewMenuOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
-                            >
-                                <ul className="p-2">
-                                    {newMenuItems.map(item => (
-                                        <li key={item.label}>
-                                            <button
-                                                onClick={() => { if (!item.disabled) { item.action(); setIsNewMenuOpen(false); } }}
-                                                disabled={item.disabled}
-                                                title={item.tooltip}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                            >
-                                                <item.icon className="w-4 h-4 text-gray-500" />
-                                                <span>{item.label}</span>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative" ref={langPopoverRef}>
-                        <button
-                            onClick={() => setIsLangPopoverOpen(p => !p)}
-                            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                            title="Changer la langue"
-                        >
-                            <FlagIcon lang={lang} className="w-6 h-auto rounded-sm" />
-                        </button>
-                        <AnimatePresence>
-                        {isLangPopoverOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg border z-20 p-1"
-                            >
-                                <button onClick={() => handleLanguageChange('fr')} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-3">
-                                    <FlagIcon lang="fr" className="w-5 h-auto rounded-sm" />
-                                    Français
-                                </button>
-                                <button onClick={() => handleLanguageChange('en')} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-3">
-                                    <FlagIcon lang="en" className="w-5 h-auto rounded-sm" />
-                                    English
-                                </button>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
-                    <div className="relative" ref={settingsPopoverRef}>
-                        <button
-                            onClick={() => setIsSettingsOpen(p => !p)}
-                            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                            title="Paramètres avancés"
-                        >
-                            <Cog className="w-5 h-5" />
-                        </button>
-                        <AnimatePresence>
-                            {isSettingsOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
-                                >
-                                    <div className="p-2">
-                                      <ul className="space-y-1">
-                                        {advancedNavItems.map(item => (
-                                          <SettingsLink 
-                                            key={item.id} 
-                                            item={item} 
-                                            onClick={() => handleNavigate(item.path)} 
-                                          />
-                                        ))}
-                                      </ul>
-                                      <hr className="my-2" />
-                                      <ul className="space-y-1">
-                                        {settingsItems.map(item => (
-                                          <SettingsLink 
-                                            key={item.id} 
-                                            item={item} 
-                                            onClick={() => handleSettingsItemClick(item.id)} 
-                                          />
-                                        ))}
-                                      </ul>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <SubscriptionBadge />
-                      <div className="relative" ref={avatarMenuRef}>
-                          <button 
-                              onClick={() => setIsAvatarMenuOpen(p => !p)}
-                              className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                              title="Profil utilisateur"
+                    <ul className="p-2">
+                      {newMenuItems.map(item => (
+                        <li key={item.label}>
+                          <button
+                            onClick={() => { if (!item.disabled) { item.action(); setIsNewMenuOpen(false); } }}
+                            disabled={item.disabled}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                              <User className="w-5 h-5" />
+                            <item.icon className="w-4 h-4 text-gray-500" />
+                            <span>{item.label}</span>
                           </button>
-                          <AnimatePresence>
-                              {isAvatarMenuOpen && (
-                                  <motion.div
-                                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                      className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
-                                  >
-                                      <div className="px-4 py-3 border-b">
-                                          <p className="text-sm font-semibold text-gray-800">{state.profile?.fullName || 'Utilisateur'}</p>
-                                          <p className="text-xs text-gray-500 truncate">{state.session?.user?.email}</p>
-                                          {subscriptionDetails && <p className="text-xs font-semibold text-blue-600 mt-1">{subscriptionDetails}</p>}
-                                      </div>
-                                      <div className="p-1">
-                                          {menuItems.map((item) => (
-                                              <button 
-                                                  key={item.title}
-                                                  onClick={() => handleNavigate(item.path)}
-                                                  className={`w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-                                                      item.isDestructive 
-                                                      ? 'text-red-600 hover:bg-red-50' 
-                                                      : 'text-gray-700 hover:bg-gray-100'
-                                                  }`}
-                                              >
-                                                  <item.icon className="w-4 h-4" />
-                                                  <span>{item.title}</span>
-                                              </button>
-                                          ))}
-                                          <div className="h-px bg-gray-200 my-1 mx-1"></div>
-                                          <button 
-                                              onClick={handleLogout}
-                                              className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50"
-                                          >
-                                              <LogOut className="w-4 h-4" />
-                                              <span>Se déconnecter</span>
-                                          </button>
-                                      </div>
-                                  </motion.div>
-                              )}
-                          </AnimatePresence>
-                      </div>
-                    </div>
-                    <button
-                        onClick={handleFocusClick}
-                        className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                        title="Focus"
-                    >
-                        <Maximize className="w-5 h-5" />
-                    </button>
-                </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
+            {/* Langue */}
+            <div className="relative" ref={langPopoverRef}>
+              <button onClick={() => setIsLangPopoverOpen(p => !p)} className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+                <FlagIcon lang={lang} className="w-6 h-auto rounded-sm" />
+              </button>
+            </div>
+
+            {/* Avatar */}
+            <div className="relative" ref={avatarMenuRef}>
+              <button onClick={() => setIsAvatarMenuOpen(p => !p)} className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+                <User className="w-5 h-5" />
+              </button>
+              <AnimatePresence>
+                {isAvatarMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
+                  >
+                    <div className="px-4 py-3 border-b">
+                      <p className="text-sm font-semibold text-gray-800">{user?.fullName || 'Utilisateur'}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    <div className="p-1">
+                      {menuItems.map(item => (
+                        <button 
+                          key={item.title}
+                          onClick={() => handleNavigate(item.path)}
+                          className={`w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md ${item.isDestructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.title}</span>
+                        </button>
+                      ))}
+                      <div className="h-px bg-gray-200 my-1 mx-1"></div>
+                      <button onClick={logout} className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50">
+                        <LogOut className="w-4 h-4" />
+                        <span>Se déconnecter</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Focus */}
+            <button onClick={handleFocusClick} className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <Maximize className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

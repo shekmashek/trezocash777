@@ -999,11 +999,11 @@ useEffect(() => {
         // 2. Charger les autres données initiales
         const loadInitialData = async () => {
           // Utiliser Promise.all pour lancer toutes les requêtes en parallèle
-          const endpoints = [
-            'projects', 'tiers', 'loans', 'scenarios', 'budget_entries',
-            'actual_transactions', 'payments', 'cash_accounts', 'scenario_entries',
-            'consolidated_views', 'collaborators', 'comments', 'templates', 'profiles'
-          ];
+ const endpoints = [
+  'projects', 'tiers', 'loans', 'scenarios', 'scenario_entries', 
+  'actual_transactions', 'payments', 'cash_accounts', 'scenario_entries',
+  'consolidated_views', 'collaborators', 'comments', 'templates', 'profiles'
+];
           
           const requests = endpoints.map(endpoint => 
             api.get(`/${endpoint}`).catch(err => {
@@ -1065,7 +1065,7 @@ useEffect(() => {
             id: t.id, userId: t.user_id, name: t.name, description: t.description, structure: t.structure, isPublic: t.is_public, tags: t.tags, icon: t.icon, color: t.color, purpose: t.purpose
         }));
 
-        const allEntries = (initialData.budget_entries || []).reduce((acc, entry) => {
+        const allEntries = (initialData.scenario_entries || []).reduce((acc, entry) => {
             const e = {
                 id: entry.id, loanId: entry.loan_id || entry.loanId, type: entry.type, category: entry.category,
                 frequency: entry.frequency, amount: entry.amount, date: entry.date, startDate: entry.start_date || entry.startDate,

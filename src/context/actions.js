@@ -100,7 +100,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         supplier: entry.supplier, description: entry.description,
     }));
     const { data: newEntriesData, error: entriesError } = await apiService
-        .from('budget_entries')
+        .from('scenario_entries')
         .insert(entriesToInsert)
         .select();
     if (entriesError) throw entriesError;
@@ -225,7 +225,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
         let savedEntryFromDB;
         if (editingEntry && editingEntry.id) {
             const { data, error } = await apiService
-                .from('budget_entries')
+                .from('scenario_entries')
                 .update(finalEntryDataForDB)
                 .eq('id', editingEntry.id)
                 .select()
@@ -234,7 +234,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             savedEntryFromDB = data;
         } else {
             const { data, error } = await apiService
-                .from('budget_entries')
+                .from('scenario_entries')
                 .insert(finalEntryDataForDB)
                 .select()
                 .single();
@@ -324,7 +324,7 @@ export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
             .in('status', unsettledStatuses);
         
         const { error: deleteEntryError } = await apiService
-            .from('budget_entries')
+            .from('scenario_entries')
             .delete()
             .eq('id', entryId);
 

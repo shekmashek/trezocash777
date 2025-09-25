@@ -6,6 +6,7 @@ import { BudgetProvider } from './context/BudgetContext.jsx';
 import './index.css';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { AuthProvider } from "./context/AuthContext";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -13,9 +14,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <BudgetProvider>
+        <AuthProvider>
         <Elements stripe={stripePromise}>
           <App />
         </Elements>
+        </AuthProvider>
       </BudgetProvider>
     </BrowserRouter>
   </StrictMode>,

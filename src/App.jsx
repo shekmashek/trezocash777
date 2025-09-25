@@ -1,270 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useBudget } from './context/BudgetContext';
-import OnboardingView from './components/OnboardingView';
+import { useAuth } from './context/AuthContext';
 import AuthView from './components/AuthView';
 import PublicLayout from './layouts/PublicLayout';
 import AppLayout from './layouts/AppLayout';
-import { apiService } from './utils/apiService';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, AlertCircle, Info, X, Loader } from 'lucide-react';
+import OnboardingView from './components/OnboardingView';
+import DashboardView from './components/DashboardView';
 import HomePage from './pages/HomePage';
 import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
-import DashboardView from './components/DashboardView';
-import TrezoPage from './pages/TrezoPage';
-import CashflowView from './components/CashflowView';
-import ScheduleView from './components/ScheduleView';
-import ScenarioView from './components/ScenarioView';
-import ExpenseAnalysisView from './components/ExpenseAnalysisView';
-import JournalsView from './components/JournalsView';
-import UnderConstructionView from './components/UnderConstructionView';
-import ProfilePage from './pages/ProfilePage';
-import SecurityPage from './pages/SecurityPage';
-import SubscriptionPage from './pages/SubscriptionPage';
-import DeleteAccountPage from './pages/DeleteAccountPage';
-import DisplaySettingsPage from './pages/DisplaySettingsPage';
-import AdminLoginPage from './pages/AdminLoginPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
-import AdminUsersPage from './pages/AdminUsersPage';
-import AdminLayout from './layouts/AdminLayout';
-import CollaboratorsPage from './pages/CollaboratorsPage';
-import CashAccountsPage from './pages/CashAccountsPage';
-import CategoryManagementPage from './pages/CategoryManagementPage';
-import TiersManagementPage from './pages/TiersManagementPage';
-import ArchivesPage from './pages/ArchivesPage';
-import MyTemplatesPage from './pages/MyTemplatesPage';
+import { Loader } from 'lucide-react';
 
-const toastIcons = {
-  success: <CheckCircle className="w-5 h-5" />,
-  error: <XCircle className="w-5 h-5" />,
-  info: <Info className="w-5 h-5" />,
-  warning: <AlertCircle className="w-5 h-5" />,
+// ProtectedRoute
+const ProtectedRoute = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
+  const { projects, loading: budgetLoading } = useBudget();
+  const location = useLocation();
+
+  // Attendre que les deux contextes soient chargés
+  if (authLoading || budgetLoading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
+        <Loader className="w-12 h-12 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
+  // Vérifier si projects est disponible avant d'utiliser filter
+  const hasActiveProjects = projects && projects.filter(p => !p.isArchived).length > 0;
+
+  // Si pas de projets actifs et qu'on n'est pas déjà sur l'onboarding, rediriger vers l'onboarding
+  if (!hasActiveProjects && !location.pathname.includes('/onboarding')) {
+    return <Navigate to="/app/onboarding" replace />;
+  }
+
+  // Si l'utilisateur a des projets mais est sur l'onboarding, rediriger vers le dashboard
+  if (hasActiveProjects && location.pathname.includes('/onboarding')) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
+  return children ? children : <Outlet />;
 };
-const toastColors = {
-  success: 'bg-success-500',
-  error: 'bg-danger-500',
-  info: 'bg-info-500',
-  warning: 'bg-warning-500',
-};
-const Toast = ({ toast, onRemove }) => {
+
+// Composant pour gérer l'affichage après connexion
+const AppEntry = () => {
+  const { projects, loading } = useBudget();
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (toast.duration) {
-      const timer = setTimeout(() => onRemove(toast.id), toast.duration);
-      return () => clearTimeout(timer);
+    // Vérifier si les projets sont chargés et qu'il n'y a pas de projets actifs
+    const hasActiveProjects = projects && projects.filter(p => !p.isArchived).length > 0;
+    if (!hasActiveProjects) {
+      navigate('/app/onboarding');
+    } else {
+      navigate('/app/dashboard');
     }
-  }, [toast, onRemove]);
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 50, scale: 0.3 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-      className={`relative flex items-start w-full max-w-sm p-4 text-white rounded-lg shadow-lg ${toastColors[toast.type]}`}
-    >
-      <div className="flex-shrink-0 mr-3">{toastIcons[toast.type]}</div>
-      <div className="flex-1 text-sm font-medium">{toast.message}</div>
-      <button onClick={() => onRemove(toast.id)} className="ml-4 p-1 rounded-full hover:bg-white/20"><X className="w-4 h-4" /></button>
-      {toast.duration && <motion.div className="absolute bottom-0 left-0 h-1 bg-white/50" initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: toast.duration / 1000, ease: 'linear' }} />}
-    </motion.div>
-  );
+  }, [projects, navigate]); // Dépendre des projets pour la redirection
+
+  if (loading) {
+    return (
+      <div className="w-full h-64 flex items-center justify-center">
+        <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  // Vérifier si projects est disponible
+  const hasActiveProjects = projects && projects.filter(p => !p.isArchived).length > 0;
+
+  // Afficher l'onboarding si pas de projets, sinon le dashboard
+  if (!hasActiveProjects) {
+    return <OnboardingView />;
+  }
+
+  return <DashboardView />;
 };
-const ToastContainer = () => {
-  const { state, dispatch } = useBudget();
-  const { toasts } = state;
-  const handleRemove = (id) => dispatch({ type: 'REMOVE_TOAST', payload: id });
+
+// PublicArea
+const PublicArea = ({ authMode, setAuthMode }) => {
+  const { user, loading: authLoading } = useAuth();
+  const { projects, loading: budgetLoading } = useBudget();
+  const navigate = useNavigate();
+
+  if (authLoading || budgetLoading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
+        <Loader className="w-12 h-12 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (user) {
+    // Vérifier si projects est disponible
+    const hasActiveProjects = projects && projects.filter(p => !p.isArchived).length > 0;
+
+    if (!hasActiveProjects) {
+      navigate('/app/dashboard');
+    } else {
+      navigate('/app/dashboard');
+    }
+    return null; // No need to render anything if we redirect
+  }
+
+  if (authMode.mode) {
+    return (
+      <AuthView
+        initialMode={authMode.mode}
+        fromTrial={authMode.fromTrial}
+        onBack={() => setAuthMode({ mode: null, fromTrial: false })}
+      />
+    );
+  }
+
   return (
-    <div className="fixed top-5 right-5 z-[100] space-y-2">
-      <AnimatePresence>{toasts.map(toast => <Toast key={toast.id} toast={toast} onRemove={handleRemove} />)}</AnimatePresence>
-    </div>
+    <PublicLayout
+      onLogin={() => setAuthMode({ mode: 'login', fromTrial: false })}
+      onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })}
+    />
   );
 };
 
 function App() {
-  const { state, dispatch } = useBudget();
-  const { session, isLoading, profile } = state;
   const [authMode, setAuthMode] = useState({ mode: null, fromTrial: false });
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkAuthStatus = async () => {
-      console.log('🔄 Starting auth check...');
-      
-      if (!session && isMounted) {
-        dispatch({ type: 'SET_LOADING', payload: true });
-      }
-
-      const token = localStorage.getItem('auth_token');
-      console.log('🔐 Token found:', !!token);
-      
-      if (token && !session) {
-        try {
-          console.log('📡 Fetching user profile...');
-          const { data: userData, error } = await apiService.getProfile('current');
-          
-          if (error) throw error;
-          
-          if (userData && isMounted) {
-            console.log('✅ User profile loaded:', userData);
-            const simulatedSession = {
-              user: {
-                id: userData.id,
-                email: userData.email,
-                name: userData.name
-              }
-            };
-            dispatch({ type: 'SET_SESSION', payload: simulatedSession });
-          }
-        } catch (error) {
-          console.error('❌ Auth check failed:', error);
-          if (isMounted) {
-            // Créer une session basique
-            const basicSession = {
-              user: {
-                id: 'current',
-                email: 'user@example.com',
-                name: 'Utilisateur'
-              }
-            };
-            dispatch({ type: 'SET_SESSION', payload: basicSession });
-          }
-        }
-      } else if (!token && session && isMounted) {
-        console.log('🚪 No token, logging out...');
-        dispatch({ type: 'SET_SESSION', payload: null });
-      }
-
-      // Fin du chargement
-      if (isMounted) {
-        console.log('✅ Auth check completed');
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    };
-
-    checkAuthStatus();
-    
-
-
-    // Écouter les changements de localStorage
-    const handleStorageChange = (e) => {
-      if (e.key === 'auth_token') {
-        checkAuthStatus();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [session, dispatch]);
-
-  const ProtectedRoute = () => {
-    const location = useLocation();
-    
-    if (isLoading) {
-        return (
-            <div className="w-screen h-screen flex items-center justify-center bg-gray-50">
-                <Loader className="w-12 h-12 text-blue-600 animate-spin" />
-            </div>
-        );
-    }
-
-    if (!session) {
-      return <Navigate to="/" replace />;
-    }
-
-    if (profile?.role === 'superadmin' && !location.pathname.startsWith('/admin')) {
-        return <Navigate to="/admin" replace />;
-    }
-    
-    if (profile?.role !== 'superadmin' && location.pathname.startsWith('/admin')) {
-        return <Navigate to="/app" replace />;
-    }
-
-    if (!location.pathname.startsWith('/admin') && (state.isOnboarding || state.projects.length === 0)) {
-      return <OnboardingView />;
-    }
-
-    return <Outlet />;
-  };
-
-  const PublicArea = () => {
-    if (isLoading) return <div className="w-screen h-screen flex items-center justify-center bg-gray-50"><Loader className="w-12 h-12 text-blue-600 animate-spin" /></div>;
-    
-    if (session) {
-      if (profile?.role === 'superadmin') return <Navigate to="/admin" replace />;
-      return <Navigate to="/app" replace />;
-    }
-
-    if (authMode.mode) {
-      return <AuthView 
-        initialMode={authMode.mode}
-        fromTrial={authMode.fromTrial}
-        onBack={() => setAuthMode({ mode: null, fromTrial: false })}
-      />;
-    }
-    return <PublicLayout 
-      onLogin={() => setAuthMode({ mode: 'login', fromTrial: false })} 
-      onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })}
-    />;
-  };
-  
-  const HomePageWithAuthTrigger = () => {
-      return <HomePage onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })} />;
-  };
-
   return (
-    <>
-      <ToastContainer />
-      <Routes>
-          <Route element={<ProtectedRoute />}>
-              <Route path="/admin" element={<AdminLayout />}>
-                  <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route path="dashboard" element={<AdminDashboardPage />} />
-                  <Route path="users" element={<AdminUsersPage />} />
-              </Route>
-              <Route path="/app" element={<AppLayout />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<DashboardView />} />
-                <Route path="trezo" element={<TrezoPage />} />
-                <Route path="flux" element={<CashflowView />} />
-                <Route path="echeancier" element={<ScheduleView />} />
-                <Route path="scenarios" element={<ScenarioView />} />
-                <Route path="analyse" element={<ExpenseAnalysisView />} />
-                <Route path="journal-budget" element={<JournalsView type="budget" />} />
-                <Route path="journal-paiements" element={<JournalsView type="payment" />} />
-                <Route path="profil" element={<ProfilePage />} />
-                <Route path="securite" element={<SecurityPage />} />
-                <Route path="abonnement" element={<SubscriptionPage />} />
-                <Route path="collaborateurs" element={<CollaboratorsPage />} />
-                <Route path="comptes" element={<CashAccountsPage />} />
-                <Route path="categories" element={<CategoryManagementPage />} />
-                <Route path="tiers" element={<TiersManagementPage />} />
-                <Route path="archives" element={<ArchivesPage />} />
-                <Route path="templates" element={<MyTemplatesPage />} />
-                <Route path="display-settings" element={<DisplaySettingsPage />} />
-                <Route path="delete-account" element={<DeleteAccountPage />} />
-                <Route path="factures" element={<UnderConstructionView title="Factures" />} />
-                <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
-              </Route>
-          </Route>
+    <Routes>
+      <Route element={<ProtectedRoute />}>
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<AppEntry />} />
+          <Route path="onboarding" element={<OnboardingView />} />
+          <Route path="dashboard" element={<DashboardView />} />
+          {/* Ajoute tes autres routes ici */}
+        </Route>
+      </Route>
 
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          
-          <Route element={<PublicArea />}>
-            <Route path="/" element={<HomePageWithAuthTrigger />} />
-            <Route path="/a-propos" element={<AboutPage />} />
-            <Route path="/cgu" element={<LegalPage type="cgu" />} />
-            <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
-            <Route path="/cookies" element={<LegalPage type="cookies" />} />
-            <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
-            <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-      </Routes>
-    </>
+      <Route element={<PublicArea authMode={authMode} setAuthMode={setAuthMode} />}>
+        <Route path="/" element={<HomePage onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })} />} />
+        <Route path="/a-propos" element={<AboutPage />} />
+        <Route path="/cgu" element={<LegalPage type="cgu" />} />
+        <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
+        <Route path="/cookies" element={<LegalPage type="cookies" />} />
+        <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
+        <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
