@@ -3,7 +3,7 @@ import { Table, TableProperties } from 'lucide-react';
 import BudgetTracker from '../components/BudgetTracker';
 
 const TrezoPage = () => {
-    const [tableauMode, setTableauMode] = useState('edition');
+    const [tableauMode, setTableauMode] = useState('lecture');
 
     return (
         <div className="container mx-auto p-6 max-w-full">
@@ -16,18 +16,18 @@ const TrezoPage = () => {
                 </div>
                 <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
                     <button 
-                        onClick={() => setTableauMode('edition')}
-                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${tableauMode === 'edition' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
-                    >
-                        <TableProperties size={16} />
-                        TCD
-                    </button>
-                    <button 
                         onClick={() => setTableauMode('lecture')}
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${tableauMode === 'lecture' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
                     >
                         <Table size={16} />
                         Table
+                    </button>
+                    <button 
+                        onClick={() => setTableauMode('edition')}
+                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${tableauMode === 'edition' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
+                    >
+                        <TableProperties size={16} />
+                        TCD
                     </button>
                 </div>
             </div>

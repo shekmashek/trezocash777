@@ -33,9 +33,10 @@ const LectureView = ({ entries, settings }) => {
                         <tr className="border-b text-left text-xs text-gray-500 uppercase">
                             <th className="py-3 px-4 w-[15%]">Sous-catégorie</th>
                             <th className="py-3 px-4 w-[15%]">Tiers</th>
-                            <th className="py-3 px-4 w-[20%]">Détails</th>
+                            <th className="py-3 px-4 w-[20%]">Description</th>
+                            <th className="py-3 px-4 w-[15%]">Détails</th>
                             <th className="py-3 px-4 w-[10%]">Fréquence</th>
-                            <th className="py-3 px-4 w-[15%]">Période</th>
+                            <th className="py-3 px-4 w-[10%]">Période</th>
                             <th className="py-3 px-4 text-right w-[15%]">Montant</th>
                         </tr>
                     </thead>
@@ -46,6 +47,7 @@ const LectureView = ({ entries, settings }) => {
                                     {entry.category}
                                 </td>
                                 <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
+                                <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
                                 <td className="py-3 px-4 text-gray-600">
                                     {entry.isProvision && (
                                         <div className="flex items-center gap-2 text-xs text-indigo-700">
@@ -194,7 +196,7 @@ const BudgetStateView = ({ mode = 'edition' }) => {
                             return (
                                 <React.Fragment key={mainCat.id}>
                                     <tr className="bg-gray-100 font-semibold">
-                                        <td className="py-3 px-4" colSpan="7">
+                                        <td className="py-3 px-4" colSpan="8">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <Folder className="w-4 h-4 text-gray-600" />
@@ -218,12 +220,11 @@ const BudgetStateView = ({ mode = 'edition' }) => {
                                                 <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">{percentage.toFixed(1)}%</span>
                                             )}
                                         </td>
-                                        <td className="py-3 px-4"></td>
                                     </tr>
                                     {entriesForMainCat.map(entry => (
                                         <tr key={entry.id} className="border-b hover:bg-gray-50 group">
                                             <td className="py-3 px-4 text-blue-600 font-medium">{entry.category}</td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.description || '-'}</td>
+                                            <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
                                             <td className="py-3 px-4 text-gray-600">
                                                 {entry.isProvision && (

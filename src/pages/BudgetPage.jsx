@@ -27,7 +27,7 @@ const BudgetPage = () => {
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 ${mode === 'edition' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
                     >
                         <Edit size={16} />
-                        Édition
+                        Editer votre budget
                     </button>
                 </div>
             </div>

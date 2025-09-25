@@ -187,7 +187,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
-  const [visibleColumns, setVisibleColumns] = useState({ budget: true, actual: true, reste: true });
+  const [visibleColumns, setVisibleColumns] = useState({ budget: true, actual: false, reste: false });
   const [drawerData, setDrawerData] = useState({ isOpen: false, transactions: [], title: '' });
   const [collapsedItems, setCollapsedItems] = useState({});
   const [isEntreesCollapsed, setIsEntreesCollapsed] = useState(false);
