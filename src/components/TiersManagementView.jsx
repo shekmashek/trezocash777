@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Users, UserPlus, Edit, Trash2, Save, X, Plus, Search, Banknote } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Save, X, Plus, Search, Banknote, CreditCard } from 'lucide-react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import EmptyState from './EmptyState';
 
-const TiersManagementView = () => {
+const TiersManagementView = ({ onOpenPaymentTerms }) => {
   const { state, dispatch } = useBudget();
   const { tiers, allEntries, allActuals, settings, loans } = state;
 
@@ -103,7 +103,7 @@ const TiersManagementView = () => {
                     <tr className="border-b">
                         <th className="py-2 text-left font-medium text-gray-500">Nom</th>
                         <th className="py-2 text-right font-medium text-gray-500">Impayés</th>
-                        <th className="py-2 text-right font-medium text-gray-500 w-24">Actions</th>
+                        <th className="py-2 text-right font-medium text-gray-500 w-32">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,7 +136,8 @@ const TiersManagementView = () => {
                                         <button onClick={handleCancelEdit} className="p-1 text-gray-500 hover:text-gray-700"><X className="w-4 h-4" /></button>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => onOpenPaymentTerms(tier)} className="p-1 text-gray-500 hover:text-purple-600" title="Définir les conditions de paiement"><CreditCard className="w-4 h-4" /></button>
                                         <button onClick={() => handleStartEdit(tier)} className="p-1 text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
                                         <button onClick={() => handleDeleteTier(tier.id)} className="p-1 text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed" title={isTierUsed(tier.name) ? "Suppression impossible: tiers utilisé" : "Supprimer"}><Trash2 className="w-4 h-4" /></button>
                                     </div>

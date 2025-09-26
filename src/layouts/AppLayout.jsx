@@ -18,9 +18,11 @@ import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
+import TierDetailDrawer from '../components/TierDetailDrawer';
 import SaveTemplateModal from '../components/SaveTemplateModal';
 import CollaborationBanner from '../components/CollaborationBanner';
-import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, deleteEntry } from '../context/actions';
+import PaymentTermsModal from '../components/PaymentTermsModal';
+import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, deleteEntry, updateTierPaymentTerms } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
@@ -39,10 +41,14 @@ const AppLayout = () => {
         isDirectPaymentModalOpen, directPaymentType, timeUnit, horizonLength, periodOffset, 
         allCashAccounts, allEntries, allActuals, settings, activeQuickSelect, isTourActive, 
         transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView,
-        isCommentDrawerOpen, commentDrawerContext, isSaveTemplateModalOpen, editingTemplate
+        isCommentDrawerOpen, commentDrawerContext, isTierDetailDrawerOpen, tierDetailContext, 
+        isSaveTemplateModalOpen, editingTemplate, tiers
     } = state;
     
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isPaymentTermsModalOpen, setIsPaymentTermsModalOpen] = useState(false);
+    const [editingTierForTerms, setEditingTierForTerms] = useState(null);
+
 
     const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
 
@@ -340,6 +346,16 @@ const AppLayout = () => {
         saveConsolidatedView(dispatch, { viewData, editingView: editingConsolidatedView, user });
     };
 
+    const handleOpenPaymentTerms = (tier) => {
+        setEditingTierForTerms(tier);
+        setIsPaymentTermsModalOpen(true);
+    };
+
+    const handleSavePaymentTerms = (tierId, terms) => {
+        updateTierPaymentTerms(dispatch, { tierId, terms });
+        setIsPaymentTermsModalOpen(false);
+    };
+
     return (
         <div className="flex min-h-screen bg-background">
             <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
@@ -360,7 +376,7 @@ const AppLayout = () => {
                 />
                 <CollaborationBanner />
                 <main className="flex-grow bg-gray-50">
-                    <Outlet />
+                    <Outlet context={{ onOpenPaymentTerms: handleOpenPaymentTerms }} />
                 </main>
             </div>
             
@@ -426,6 +442,12 @@ const AppLayout = () => {
                     editingTemplate={editingTemplate}
                 />
             )}
+            <PaymentTermsModal
+                isOpen={isPaymentTermsModalOpen}
+                onClose={() => setIsPaymentTermsModalOpen(false)}
+                tier={editingTierForTerms}
+                onSave={handleSavePaymentTerms}
+            />
             {infoModal.isOpen && (
                 <InfoModal
                     isOpen={infoModal.isOpen}
@@ -471,6 +493,11 @@ const AppLayout = () => {
                 isOpen={isCommentDrawerOpen}
                 onClose={() => dispatch({ type: 'CLOSE_COMMENT_DRAWER' })}
                 context={commentDrawerContext}
+            />
+            <TierDetailDrawer
+                isOpen={isTierDetailDrawerOpen}
+                onClose={() => dispatch({ type: 'CLOSE_TIER_DETAIL_DRAWER' })}
+                context={tierDetailContext}
             />
         </div>
     );

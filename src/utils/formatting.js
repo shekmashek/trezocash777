@@ -29,3 +29,17 @@ export const formatCurrency = (amount, settings = {}) => {
 
   return `${formatter.format(value)}${suffix} ${currencySymbol}`;
 };
+
+export const formatPaymentTerms = (terms) => {
+    if (!terms || terms.length === 0) {
+        return '-';
+    }
+    if (terms.length === 1 && terms[0].days === 0 && terms[0].percentage === 100) {
+        return 'Comptant';
+    }
+
+    return terms
+        .sort((a, b) => a.days - b.days)
+        .map(term => `${term.percentage}% à ${term.days}j`)
+        .join(', ');
+};

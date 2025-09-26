@@ -190,7 +190,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
     try {
         const { supplier, type } = entryData;
         const tierType = type === 'revenu' ? 'client' : 'fournisseur';
-        const existingTier = tiers.find(t => t.name.toLowerCase() === supplier.toLowerCase());
+        const existingTier = tiers.find(t => t.name.toLowerCase() === supplier.toLowerCase() && t.type === tierType);
         let newTierData = null;
 
         if (!existingTier && supplier) {
@@ -267,7 +267,10 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             isProvision: savedEntryFromDB.is_provision,
         };
 
-        const newActuals = deriveActualsFromEntry(savedEntryForClient, activeProjectId, cashAccounts);
+        const tier = existingTier || newTierData;
+        const paymentTerms = tier?.payment_terms;
+
+        const newActuals = deriveActualsFromEntry(savedEntryForClient, activeProjectId, cashAccounts, paymentTerms);
         
         if (newActuals.length > 0) {
             const { error: insertError } = await supabase
@@ -1132,5 +1135,29 @@ export const deleteProject = async (dispatch, projectId) => {
     } catch (error) {
         console.error("Error deleting project:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression du projet: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const updateTierPaymentTerms = async (dispatch, { tierId, terms }) => {
+    try {
+        const { data, error } = await supabase
+            .from('tiers')
+            .update({ payment_terms: terms })
+            .eq('id', tierId)
+            .select()
+            .single();
+        if (error) throw error;
+        
+        dispatch({
+            type: 'UPDATE_TIER_PAYMENT_TERMS_SUCCESS',
+            payload: {
+                tierId: data.id,
+                payment_terms: data.payment_terms
+            }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Conditions de paiement mises à jour.', type: 'success' } });
+    } catch (error) {
+        console.error("Error updating payment terms:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

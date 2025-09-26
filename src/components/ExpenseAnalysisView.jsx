@@ -19,6 +19,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
   const [localActiveQuickSelect, setLocalActiveQuickSelect] = useState('month');
   const [localAnalysisType, setLocalAnalysisType] = useState('expense');
   const [localAnalysisMode, setLocalAnalysisMode] = useState('category');
+  const [visibleData, setVisibleData] = useState({ budget: true, actual: true });
   
   const [drillDownState, setDrillDownState] = useState({
     level: 0, // 0: main, 1: sub-category, 2: supplier
@@ -499,7 +500,49 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
       ? { budget: '#fca5a5', actual: '#ef4444', budgetLabel: '#b91c1c', actualLabel: '#7f1d1d' }
       : { budget: '#6ee7b7', actual: '#10b981', budgetLabel: '#047857', actualLabel: '#065f46' };
 
-    if (categories.length === 0) {
+    const series = [];
+
+    if (visibleData.budget) {
+        series.push({
+            name: `Budget: ${formatCurrency(totalBudget, settings)}`,
+            type: 'bar',
+            data: budgetData,
+            itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] },
+            emphasis: { focus: 'series' },
+            label: {
+                show: true,
+                position: 'right',
+                formatter: (params) => {
+                    if (params.value <= 0) return '';
+                    const percentage = totalBudget > 0 ? (params.value / totalBudget) * 100 : 0;
+                    return `${formatCurrency(params.value, settings)} (${percentage.toFixed(0)}%)`;
+                },
+                color: chartColors.budgetLabel
+            }
+        });
+    }
+
+    if (visibleData.actual) {
+        series.push({
+            name: `Réel: ${formatCurrency(totalActual, settings)}`,
+            type: 'bar',
+            data: actualData,
+            itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] },
+            emphasis: { focus: 'series' },
+            label: {
+                show: true,
+                position: 'right',
+                formatter: (params) => {
+                    if (params.value <= 0) return '';
+                    const percentage = totalActual > 0 ? (params.value / totalActual) * 100 : 0;
+                    return `${formatCurrency(params.value, settings)} (${percentage.toFixed(0)}%)`;
+                },
+                color: chartColors.actualLabel
+            }
+        });
+    }
+
+    if (series.length === 0) {
         return {
             title: { text: 'Aucune donnée à analyser', left: 'center', top: 'center' },
             series: []
@@ -522,14 +565,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 return tooltip;
             }
         },
-        legend: {
-            data: [`Budget: ${formatCurrency(totalBudget, settings)}`, `Réel: ${formatCurrency(totalActual, settings)}`],
-            top: 30,
-            textStyle: {
-                fontSize: 14,
-                fontWeight: 'bold'
-            }
-        },
+        legend: { show: false },
         grid: {
             left: '3%',
             right: '10%',
@@ -550,42 +586,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 rotate: 0
             }
         },
-        series: [
-            {
-                name: `Budget: ${formatCurrency(totalBudget, settings)}`,
-                type: 'bar',
-                data: budgetData,
-                itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] },
-                emphasis: { focus: 'series' },
-                label: {
-                    show: true,
-                    position: 'right',
-                    formatter: (params) => {
-                        if (params.value <= 0) return '';
-                        const percentage = totalBudget > 0 ? (params.value / totalBudget) * 100 : 0;
-                        return `${formatCurrency(params.value, settings)} (${percentage.toFixed(0)}%)`;
-                    },
-                    color: chartColors.budgetLabel
-                }
-            },
-            {
-                name: `Réel: ${formatCurrency(totalActual, settings)}`,
-                type: 'bar',
-                data: actualData,
-                itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] },
-                emphasis: { focus: 'series' },
-                label: {
-                    show: true,
-                    position: 'right',
-                    formatter: (params) => {
-                        if (params.value <= 0) return '';
-                        const percentage = totalActual > 0 ? (params.value / totalActual) * 100 : 0;
-                        return `${formatCurrency(params.value, settings)} (${percentage.toFixed(0)}%)`;
-                    },
-                    color: chartColors.actualLabel
-                }
-            }
-        ]
+        series: series
     };
   };
 
@@ -683,17 +684,22 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
 
     if (projects.length === 0) return { title: { text: 'Aucune donnée de projet à analyser', left: 'center', top: 'center' }, series: [] };
 
+    const series = [];
+    if (visibleData.budget) {
+        series.push({ name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } });
+    }
+    if (visibleData.actual) {
+        series.push({ name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } });
+    }
+
     return {
         title: { text: 'Analyse par Projet', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { data: ['Budget', 'Réel'], top: 30 },
+        legend: { show: false },
         grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: projects },
-        series: [
-            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
-            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
-        ]
+        series: series
     };
   };
 
@@ -705,17 +711,22 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
 
     if (tiers.length === 0) return { title: { text: 'Aucune donnée par tiers à analyser', left: 'center', top: 'center' }, series: [] };
 
+    const series = [];
+    if (visibleData.budget) {
+        series.push({ name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } });
+    }
+    if (visibleData.actual) {
+        series.push({ name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } });
+    }
+    
     return {
         title: { text: 'Analyse par Tiers (Top 10)', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { data: ['Budget', 'Réel'], top: 30 },
+        legend: { show: false },
         grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: tiers },
-        series: [
-            { name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } },
-            { name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } }
-        ]
+        series: series
     };
   };
 
@@ -896,6 +907,20 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                                 </motion.div>
                             )}
                         </AnimatePresence>
+                    </div>
+                    <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setVisibleData(p => ({ ...p, budget: !p.budget }))}
+                            className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${visibleData.budget ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
+                        >
+                            Budget
+                        </button>
+                        <button 
+                            onClick={() => setVisibleData(p => ({ ...p, actual: !p.actual }))}
+                            className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${visibleData.actual ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:bg-gray-300'}`}
+                        >
+                            Réel
+                        </button>
                     </div>
                 </div>
             </div>

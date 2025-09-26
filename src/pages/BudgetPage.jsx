@@ -32,7 +32,7 @@ const BudgetPage = () => {
                 </div>
             </div>
             
-            <BudgetStateView mode={mode} />
+            <BudgetStateView mode={mode} setMode={setMode} />
         </div>
     );
 };

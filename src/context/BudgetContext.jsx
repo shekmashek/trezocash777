@@ -158,6 +158,8 @@ const getInitialState = () => ({
     allComments: {},
     isCommentDrawerOpen: false,
     commentDrawerContext: null,
+    isTierDetailDrawerOpen: false,
+    tierDetailContext: null,
     consolidatedViews: [],
     collaborators: [],
     templates: [],
@@ -231,6 +233,10 @@ const budgetReducer = (state, action) => {
         return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
     case 'CLOSE_COMMENT_DRAWER':
         return { ...state, isCommentDrawerOpen: false, commentDrawerContext: null };
+    case 'OPEN_TIER_DETAIL_DRAWER':
+        return { ...state, isTierDetailDrawerOpen: true, tierDetailContext: action.payload };
+    case 'CLOSE_TIER_DETAIL_DRAWER':
+        return { ...state, isTierDetailDrawerOpen: false, tierDetailContext: null };
     case 'ADD_COMMENT_SUCCESS': {
         const { newComment } = action.payload;
         const projectId = newComment.projectId === null ? state.activeProjectId : newComment.projectId;
@@ -683,6 +689,15 @@ const budgetReducer = (state, action) => {
       const tierId = action.payload;
       return { ...state, tiers: state.tiers.filter(t => t.id !== tierId) };
     }
+    case 'UPDATE_TIER_PAYMENT_TERMS_SUCCESS': {
+        const { tierId, payment_terms } = action.payload;
+        return {
+            ...state,
+            tiers: state.tiers.map(t => 
+                t.id === tierId ? { ...t, payment_terms } : t
+            ),
+        };
+    }
 
     case 'ADD_MAIN_CATEGORY_SUCCESS': {
         const { type, newMainCategory } = action.payload;
@@ -1057,7 +1072,7 @@ export const BudgetProvider = ({ children }) => {
             annualGoals: p.annual_goals, expenseTargets: p.expense_targets
           }));
           
-          const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type }));
+          const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type, payment_terms: t.payment_terms }));
           const loans = (loansRes.data || []).map(l => ({
             id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
             monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
@@ -1196,7 +1211,7 @@ export const BudgetProvider = ({ children }) => {
     } else if (!state.session && state.profile) {
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [state.session, state.profile, dispatch]);
+  }, [state.session]);
 
   return (
     <BudgetContext.Provider value={{ state, dispatch }}>

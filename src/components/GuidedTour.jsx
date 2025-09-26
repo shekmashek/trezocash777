@@ -12,18 +12,24 @@ const tourSteps = [
   },
   {
     target: '#tour-step-budget',
-    title: 'Le Tableau de Trésorerie',
+    title: 'La Vue Budget (État des lieux)',
+    content: 'Construisez votre budget prévisionnel ici. C\'est une vue en liste de toutes vos entrées et sorties planifiées.',
+    position: 'bottom'
+  },
+  {
+    target: '#tour-step-trezo',
+    title: 'Le Tableau de Trésorerie (Trezo)',
     content: 'Votre centre de contrôle. Ici, vous avez une vision claire et détaillée de tous vos flux, période par période.',
     position: 'bottom'
   },
   {
-    target: '#tour-step-cashflow',
+    target: '#tour-step-flux',
     title: 'Le Suivi des Flux',
     content: 'Visualisez vos flux. Ce graphique vous permet de comprendre en un clin d\'œil d\'où vient et où va votre argent.',
     position: 'bottom'
   },
   {
-    target: '#tour-step-schedule',
+    target: '#tour-step-echeancier',
     title: 'L\'Échéancier',
     content: 'Ne manquez plus jamais une échéance. L\'échéancier vous présente toutes vos transactions à venir sous forme de calendrier.',
     position: 'bottom'
@@ -35,9 +41,9 @@ const tourSteps = [
     position: 'bottom'
   },
   {
-    target: '#tour-step-expenseAnalysis',
+    target: '#tour-step-analyse',
     title: 'L\'Analyse Approfondie',
-    content: 'Plongez dans vos données. Analysez la répartition de vos dépenses et revenus pour prendre les meilleures décisions.',
+    content: 'Plongez dans vos données pour comprendre la répartition de vos dépenses et revenus pour prendre les meilleures décisions.',
     position: 'bottom'
   },
   {
