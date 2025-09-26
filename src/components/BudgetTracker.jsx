@@ -1,14 +1,13 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, ArrowRightLeft, Calendar, Lock, MessageSquare, ChevronUp } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
-import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
+import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions } from '../utils/selectors.jsx';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const getStartOfWeek = (date) => { const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); d.setHours(0, 0, 0, 0); return new Date(d.setDate(diff)); };
 
 const LectureView = ({ entries, periods, settings, actuals, isConsolidated, projects, visibleColumns, CommentButton }) => {
     const sortedEntries = useMemo(() => {
@@ -112,13 +111,13 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
 const BudgetTracker = ({ mode = 'edition' }) => {
   const { dataState, dataDispatch } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, consolidatedViews, allComments, vatRegimes } = dataState;
+  const { projects, categories, settings, allComments, vatRegimes } = dataState;
   const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
   
-  const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
   const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
   const periodMenuRef = useRef(null);
+
+  const { budgetEntries, actualTransactions, cashAccounts, activeProject, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
 
   const CommentButton = ({ rowId, columnId, rowName, columnName }) => {
     const { dataState: budgetDataState } = useData();
@@ -153,38 +152,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
         </button>
     );
   };
-
-  const { activeProject, budgetEntries, actualTransactions } = useMemo(() => {
-    let relevantEntries, relevantActuals, project;
-
-    if (isConsolidated) {
-        relevantEntries = Object.entries(allEntries).flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId })));
-        relevantActuals = Object.entries(allActuals).flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId })));
-        project = { id: 'consolidated', name: 'Projet consolidé' };
-    } else if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) {
-            return { activeProject: { id: activeProjectId, name: 'Vue Inconnue' }, budgetEntries: [], actualTransactions: [] };
-        }
-        const projectIdsInView = view.project_ids;
-        relevantEntries = projectIdsInView.flatMap(projectId => (allEntries[projectId] || []).map(entry => ({ ...entry, projectId })));
-        relevantActuals = projectIdsInView.flatMap(projectId => (allActuals[projectId] || []).map(actual => ({ ...actual, projectId })));
-        project = { id: activeProjectId, name: view.name };
-    } else {
-        project = projects.find(p => p.id === activeProjectId);
-        relevantEntries = project ? (allEntries[project.id] || []) : [];
-        relevantActuals = project ? (allActuals[project.id] || []) : [];
-    }
-
-    const filteredActuals = relevantActuals.filter(a => !a.isFinalProvisionPayment);
-
-    return {
-        activeProject: project,
-        budgetEntries: relevantEntries,
-        actualTransactions: filteredActuals,
-    };
-  }, [activeProjectId, projects, allEntries, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
@@ -413,18 +380,18 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return entries;
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
 
-  const expandedAndVatEntries = useMemo(() => {
-    const expanded = expandVatEntries(filteredBudgetEntries, categories);
-    const vatRegime = vatRegimes[activeProjectId];
+  const isRowVisibleInPeriods = useCallback((entry) => {
+    for (const period of periods) { 
+      if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; 
+    } 
+    return false;
+  }, [periods, actualTransactions]);
 
-    if (isConsolidated || isCustomConsolidated || !vatRegime) {
-      return expanded;
-    }
-    
-    const dynamicVatEntries = periods.flatMap(period => generateVatPaymentEntries(expanded, period, vatRegime));
-    
-    return [...expanded, ...dynamicVatEntries];
-  }, [filteredBudgetEntries, categories, periods, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated]);
+  const expandedAndVatEntries = useProcessedEntries(filteredBudgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
+  const hasOffBudgetRevenues = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
+  const hasOffBudgetExpenses = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
+  const groupedData = useGroupedData(expandedAndVatEntries, categories, isRowVisibleInPeriods);
+  const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings);
 
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
@@ -454,10 +421,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const getFrequencyTitle = (entry) => { const freq = entry.frequency.charAt(0).toUpperCase() + entry.frequency.slice(1); if (entry.frequency === 'ponctuel') return `Ponctuel: ${formatDate(entry.date)}`; if (entry.frequency === 'irregulier') return `Irrégulier: ${entry.payments?.length || 0} paiements`; const period = `De ${formatDate(entry.startDate)} à ${entry.endDate ? formatDate(entry.endDate) : '...'}`; return `${freq} | ${period}`; };
   const getResteColor = (reste, isEntree) => reste === 0 ? 'text-text-secondary' : isEntree ? (reste <= 0 ? 'text-success-600' : 'text-danger-600') : (reste >= 0 ? 'text-success-600' : 'text-danger-600');
   
-  const isRowVisibleInPeriods = (entry) => { for (const period of periods) { if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; } return false; };
-  const hasOffBudgetRevenues = expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
-  const hasOffBudgetExpenses = expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
-
   const handleOpenPaymentDrawer = (entry, period) => {
     const entryActuals = actualTransactions.filter(actual => actual.budgetId === entry.id);
 
@@ -527,23 +490,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   };
 
   const handleCloseDrawer = () => setDrawerData({ isOpen: false, transactions: [], title: '' });
-  const groupedData = useMemo(() => {
-    const entriesToGroup = expandedAndVatEntries.filter(e => !e.isOffBudget);
-    const groupByType = (type) => {
-      const catType = type === 'entree' ? 'revenue' : 'expense';
-      if (!categories || !categories[catType]) return [];
-      return categories[catType].map(mainCat => {
-        if (!mainCat.subCategories) return null;
-        const entriesForMainCat = entriesToGroup.filter(entry => 
-            (mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible')) || (entry.is_vat_payment && (entry.category === 'TVA à payer' || entry.category === 'Crédit de TVA')))
-            && isRowVisibleInPeriods(entry)
-        );
-        return entriesForMainCat.length > 0 ? { ...mainCat, entries: entriesForMainCat } : null;
-      }).filter(Boolean);
-    };
-    return { entree: groupByType('entree'), sortie: groupByType('sortie') };
-  }, [expandedAndVatEntries, categories, periods]);
-
+  
   const handleDrillDown = () => {
     const newCollapsedState = {};
     groupedData.entree.forEach(mainCat => newCollapsedState[mainCat.id] = false);
@@ -589,81 +536,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     }
     return totals;
   };
-  
-  const userCashAccounts = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allCashAccounts).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(projectId => allCashAccounts[projectId] || []);
-    }
-    return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const periodPositions = useMemo(() => {
-    if (periods.length === 0) return [];
-    
-    const today = getTodayInTimezone(settings.timezoneOffset);
-    let todayIndex = periods.findIndex(p => today >= p.startDate && today < p.endDate);
-    if (todayIndex === -1) {
-        if (periods.length > 0 && today < periods[0].startDate) todayIndex = -1; // All future
-        else if (periods.length > 0 && today >= periods[periods.length - 1].endDate) todayIndex = periods.length - 1; // All past
-    }
-    
-    const firstPeriodStart = periods[0].startDate;
-    const initialBalanceSum = userCashAccounts.reduce((sum, acc) => sum + (parseFloat(acc.initialBalance) || 0), 0);
-    const netFlowBeforeFirstPeriod = actualTransactions
-      .flatMap(actual => actual.payments || [])
-      .filter(p => new Date(p.paymentDate) < firstPeriodStart)
-      .reduce((sum, p) => {
-        const actual = actualTransactions.find(a => (a.payments || []).some(payment => payment.id === p.id));
-        if (!actual) return sum;
-        return actual.type === 'receivable' ? sum + p.paidAmount : sum - p.paidAmount;
-      }, 0);
-    const startingBalance = initialBalanceSum + netFlowBeforeFirstPeriod;
-
-    const positions = [];
-    let lastPeriodFinalPosition = startingBalance;
-    
-    for (let i = 0; i <= todayIndex; i++) {
-        if (!periods[i]) continue;
-        const period = periods[i];
-        const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
-        const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie');
-        const netActual = revenueTotals.actual - expenseTotals.actual;
-        const initialPosition = lastPeriodFinalPosition;
-        const finalPosition = initialPosition + netActual;
-        positions.push({ initial: initialPosition, final: finalPosition });
-        lastPeriodFinalPosition = finalPosition;
-    }
-    
-    if (todayIndex < periods.length - 1) {
-        const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
-        const impayes = actualTransactions.filter(a => new Date(a.date) < today && unpaidStatuses.includes(a.status));
-        const netImpayes = impayes.reduce((sum, actual) => {
-            const totalPaid = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-            const remaining = actual.amount - totalPaid;
-            return actual.type === 'receivable' ? sum + remaining : sum - remaining;
-        }, 0);
-        lastPeriodFinalPosition += netImpayes;
-        
-        for (let i = todayIndex + 1; i < periods.length; i++) {
-            if (!periods[i]) continue;
-            const period = periods[i];
-            const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
-            const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie');
-            const netPlanned = revenueTotals.budget - expenseTotals.budget;
-            const initialPosition = lastPeriodFinalPosition;
-            const finalPosition = initialPosition + netPlanned;
-            positions.push({ initial: initialPosition, final: finalPosition });
-            lastPeriodFinalPosition = finalPosition;
-        }
-    }
-    return positions;
-  }, [periods, userCashAccounts, actualTransactions, groupedData, settings.timezoneOffset]);
   
   const numVisibleCols = Object.values(visibleColumns).filter(v => v).length;
   const periodColumnWidth = numVisibleCols > 0 ? numVisibleCols * 90 : 50;

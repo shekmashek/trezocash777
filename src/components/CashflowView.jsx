@@ -6,8 +6,9 @@ import BudgetModal from './BudgetModal';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
-import { generateScenarioActuals, resolveScenarioEntries } from '../utils/scenarioCalculations';
-import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek, expandVatEntries } from '../utils/budgetCalculations';
+import { resolveScenarioEntries } from '../utils/scenarioCalculations';
+import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
+import { useActiveProjectData, calculatePeriodPositions } from '../utils/selectors.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function renderBudgetLine(params, api) {
@@ -51,12 +52,11 @@ function renderBudgetLine(params, api) {
 const CashflowView = ({ isFocusMode = false }) => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, consolidatedViews, categories } = dataState;
-  const { timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
+  const { scenarios, scenarioEntries, settings, categories } = dataState;
+  const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
 
-  const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
-
+  const { budgetEntries, actualTransactions, cashAccounts, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+  
   const [isScenarioBudgetModalOpen, setIsScenarioBudgetModalOpen] = useState(false);
   const [editingScenarioEntry, setEditingScenarioEntry] = useState(null);
   const [activeScenarioIdForModal, setActiveScenarioIdForModal] = useState(null);
@@ -175,12 +175,12 @@ const CashflowView = ({ isFocusMode = false }) => {
   const projectScenarios = useMemo(() => {
     if (isConsolidated) {
       return scenarios.map(s => {
-        const project = projects.find(p => p.id === s.projectId);
+        const project = dataState.projects.find(p => p.id === s.projectId);
         return { ...s, name: `${s.name} (${project?.name || 'N/A'})` };
       });
     }
     return scenarios.filter(s => s.projectId === activeProjectId && !s.isArchived);
-  }, [scenarios, activeProjectId, isConsolidated, projects]);
+  }, [scenarios, activeProjectId, isConsolidated, dataState.projects]);
 
   useEffect(() => {
     const initialSelection = {};
@@ -189,42 +189,6 @@ const CashflowView = ({ isFocusMode = false }) => {
     });
     setSelectedScenarios(initialSelection);
   }, [projectScenarios]);
-
-  const baseActuals = useMemo(() => {
-    if (isConsolidated) return Object.values(allActuals).flat();
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(projectId => allActuals[projectId] || []);
-    }
-    const project = projects.find(p => p.id === activeProjectId) || projects[0];
-    return project ? (allActuals[project.id] || []) : [];
-  }, [activeProjectId, projects, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const userCashAccounts = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allCashAccounts).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(projectId => allCashAccounts[projectId] || []);
-    }
-    return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const baseBudgetEntries = useMemo(() => {
-    if (isConsolidated) return Object.values(allEntries).flat();
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(projectId => allEntries[projectId] || []);
-    }
-    return allEntries[activeProjectId] || [];
-  }, [allEntries, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
 
   const periods = useMemo(() => {
     const today = getTodayInTimezone(settings.timezoneOffset);
@@ -306,117 +270,29 @@ const CashflowView = ({ isFocusMode = false }) => {
   }, [timeUnit, horizonLength, periodOffset, activeQuickSelect, settings.timezoneOffset]);
 
   const cashflowData = useMemo(() => {
-    const calculateCashflowData = (actualsForCalc, budgetEntriesForCalc) => {
-        const chartPeriods = periods;
-        if (chartPeriods.length === 0) return { labels: [], periods: [], inflows: [], outflows: [], budgetedInflows: [], budgetedOutflows: [], actualBalance: [], projectedBalance: [], todayIndex: -1 };
+    const calculateCashflowData = (budgetEntriesForCalc, actualsForCalc) => {
+        const periodPositions = calculatePeriodPositions(periods, cashAccounts, actualsForCalc, {}, false, false, settings, budgetEntriesForCalc);
         
-        const today = getTodayInTimezone(settings.timezoneOffset);
-        let todayIndex = -1;
-        for (let i = 0; i < chartPeriods.length; i++) {
-            if (today >= chartPeriods[i].startDate && today < chartPeriods[i].endDate) {
-                todayIndex = i;
-                break;
-            }
-        }
-        if (todayIndex === -1 && chartPeriods.length > 0 && today < chartPeriods[0].startDate) {
-            todayIndex = -1;
-        } else if (todayIndex === -1 && chartPeriods.length > 0 && today >= chartPeriods[chartPeriods.length - 1].endDate) {
-            todayIndex = chartPeriods.length - 1;
-        }
-        
-        const periodFlows = chartPeriods.map((period, i) => {
-            const { startDate: periodStart, endDate: periodEnd } = period;
-            let realizedInflow = 0;
-            let realizedOutflow = 0;
-
-            actualsForCalc.forEach(actual => {
-                (actual.payments || []).forEach(payment => {
-                    const paymentDate = new Date(payment.paymentDate);
-                    if (paymentDate >= periodStart && paymentDate < periodEnd) {
-                        if (actual.type === 'receivable') realizedInflow += payment.paidAmount;
-                        else if (actual.type === 'payable') realizedOutflow += payment.paidAmount;
-                    }
-                });
-            });
-
-            const budgetedInflow = budgetEntriesForCalc.filter(e => e.type === 'revenu').reduce((sum, e) => sum + getEntryAmountForPeriod(e, periodStart, periodEnd), 0);
-            const budgetedOutflow = budgetEntriesForCalc.filter(e => e.type === 'depense').reduce((sum, e) => sum + getEntryAmountForPeriod(e, periodStart, periodEnd), 0);
-
-            const isFuture = i > todayIndex;
-
-            return {
-                inflow: isFuture ? budgetedInflow : realizedInflow,
-                outflow: isFuture ? budgetedOutflow : realizedOutflow,
-                isFuture: isFuture,
-                netRealizedFlow: realizedInflow - realizedOutflow,
-                budgetedInflow,
-                budgetedOutflow,
-            };
+        const periodFlows = periods.map(period => {
+            const realizedInflow = actualsForCalc.filter(a => a.type === 'receivable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
+            const realizedOutflow = actualsForCalc.filter(a => a.type === 'payable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
+            return { inflow: realizedInflow, outflow: realizedOutflow };
         });
-        
-        const chartStartDate = chartPeriods[0].startDate;
-        const initialBalancesSum = userCashAccounts.reduce((sum, acc) => sum + (parseFloat(acc.initialBalance) || 0), 0);
-        
-        const allActualsFlat = Object.values(allActuals).flat();
-        const netFlowOfPastPayments = allActualsFlat.flatMap(actual => actual.payments || []).filter(p => new Date(p.paymentDate) < chartStartDate).reduce((sum, p) => {
-            const actual = allActualsFlat.find(a => (a.payments || []).some(payment => payment.id === p.id));
-            if (!actual) return sum;
-            return actual.type === 'receivable' ? sum + p.paidAmount : sum - p.paidAmount;
-        }, 0);
-        const calculatedStartingBalance = initialBalancesSum + netFlowOfPastPayments;
-        
-        const balanceData = [];
-        let currentBalance = calculatedStartingBalance;
-
-        for (let i = 0; i <= todayIndex; i++) {
-            if (periodFlows[i]) {
-                currentBalance += periodFlows[i].netRealizedFlow;
-            }
-            balanceData.push(currentBalance);
-        }
-
-        if (todayIndex > -1 && todayIndex < chartPeriods.length - 1) {
-            let futureBalance = balanceData[todayIndex];
-            
-            const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
-            const impayes = actualsForCalc.filter(a => new Date(a.date) < today && unpaidStatuses.includes(a.status));
-            
-            const netImpayes = impayes.reduce((sum, actual) => {
-                const totalPaid = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-                const remaining = actual.amount - totalPaid;
-                return actual.type === 'receivable' ? sum + remaining : sum - remaining;
-            }, 0);
-
-            futureBalance += netImpayes;
-
-            for (let i = todayIndex + 1; i < chartPeriods.length; i++) {
-                const netPlannedFlow = periodFlows[i].budgetedInflow - periodFlows[i].budgetedOutflow;
-                futureBalance += netPlannedFlow;
-                balanceData.push(futureBalance);
-            }
-        }
-
-        const actualBalance = balanceData.map((val, i) => i <= todayIndex ? val : null);
-        const projectedBalance = balanceData.map((val, i) => i >= todayIndex ? val : null);
 
         return {
-            labels: chartPeriods.map(p => p.label),
-            periods: chartPeriods,
-            inflows: periodFlows.map(f => ({ value: f.inflow, isFuture: f.isFuture })),
-            outflows: periodFlows.map(f => ({ value: f.outflow, isFuture: f.isFuture })),
-            budgetedInflows: periodFlows.map(f => f.budgetedInflow),
-            budgetedOutflows: periodFlows.map(f => f.budgetedOutflow),
-            actualBalance,
-            projectedBalance,
-            todayIndex,
+            labels: periods.map(p => p.label),
+            periods,
+            inflows: periodFlows.map(f => ({ value: f.inflow, isFuture: false })), // Simplified for chart display
+            outflows: periodFlows.map(f => ({ value: f.outflow, isFuture: false })),
+            actualBalance: periodPositions.map(p => p.final),
+            projectedBalance: periodPositions.map(p => p.final),
         };
     };
 
-    const expandedBaseBudgetEntries = expandVatEntries(baseBudgetEntries, categories);
-    const baseFlow = calculateCashflowData(baseActuals, expandedBaseBudgetEntries);
+    const baseFlow = calculateCashflowData(budgetEntries, actualTransactions);
     
     return { base: baseFlow };
-  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset, categories]);
+  }, [periods, budgetEntries, actualTransactions, cashAccounts, settings]);
   
   const getChartOptions = () => {
     const { base } = cashflowData;
@@ -428,7 +304,7 @@ const CashflowView = ({ isFocusMode = false }) => {
         };
     }
 
-    const { labels, inflows, outflows, budgetedInflows, budgetedOutflows, actualBalance, projectedBalance, todayIndex } = base;
+    const { labels, inflows, outflows, actualBalance, projectedBalance } = base;
 
     const labelFormatter = (params) => {
         if (params.value === null || params.value === undefined) return '';
@@ -442,156 +318,31 @@ const CashflowView = ({ isFocusMode = false }) => {
 
     const seriesData = [
         {
-            name: 'Entrées',
-            type: 'bar',
-            stack: 'flows',
-            barMaxWidth: 50,
-            data: inflows.map(item => item.value),
-            itemStyle: {
-                color: (params) => inflows[params.dataIndex].isFuture ? '#86efac' : '#22c55e',
-                borderRadius: [5, 5, 0, 0]
-            },
-            label: {
-                show: true,
-                position: 'top',
-                formatter: (params) => params.value > 0 ? labelFormatter(params) : '',
-                color: (params) => inflows[params.dataIndex].isFuture ? '#16a34a' : '#166534',
-                fontSize: 10,
-            }
+            name: 'Entrées', type: 'bar', stack: 'flows', barMaxWidth: 50, data: inflows.map(item => item.value),
+            itemStyle: { color: '#22c55e', borderRadius: [5, 5, 0, 0] },
+            label: { show: true, position: 'top', formatter: (p) => p.value > 0 ? labelFormatter(p) : '', color: '#166534', fontSize: 10 }
         },
         {
-            name: 'Sorties',
-            type: 'bar',
-            stack: 'flows',
-            barMaxWidth: 50,
-            data: outflows.map(item => -item.value),
-            itemStyle: {
-                color: (params) => outflows[params.dataIndex].isFuture ? '#fca5a5' : '#ef4444',
-                borderRadius: [0, 0, 5, 5]
-            },
-            label: {
-                show: true,
-                position: 'bottom',
-                formatter: (params) => params.value < 0 ? negativeLabelFormatter(params) : '',
-                color: (params) => outflows[params.dataIndex].isFuture ? '#dc2626' : '#991b1b',
-                fontSize: 10,
-            }
+            name: 'Sorties', type: 'bar', stack: 'flows', barMaxWidth: 50, data: outflows.map(item => -item.value),
+            itemStyle: { color: '#ef4444', borderRadius: [0, 0, 5, 5] },
+            label: { show: true, position: 'bottom', formatter: (p) => p.value < 0 ? negativeLabelFormatter(p) : '', color: '#991b1b', fontSize: 10 }
         },
         {
-            name: 'Solde Réel',
-            type: 'line',
-            symbol: 'circle',
-            symbolSize: 8,
-            itemStyle: { color: '#3b82f6' }, // primary-500
-            lineStyle: { width: 3, type: 'solid' },
-            data: actualBalance,
-            label: {
-                show: true,
-                position: 'top',
-                formatter: labelFormatter,
-                color: '#1d4ed8',
-                fontSize: 10,
-                distance: 5,
-            }
+            name: 'Solde Réel', type: 'line', symbol: 'circle', symbolSize: 8, itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3, type: 'solid' }, data: actualBalance,
+            label: { show: true, position: 'top', formatter: labelFormatter, color: '#1d4ed8', fontSize: 10, distance: 5 }
         },
         {
-            name: 'Solde Prévisionnel',
-            type: 'line',
-            symbol: 'none',
-            itemStyle: { color: '#3b82f6' },
-            lineStyle: { width: 3, type: 'dashed' },
-            data: projectedBalance,
-            label: {
-                show: true,
-                position: 'top',
-                formatter: labelFormatter,
-                color: '#2563eb',
-                fontSize: 10,
-                distance: 5,
-            }
-        },
-        {
-            name: 'Budget Entrées',
-            type: 'custom',
-            renderItem: renderBudgetLine,
-            itemStyle: { borderWidth: 2 },
-            data: budgetedInflows.map((val, i) => [i, val, 'inflow']),
-            encode: { x: 0, y: 1 },
-            color: '#10b981', // emerald-500
-            z: 10,
-        },
-        {
-            name: 'Budget Sorties',
-            type: 'custom',
-            renderItem: renderBudgetLine,
-            itemStyle: { borderWidth: 2 },
-            data: budgetedOutflows.map((val, i) => [i, -val, 'outflow']),
-            encode: { x: 0, y: 1 },
-            color: '#f43f5e', // rose-500
-            z: 10,
+            name: 'Solde Prévisionnel', type: 'line', symbol: 'none', itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3, type: 'dashed' }, data: projectedBalance,
+            label: { show: true, position: 'top', formatter: labelFormatter, color: '#2563eb', fontSize: 10, distance: 5 }
         }
     ];
 
     return {
-        tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'shadow' },
-            formatter: (params) => {
-                const periodIndex = params[0].dataIndex;
-                const periodLabel = params[0].name;
-                let tooltip = `<strong>${periodLabel}</strong><br/>`;
-                
-                const inflowParam = params.find(p => p.seriesName === 'Entrées');
-                const outflowParam = params.find(p => p.seriesName === 'Sorties');
-                
-                const inflow = inflowParam ? inflowParam.value : 0;
-                const outflow = outflowParam ? Math.abs(outflowParam.value) : 0;
-                
-                const isFuture = periodIndex > todayIndex;
-                
-                tooltip += `<b>Flux ${isFuture ? 'Prévisionnels' : 'Réels'}:</b><br/>`;
-                tooltip += `${inflowParam?.marker || ''} Entrées: ${formatCurrency(inflow, settings)}<br/>`;
-                tooltip += `${outflowParam?.marker || ''} Sorties: ${formatCurrency(outflow, settings)}<br/>`;
-                tooltip += `<b>Flux Net: ${formatCurrency(inflow - outflow, settings)}</b><br/>`;
-                
-                tooltip += `<hr class="my-1 border-gray-300">`;
-
-                const balanceParam = params.find(p => p.seriesName.includes('Solde') && p.value != null);
-                if (balanceParam) {
-                    const seriesName = periodIndex <= todayIndex ? 'Solde Réel' : 'Solde Prévisionnel';
-                    tooltip += `${balanceParam.marker} ${seriesName}: <strong>${formatCurrency(balanceParam.value, settings)}</strong><br/>`;
-                }
-                return tooltip;
-            }
-        },
-        legend: {
-            data: ['Entrées', 'Sorties', 'Solde Réel', 'Solde Prévisionnel'],
-            top: 'bottom',
-            type: 'scroll',
-            selected: {
-                'Budget Entrées': false,
-                'Budget Sorties': false,
-            }
-        },
-        grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '15%',
-            containLabel: true
-        },
-        xAxis: [
-            {
-                type: 'category',
-                data: labels,
-                axisTick: { alignWithLabel: true }
-            }
-        ],
-        yAxis: [
-            {
-                type: 'value',
-                axisLabel: { formatter: (value) => formatCurrency(value, settings) }
-            }
-        ],
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { data: ['Entrées', 'Sorties', 'Solde Réel', 'Solde Prévisionnel'], top: 'bottom', type: 'scroll' },
+        grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+        xAxis: [{ type: 'category', data: labels, axisTick: { alignWithLabel: true } }],
+        yAxis: [{ type: 'value', axisLabel: { formatter: (value) => formatCurrency(value, settings) } }],
         series: seriesData
     };
   };
@@ -608,15 +359,6 @@ const CashflowView = ({ isFocusMode = false }) => {
   ];
 
   const selectedPeriodLabel = quickPeriodOptions.find(opt => opt.id === activeQuickSelect)?.label || 'Période';
-
-  const handleChartClick = (params) => {
-    if (params.seriesName !== 'Entrées' && params.seriesName !== 'Sorties') return;
-    const periodIndex = params.dataIndex;
-    const periodStart = cashflowData.base.periods[periodIndex];
-    const periodEnd = new Date(periodStart);
-    // ... (rest of the implementation from existing CashflowView)
-  };
-  const onEvents = { 'click': handleChartClick };
 
   return (
     <div className={isFocusMode ? "h-full flex flex-col" : "container mx-auto p-6 max-w-full flex flex-col h-full"}>
@@ -688,7 +430,6 @@ const CashflowView = ({ isFocusMode = false }) => {
             <ReactECharts 
                 option={getChartOptions()} 
                 style={{ height: '100%', width: '100%' }} 
-                onEvents={onEvents}
                 notMerge={true}
                 lazyUpdate={true}
             />

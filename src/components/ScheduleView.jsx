@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
-import { formatCurrency } from '../utils/formatting';
 import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,14 +11,19 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
     const visibleTransactions = transactions.slice(0, maxVisibleItems);
     const hiddenCount = transactions.length - maxVisibleItems;
 
+    const formatForSchedule = (amount) => {
+        if (amount === null || amount === undefined || isNaN(amount)) return '-';
+        const formatter = new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: currencySettings.currency || 'EUR',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        return formatter.format(amount);
+    };
+
     const totalPayable = useMemo(() => transactions.filter(tx => tx.type === 'payable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
     const totalReceivable = useMemo(() => transactions.filter(tx => tx.type === 'receivable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
-
-    // Force standard display for the schedule to avoid compacting small amounts.
-    const scheduleCurrencySettings = useMemo(() => ({
-        ...currencySettings,
-        displayUnit: 'standard'
-    }), [currencySettings]);
 
     const getTransactionStyle = (tx) => {
         const dueDate = new Date(tx.date);
@@ -49,13 +53,13 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
             <div className="flex justify-between items-start">
                 <div className="text-left flex-grow space-y-0.5 pr-1">
                     {totalReceivable > 0 && (
-                        <div className="text-xs font-semibold text-green-600" title={`Entrées: ${formatCurrency(totalReceivable, scheduleCurrencySettings)}`}>
-                            +{formatCurrency(totalReceivable, scheduleCurrencySettings)}
+                        <div className="text-xs font-semibold text-green-600" title={`Entrées: ${formatForSchedule(totalReceivable)}`}>
+                            +{formatForSchedule(totalReceivable)}
                         </div>
                     )}
                     {totalPayable > 0 && (
-                        <div className="text-xs font-semibold text-red-600" title={`Sorties: ${formatCurrency(totalPayable, scheduleCurrencySettings)}`}>
-                            -{formatCurrency(totalPayable, scheduleCurrencySettings)}
+                        <div className="text-xs font-semibold text-red-600" title={`Sorties: ${formatForSchedule(totalPayable)}`}>
+                            -{formatForSchedule(totalPayable)}
                         </div>
                     )}
                 </div>
@@ -74,7 +78,7 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
                     >
                         <div className="flex justify-between items-center">
                             <span className="font-semibold truncate flex-1" title={tx.thirdParty}>{tx.thirdParty}</span>
-                            <span className="font-mono ml-2 whitespace-nowrap">{formatCurrency(tx.amount, scheduleCurrencySettings)}</span>
+                            <span className="font-mono ml-2 whitespace-nowrap">{formatForSchedule(tx.amount)}</span>
                         </div>
                     </button>
                 ))}
