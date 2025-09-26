@@ -154,6 +154,10 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
         dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
 
+    const handleEditEntry = (entry) => {
+        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry });
+    };
+
     const handleDeleteEntry = (entry) => {
         deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId });
     };
@@ -251,9 +255,14 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                                             <td className="py-3 px-4 text-gray-600">{entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : 'Indéterminée'}</td>
                                             <td className="py-3 px-4 text-right font-medium text-gray-700">{formatCurrency(entry.amount, settings)}</td>
                                             <td className="py-3 px-4 text-right">
-                                                <button onClick={() => handleDeleteEntry(entry)} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:text-red-700">
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleEditEntry(entry)} className="p-1 text-blue-500 hover:text-blue-700" title="Modifier">
+                                                        <Edit size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteEntry(entry)} className="p-1 text-red-500 hover:text-red-700" title="Supprimer">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

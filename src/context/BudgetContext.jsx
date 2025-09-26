@@ -163,6 +163,8 @@ const getInitialState = () => ({
     consolidatedViews: [],
     collaborators: [],
     templates: [],
+    vatRates: {},
+    vatRegimes: {},
     isSaveTemplateModalOpen: false,
     editingTemplate: null,
     infoModal: { isOpen: false, title: '', message: '' },
@@ -229,6 +231,15 @@ const budgetReducer = (state, action) => {
     case 'SET_ACTIVE_TREZO_VIEW':
         sessionStorage.setItem('activeTrezoView', action.payload);
         return { ...state, activeTrezoView: action.payload };
+    case 'SET_PROJECT_VAT_RATES': {
+        const { projectId, rates } = action.payload;
+        const newVatRates = { ...state.vatRates };
+        newVatRates[projectId] = rates;
+        return {
+            ...state,
+            vatRates: newVatRates,
+        };
+    }
     case 'OPEN_COMMENT_DRAWER':
         return { ...state, isCommentDrawerOpen: true, commentDrawerContext: action.payload };
     case 'CLOSE_COMMENT_DRAWER':
@@ -1004,7 +1015,7 @@ export const BudgetProvider = ({ children }) => {
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [] } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [], collaborators: [], allComments: {}, templates: [], vatRates: {}, vatRegimes: {} } });
              return;
           }
 
@@ -1019,7 +1030,8 @@ export const BudgetProvider = ({ children }) => {
           const [
             projectsRes, tiersRes, loansRes, scenariosRes, 
             entriesRes, actualsRes, paymentsRes, cashAccountsRes, 
-            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes
+            scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes,
+            vatRatesRes, vatRegimesRes,
           ] = await Promise.all([
             supabase.from('projects').select('*'),
             supabase.from('tiers').select('*'),
@@ -1035,9 +1047,11 @@ export const BudgetProvider = ({ children }) => {
             supabase.from('comments').select('*'),
             supabase.from('templates').select('*'),
             supabase.from('user_categories').select('*'),
+            supabase.from('vat_rates').select('*'),
+            supabase.from('vat_regimes').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes };
+          const responses = { projectsRes, tiersRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes, collaboratorsRes, commentsRes, templatesRes, customCategoriesRes, vatRatesRes, vatRegimesRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
@@ -1098,6 +1112,10 @@ export const BudgetProvider = ({ children }) => {
               payments: entry.payments,
               provisionDetails: entry.provision_details,
               isProvision: entry.is_provision,
+              amount_type: entry.amount_type,
+              vat_rate_id: entry.vat_rate_id,
+              ht_amount: entry.ht_amount,
+              ttc_amount: entry.ttc_amount,
             };
             if (!acc[entry.project_id]) acc[entry.project_id] = [];
             acc[entry.project_id].push(e);
@@ -1111,6 +1129,10 @@ export const BudgetProvider = ({ children }) => {
               date: actual.date, amount: actual.amount, status: actual.status, isOffBudget: actual.is_off_budget,
               isProvision: actual.is_provision, isFinalProvisionPayment: actual.is_final_provision_payment,
               provisionDetails: actual.provision_details, isInternalTransfer: actual.is_internal_transfer,
+              amount_type: actual.amount_type,
+              vat_rate_id: actual.vat_rate_id,
+              ht_amount: actual.ht_amount,
+              ttc_amount: actual.ttc_amount,
               payments: (paymentsRes.data || []).filter(p => p.actual_id === actual.id).map(p => ({
                 id: p.id, paymentDate: p.payment_date, paidAmount: p.paid_amount, cashAccount: p.cash_account
               }))
@@ -1185,13 +1207,24 @@ export const BudgetProvider = ({ children }) => {
               }
           });
 
+          const vatRates = (vatRatesRes.data || []).reduce((acc, rate) => {
+              if (!acc[rate.project_id]) acc[rate.project_id] = [];
+              acc[rate.project_id].push(rate);
+              return acc;
+          }, {});
+
+          const vatRegimes = (vatRegimesRes.data || []).reduce((acc, regime) => {
+              acc[regime.project_id] = regime;
+              return acc;
+          }, {});
+
           dispatch({
             type: 'SET_INITIAL_DATA',
             payload: {
               profile,
               allProfiles: profilesData || [],
               settings,
-              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates,
+              projects, tiers, loans, scenarios, consolidatedViews, collaborators, allComments, templates, vatRates, vatRegimes,
               allEntries, allActuals, allCashAccounts, scenarioEntries, categories: finalCategories,
             },
           });

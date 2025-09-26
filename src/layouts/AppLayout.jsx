@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, NavLink } from 'react-router-dom';
 import { useBudget } from '../context/BudgetContext';
 import Header from '../components/Header';
 import SubHeader from '../components/SubHeader';
@@ -25,14 +25,32 @@ import PaymentTermsModal from '../components/PaymentTermsModal';
 import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, deleteEntry, updateTierPaymentTerms } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
-import { Loader } from 'lucide-react';
+import { Loader, LayoutDashboard, ListChecks, Table, AreaChart, Calendar, Layers, PieChart, Hash } from 'lucide-react';
 import { getTodayInTimezone, getStartOfWeek, getEntryAmountForPeriod, getActualAmountForPeriod } from '../utils/budgetCalculations';
-import { formatCurrency } from '../utils/formatting';
+
+const NavItem = ({ item, isCollapsed }) => {
+    const location = useLocation();
+    const isActive = location.pathname === item.path;
+    const isHighlighted = false; // Placeholder for tour highlight logic if needed
+
+    return (
+        <NavLink
+            to={item.path}
+            id={`tour-step-${item.id}`}
+            className={`flex items-center gap-3 h-10 px-4 rounded-lg text-sm font-medium transition-all duration-200
+                ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
+                ${isHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}
+                ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? item.label : ''}
+        >
+            <item.icon className="w-5 h-5 shrink-0" />
+            {!isCollapsed && <span className="truncate">{item.label}</span>}
+        </NavLink>
+    );
+};
 
 const AppLayout = () => {
     const { state, dispatch } = useBudget();
-    const location = useLocation();
-
     const { 
         projects, activeProjectId, activeSettingsDrawer, isBudgetModalOpen, editingEntry, 
         infoModal, confirmationModal, inlinePaymentDrawer, isTransferModalOpen, 
@@ -42,7 +60,7 @@ const AppLayout = () => {
         allCashAccounts, allEntries, allActuals, settings, activeQuickSelect, isTourActive, 
         transactionMenu, isLoading, isConsolidatedViewModalOpen, editingConsolidatedView,
         isCommentDrawerOpen, commentDrawerContext, isTierDetailDrawerOpen, tierDetailContext, 
-        isSaveTemplateModalOpen, editingTemplate, tiers
+        isSaveTemplateModalOpen, editingTemplate
     } = state;
     
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -355,25 +373,53 @@ const AppLayout = () => {
         updateTierPaymentTerms(dispatch, { tierId, terms });
         setIsPaymentTermsModalOpen(false);
     };
+    
+    const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/app/dashboard' },
+        { id: 'budget', label: 'Budget', icon: ListChecks, path: '/app/budget' },
+        { id: 'trezo', label: 'Trezo', icon: Table, path: '/app/trezo' },
+        { id: 'flux', label: 'Flux', icon: AreaChart, path: '/app/flux' },
+        { id: 'echeancier', label: 'Echeancier', icon: Calendar, path: '/app/echeancier' },
+        { id: 'scenarios', label: 'Scénarios', icon: Layers, path: '/app/scenarios' },
+        { id: 'analyse', label: 'Analyse', icon: PieChart, path: '/app/analyse' },
+    ];
+    
+    const fiscalNavItems = [
+        { id: 'tva', label: 'Gestion TVA', icon: Hash, path: '/app/tva' },
+    ];
 
     return (
         <div className="flex min-h-screen bg-background">
             <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
             
-            <Header 
-                isCollapsed={isSidebarCollapsed} 
-                onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
-                periodPositions={periodPositions}
-                periods={periods}
-            />
+            <div className={`flex flex-col bg-white shadow-lg transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+                <Header 
+                    isCollapsed={isSidebarCollapsed} 
+                    onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+                    periodPositions={periodPositions}
+                    periods={periods}
+                />
+                <div className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+                    <nav>
+                        {navItems.map(item => (
+                            <NavItem key={item.id} item={item} isCollapsed={isSidebarCollapsed} />
+                        ))}
+                    </nav>
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h3 className={`px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider ${isSidebarCollapsed ? 'text-center' : ''}`}>
+                            {isSidebarCollapsed ? 'FIS' : 'Fiscalité'}
+                        </h3>
+                        <nav className="mt-2">
+                            {fiscalNavItems.map(item => (
+                                <NavItem key={item.id} item={item} isCollapsed={isSidebarCollapsed} />
+                            ))}
+                        </nav>
+                    </div>
+                </div>
+            </div>
             
             <div className="flex-1 flex flex-col overflow-y-auto">
-                <SubHeader 
-                    onOpenSettingsDrawer={onOpenSettingsDrawer}
-                    onNewBudgetEntry={handleNewBudgetEntry}
-                    onNewScenario={handleNewScenario}
-                    isConsolidated={isConsolidated}
-                />
+                <SubHeader />
                 <CollaborationBanner />
                 <main className="flex-grow bg-gray-50">
                     <Outlet context={{ onOpenPaymentTerms: handleOpenPaymentTerms }} />

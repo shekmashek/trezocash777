@@ -5,10 +5,11 @@ import AddCategoryModal from './AddCategoryModal';
 import { useBudget } from '../context/BudgetContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { saveSubCategory } from '../context/actions';
+import { supabase } from '../utils/supabase';
 
 const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const { state, dispatch } = useBudget();
-  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects, session } = state;
+  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects, session, vatRates } = state;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const isContextualAdd = useMemo(() => editingData && !editingData.id && editingData.category, [editingData]);
@@ -20,11 +21,45 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
     return allCashAccounts[activeProjectId] || [];
   }, [allCashAccounts, activeProjectId, isConsolidated]);
 
+  const projectVatRates = useMemo(() => {
+    if (isConsolidated) return [];
+    return (vatRates[activeProjectId] || []).sort((a, b) => b.is_default - a.is_default);
+  }, [vatRates, activeProjectId, isConsolidated]);
+
+  useEffect(() => {
+    const ensureVatRates = async () => {
+        if (isOpen && !isConsolidated && activeProjectId && (!vatRates[activeProjectId] || vatRates[activeProjectId].length === 0)) {
+            const defaultRatesPayload = [
+                { project_id: activeProjectId, name: 'Taux normal', rate: 20, is_default: true },
+                { project_id: activeProjectId, name: 'Taux intermédiaire', rate: 10, is_default: false },
+                { project_id: activeProjectId, name: 'Taux réduit', rate: 5.5, is_default: false },
+                { project_id: activeProjectId, name: 'Taux super-réduit', rate: 2.1, is_default: false },
+                { project_id: activeProjectId, name: 'Taux zéro', rate: 0, is_default: false },
+            ];
+            const { data: newRates, error: insertError } = await supabase
+                .from('vat_rates')
+                .insert(defaultRatesPayload)
+                .select();
+
+            if (insertError) {
+                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux TVA par défaut: ${insertError.message}`, type: 'error' } });
+            } else if (newRates) {
+                dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
+                dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés pour ce projet.', type: 'info' } });
+            }
+        }
+    };
+
+    ensureVatRates();
+  }, [isOpen, activeProjectId, isConsolidated, vatRates, dispatch]);
+
   const getInitialFormData = () => ({
     type: 'revenu',
     category: '',
     frequency: 'mensuel',
     amount: '',
+    amount_type: 'ttc',
+    vat_rate_id: null,
     date: new Date().toISOString().split('T')[0],
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
@@ -60,6 +95,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
 
   useEffect(() => {
     if (isOpen) {
+      const defaultVatRateId = projectVatRates.find(r => r.is_default)?.id || null;
       if (editingData) {
         const mainCategoryType = editingData.type === 'revenu' ? 'revenue' : 'expense';
         const availableCategories = categories[mainCategoryType] || [];
@@ -81,6 +117,9 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
         setFormData({
           ...getInitialFormData(),
           ...editingData,
+          amount: editingData.amount_type === 'ht' ? editingData.ht_amount : (editingData.ttc_amount || editingData.amount),
+          amount_type: editingData.amount_type || 'ttc',
+          vat_rate_id: editingData.vat_rate_id || defaultVatRateId,
           type: editingData.type || 'revenu',
           isProvision: editingData.isProvision || false,
           numProvisions: editingData.isProvision && num ? num : (editingData.numProvisions || ''),
@@ -89,11 +128,11 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
             : [{ date: new Date().toISOString().split('T')[0], amount: '' }],
         });
       } else {
-        setFormData(getInitialFormData());
+        setFormData(prev => ({...getInitialFormData(), vat_rate_id: defaultVatRateId}));
         setSelectedMainCategoryId('');
       }
     }
-  }, [isOpen, editingData, categories]);
+  }, [isOpen, editingData, categories, projectVatRates]);
 
   useEffect(() => {
     if (formData.isProvision) {
@@ -108,7 +147,26 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
         setFormData(prev => ({ ...prev, numProvisions: '' }));
     }
   }, [formData.isProvision, formData.frequency]);
+  
+  const { htAmount, ttcAmount, vatAmount } = useMemo(() => {
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount)) return { htAmount: 0, ttcAmount: 0, vatAmount: 0 };
 
+    const rateInfo = projectVatRates.find(r => r.id === formData.vat_rate_id);
+    const rate = rateInfo ? parseFloat(rateInfo.rate) / 100 : 0;
+
+    if (formData.amount_type === 'ht') {
+        const ht = amount;
+        const ttc = ht * (1 + rate);
+        const vat = ttc - ht;
+        return { htAmount: ht, ttcAmount: ttc, vatAmount: vat };
+    } else { // 'ttc'
+        const ttc = amount;
+        const ht = ttc / (1 + rate);
+        const vat = ttc - ht;
+        return { htAmount: ht, ttcAmount: ttc, vatAmount: vat };
+    }
+  }, [formData.amount, formData.amount_type, formData.vat_rate_id, projectVatRates]);
 
   const handlePaymentChange = (index, field, value) => {
     const newPayments = [...formData.payments];
@@ -125,7 +183,13 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs obligatoires.', type: 'error' } });
       return;
     }
-    let entryData = { ...formData };
+    let entryData = { 
+        ...formData,
+        ht_amount: htAmount,
+        ttc_amount: ttcAmount,
+        amount: ttcAmount, // Ensure cashflow uses TTC
+    };
+
     if (entryData.frequency === 'irregulier' || entryData.isProvision) {
       const validPayments = entryData.payments.filter(p => p.date && p.amount);
       if (validPayments.length === 0 && entryData.frequency !== 'irregulier' && !entryData.isProvision) {
@@ -135,15 +199,18 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       entryData.payments = validPayments;
       if (entryData.isProvision) {
         entryData.amount = parseFloat(formData.amount);
+        entryData.ttc_amount = parseFloat(formData.amount);
+        entryData.ht_amount = parseFloat(formData.amount);
       } else {
         entryData.amount = validPayments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+        entryData.ttc_amount = entryData.amount;
+        entryData.ht_amount = entryData.amount;
       }
     } else {
       if (!formData.amount) {
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir le montant.', type: 'error' } });
         return;
       }
-      entryData.amount = parseFloat(formData.amount);
       entryData.payments = [];
     }
     if (formData.frequency === 'ponctuel' && !formData.date) {
@@ -330,24 +397,59 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
             
             {formData.frequency !== 'irregulier' && (
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Montant ({settings.currency}) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Montant *</label>
                 <div className="flex items-center gap-2">
-                  <input type="number" value={formData.amount || ''} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0.00" step="0.01" min="0" required disabled={formData.isProvision} />
-                  {showProvisionButton && (
-                    <button 
-                      type="button" 
-                      onClick={() => setFormData(p => ({ ...p, isProvision: !p.isProvision }))} 
-                      className={`px-3 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${formData.isProvision ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`} 
-                      title="Provisionner cette dépense pour lisser son impact sur votre trésorerie."
-                    >
-                      <Lock className="w-4 h-4" />
-                      Fonds à provisionner
-                    </button>
-                  )}
+                    <div className="flex-grow relative">
+                        <input type="number" value={formData.amount || ''} onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0.00" step="0.01" min="0" required disabled={formData.isProvision} />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-500">
+                            {settings.currency}
+                        </div>
+                    </div>
+                    <div className="flex items-center bg-gray-200 rounded-lg p-0.5">
+                        <button type="button" onClick={() => setFormData(p => ({...p, amount_type: 'ht'}))} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${formData.amount_type === 'ht' ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-600'}`}>
+                            HT
+                        </button>
+                        <button type="button" onClick={() => setFormData(p => ({...p, amount_type: 'ttc'}))} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${formData.amount_type === 'ttc' ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-600'}`}>
+                            TTC
+                        </button>
+                    </div>
+                    {showProvisionButton && (
+                        <button 
+                        type="button" 
+                        onClick={() => setFormData(p => ({ ...p, isProvision: !p.isProvision }))} 
+                        className={`px-3 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${formData.isProvision ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`} 
+                        title="Provisionner cette dépense pour lisser son impact sur votre trésorerie."
+                        >
+                        <Lock className="w-4 h-4" />
+                        Provision
+                        </button>
+                    )}
                 </div>
-                {formData.amount && !formData.isProvision && (<p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-start gap-2"><AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /><span><strong>Aperçu:</strong> {getFrequencyDescription(formData.frequency, formData.amount)} {formData.frequency !== 'ponctuel' && ` du ${new Date(formData.startDate).toLocaleDateString('fr-FR')} ${formData.endDate ? `au ${new Date(formData.endDate).toLocaleDateString('fr-FR')}` : 'indéfiniment'}.`}</span></p>)}
+                {formData.amount && !formData.isProvision && (<p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-start gap-2"><AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /><span><strong>Aperçu:</strong> {getFrequencyDescription(formData.frequency, ttcAmount)} {formData.frequency !== 'ponctuel' && ` du ${new Date(formData.startDate).toLocaleDateString('fr-FR')} ${formData.endDate ? `au ${new Date(formData.endDate).toLocaleDateString('fr-FR')}` : 'indéfiniment'}.`}</span></p>)}
               </div>
             )}
+
+            <AnimatePresence>
+                {formData.amount_type === 'ht' && projectVatRates.length > 0 && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t mt-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Taux de TVA</label>
+                                <select value={formData.vat_rate_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, vat_rate_id: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                                    <option value="">Aucune TVA</option>
+                                    {projectVatRates.map(rate => (
+                                        <option key={rate.id} value={rate.id}>{rate.name} ({rate.rate}%)</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="pt-7">
+                                <p className="text-sm text-gray-500">Montant TTC calculé:</p>
+                                <p className="font-bold text-lg text-gray-800">{formatCurrency(ttcAmount, settings)}</p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {formData.isProvision && (
