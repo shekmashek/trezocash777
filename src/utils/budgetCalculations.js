@@ -187,3 +187,46 @@ export const getActualAmountForPeriod = (entry, actualTransactions, periodStart,
         return sum + totalPaidInPeriod;
     }, 0);
 };
+
+export const expandVatEntries = (entries, categories) => {
+  if (!entries || !categories) return [];
+
+  const tvaCollectedCategoryName = 'TVA collectée';
+  const tvaDeductibleCategoryName = 'TVA déductible';
+
+  const expanded = [];
+  for (const entry of entries) {
+    if (entry.amount_type === 'ht' && entry.vat_rate_id && entry.ht_amount != null && entry.ttc_amount != null) {
+      const isRevenue = entry.type === 'revenu';
+      const vatAmount = entry.ttc_amount - entry.ht_amount;
+
+      if (vatAmount !== 0) {
+        // Main entry (HT part)
+        expanded.push({
+          ...entry,
+          amount: entry.ht_amount,
+          is_vat_parent: true,
+        });
+        
+        // Virtual VAT entry
+        expanded.push({
+          ...entry,
+          id: entry.id + '_vat',
+          category: isRevenue ? tvaCollectedCategoryName : tvaDeductibleCategoryName,
+          amount: vatAmount,
+          description: `TVA sur ${entry.supplier}`,
+          is_vat_child: true,
+          amount_type: 'ttc',
+          vat_rate_id: null,
+          ht_amount: vatAmount,
+          ttc_amount: vatAmount,
+        });
+      } else {
+        expanded.push(entry);
+      }
+    } else {
+      expanded.push(entry);
+    }
+  }
+  return expanded;
+};

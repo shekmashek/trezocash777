@@ -9,7 +9,7 @@ const VatSettingsView = () => {
     const isConsolidated = activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_');
 
     const [rates, setRates] = useState([]);
-    const [regime, setRegime] = useState({ collection_periodicity: 'monthly', payment_delay_months: 1 });
+    const [regime, setRegime] = useState({ collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -29,7 +29,6 @@ const VatSettingsView = () => {
             if (ratesError) {
                 dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement taux TVA: ${ratesError.message}`, type: 'error' } });
             } else if (ratesData && ratesData.length === 0) {
-                // No rates exist, create default French VAT rates
                 const defaultRatesPayload = [
                     { project_id: activeProjectId, name: 'Taux normal', rate: 20, is_default: true },
                     { project_id: activeProjectId, name: 'Taux intermédiaire', rate: 10, is_default: false },
@@ -55,7 +54,7 @@ const VatSettingsView = () => {
             
             const { data: regimeData, error: regimeError } = await supabase
                 .from('vat_regimes')
-                .select('*')
+                .select('id, project_id, collection_periodicity, payment_delay_months, regime_type')
                 .eq('project_id', activeProjectId)
                 .single();
 
@@ -64,9 +63,21 @@ const VatSettingsView = () => {
             } else if (regimeData) {
                 setRegime(regimeData);
             } else {
-                // Create a default regime if none exists
-                const { data: newRegimeData } = await supabase.from('vat_regimes').insert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1 }).select().single();
-                if (newRegimeData) setRegime(newRegimeData);
+                const { data: newRegimeData, error: insertError } = await supabase
+                    .from('vat_regimes')
+                    .insert({ 
+                        project_id: activeProjectId, 
+                        collection_periodicity: 'monthly', 
+                        payment_delay_months: 1,
+                        regime_type: 'reel_normal' 
+                    })
+                    .select('id, project_id, collection_periodicity, payment_delay_months, regime_type')
+                    .single();
+                if (insertError) {
+                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
+                } else if (newRegimeData) {
+                    setRegime(newRegimeData);
+                }
             }
             setLoading(false);
         };
@@ -158,7 +169,15 @@ const VatSettingsView = () => {
         <div className="space-y-8 max-w-4xl mx-auto">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Régime de TVA</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Type de régime</label>
+                        <select value={regime.regime_type || 'reel_normal'} onChange={e => setRegime({...regime, regime_type: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white">
+                            <option value="reel_normal">Réel Normal</option>
+                            <option value="reel_simplifie">Réel Simplifié</option>
+                            <option value="franchise_en_base">Franchise en Base</option>
+                        </select>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Périodicité de déclaration</label>
                         <select value={regime.collection_periodicity} onChange={e => setRegime({...regime, collection_periodicity: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white">

@@ -32,91 +32,101 @@ const createDefaultCashAccount = (projectId) => ({
 
 const initialCategories = {
   revenue: [
-    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Ventes de produits' }, { id: uuidv4(), name: 'Ventes de services' }] },
+    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: true, subCategories: [{ id: 'rev-sub-1-1', name: 'Ventes de produits' }, { id: 'rev-sub-1-2', name: 'Ventes de services' }] },
     { id: 'rev-main-2', name: 'Entrées Financières', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Intérêts perçus' }, 
-        { id: uuidv4(), name: 'Réception Emprunt' },
-        { id: uuidv4(), name: 'Remboursement de prêt reçu' },
-        { id: uuidv4(), name: 'Intérêts de prêt reçus' },
+        { id: 'rev-sub-2-1', name: 'Intérêts perçus' }, 
+        { id: 'rev-sub-2-2', name: 'Réception Emprunt' },
+        { id: 'rev-sub-2-3', name: 'Remboursement de prêt reçu' },
+        { id: 'rev-sub-2-4', name: 'Intérêts de prêt reçus' },
     ] },
-    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Subventions' }, { id: uuidv4(), name: 'Revenus Exceptionnels'}] },
+    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: true, subCategories: [
+        { id: 'rev-sub-3-1', name: 'Subventions' }, 
+        { id: 'rev-sub-3-2', name: 'Revenus Exceptionnels'},
+        { id: 'rev-sub-3-3', name: 'Crédit de TVA', isFixed: true }
+    ] },
   ],
   expense: [
     { id: 'exp-main-1', name: 'Exploitation', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Loyer et charges' }, 
-        { id: uuidv4(), name: 'Fournitures de bureau' }, 
-        { id: uuidv4(), name: 'Marketing et publicité' }, 
-        { id: uuidv4(), name: 'Frais de déplacement' },
-        { id: uuidv4(), name: 'Frais administratives et de gestion' },
-        { id: uuidv4(), name: 'Frais de transport' },
-        { id: uuidv4(), name: 'Entretien, réparation et maintenance' },
-        { id: uuidv4(), name: 'Recherche et développement' },
-        { id: uuidv4(), name: 'Petit équipement' }
+        { id: 'exp-sub-1-1', name: 'Loyer et charges' }, 
+        { id: 'exp-sub-1-2', name: 'Fournitures de bureau' }, 
+        { id: 'exp-sub-1-3', name: 'Marketing et publicité' }, 
+        { id: 'exp-sub-1-4', name: 'Frais de déplacement' },
+        { id: 'exp-sub-1-5', name: 'Frais administratives et de gestion' },
+        { id: 'exp-sub-1-6', name: 'Frais de transport' },
+        { id: 'exp-sub-1-7', name: 'Entretien, réparation et maintenance' },
+        { id: 'exp-sub-1-8', name: 'Recherche et développement' },
+        { id: 'exp-sub-1-9', name: 'Petit équipement' }
     ] },
-    { id: 'exp-main-2', name: 'Masse Salariale', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Salaires et traitements' }, { id: uuidv4(), name: 'Charges sociales' }] },
+    { id: 'exp-main-2', name: 'Masse Salariale', isFixed: true, subCategories: [{ id: 'exp-sub-2-1', name: 'Salaires et traitements' }, { id: 'exp-sub-2-2', name: 'Charges sociales' }] },
     { id: 'exp-main-3', name: 'Investissement', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Investissements financiers' },
-        { id: uuidv4(), name: 'Investissements immobiliers' },
-        { id: uuidv4(), name: 'Investissement dans sa propre entreprise' },
-        { id: uuidv4(), name: 'Autres investissements' }
+        { id: 'exp-sub-3-1', name: 'Investissements financiers' },
+        { id: 'exp-sub-3-2', name: 'Investissements immobiliers' },
+        { id: 'exp-sub-3-3', name: 'Investissement dans sa propre entreprise' },
+        { id: 'exp-sub-3-4', name: 'Autres investissements' }
     ] },
     { id: 'exp-main-4', name: 'Financement', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Octroi de Prêt' },
-        { id: uuidv4(), name: "Remboursement d'emprunt" }, 
-        { id: uuidv4(), name: "Intérêts d'emprunt" },
+        { id: 'exp-sub-4-1', name: 'Octroi de Prêt' },
+        { id: 'exp-sub-4-2', name: "Remboursement d'emprunt" }, 
+        { id: 'exp-sub-4-3', name: "Intérêts d'emprunt" },
     ] },
     { id: 'exp-main-5', name: 'Épargne', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Provision pour risques' },
-        { id: uuidv4(), name: "Fond d'urgence" },
-        { id: uuidv4(), name: 'Epargne Projet à court et moyen termes' },
-        { id: uuidv4(), name: 'Epargne retraite' },
+        { id: 'exp-sub-5-1', name: 'Provision pour risques' },
+        { id: 'exp-sub-5-2', name: "Fond d'urgence" },
+        { id: 'exp-sub-5-3', name: 'Epargne Projet à court et moyen termes' },
+        { id: 'exp-sub-5-4', name: 'Epargne retraite' },
     ] },
-    { id: 'exp-main-6', name: 'Exceptionnel', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Amendes' }] },
-    { id: 'exp-main-7', name: 'Impôts et Taxes', isFixed: true, subCategories: [{ id: uuidv4(), name: 'Impôt sur les sociétés' }, { id: uuidv4(), name: 'TVA' }, { id: uuidv4(), name: 'Autres taxes'}] },
+    { id: 'exp-main-6', name: 'Exceptionnel', isFixed: true, subCategories: [{ id: 'exp-sub-6-1', name: 'Amendes' }] },
+    { id: 'exp-main-7', name: 'Impôts et Taxes', isFixed: true, subCategories: [
+        { id: 'exp-sub-7-1', name: 'Impôt sur les sociétés', isFixed: false },
+        { id: 'exp-sub-7-2', name: 'TVA collectée', isFixed: true },
+        { id: 'exp-sub-7-3', name: 'TVA déductible', isFixed: true },
+        { id: 'exp-sub-7-4', name: 'Autres taxes', isFixed: false },
+        { id: 'exp-sub-7-5', name: 'TVA à payer', isFixed: true }
+    ] },
     { id: 'exp-main-8', name: 'Formation', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Matériel' },
-        { id: uuidv4(), name: 'Livres' },
-        { id: uuidv4(), name: 'Logiciels' },
-        { id: uuidv4(), name: 'Abonnement' },
-        { id: uuidv4(), name: 'Ateliers pratiques' },
-        { id: uuidv4(), name: 'Formations certifiantes' },
-        { id: uuidv4(), name: 'Stage' },
+        { id: 'exp-sub-8-1', name: 'Matériel' },
+        { id: 'exp-sub-8-2', name: 'Livres' },
+        { id: 'exp-sub-8-3', name: 'Logiciels' },
+        { id: 'exp-sub-8-4', name: 'Abonnement' },
+        { id: 'exp-sub-8-5', name: 'Ateliers pratiques' },
+        { id: 'exp-sub-8-6', name: 'Formations certifiantes' },
+        { id: 'exp-sub-8-7', name: 'Stage' },
     ] },
     { id: 'exp-main-9', name: 'Innovation, Recherche et développement', isFixed: true, subCategories: [] },
     { id: 'exp-main-10', name: 'Personnel', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Logement' },
-        { id: uuidv4(), name: 'Eau et Electricité' },
-        { id: uuidv4(), name: 'Frais de réparation et entretien' },
-        { id: uuidv4(), name: 'Décoration et ameublement' },
-        { id: uuidv4(), name: 'Frais de nettoyage' },
-        { id: uuidv4(), name: 'Nourriture & alimentation' },
-        { id: uuidv4(), name: 'Transports et déplacement' },
-        { id: uuidv4(), name: 'Santé et bien etre' },
-        { id: uuidv4(), name: 'Communication et divertissement' },
-        { id: uuidv4(), name: 'Enfant et education' },
-        { id: uuidv4(), name: 'Habillement & Textile' },
-        { id: uuidv4(), name: 'Assurance divers' },
-        { id: uuidv4(), name: 'Impots & obligation fiscales' },
-        { id: uuidv4(), name: 'DIvers et imprévus' },
+        { id: 'exp-sub-10-1', name: 'Logement' },
+        { id: 'exp-sub-10-2', name: 'Eau et Electricité' },
+        { id: 'exp-sub-10-3', name: 'Frais de réparation et entretien' },
+        { id: 'exp-sub-10-4', name: 'Décoration et ameublement' },
+        { id: 'exp-sub-10-5', name: 'Frais de nettoyage' },
+        { id: 'exp-sub-10-6', name: 'Nourriture & alimentation' },
+        { id: 'exp-sub-10-7', name: 'Transports et déplacement' },
+        { id: 'exp-sub-10-8', name: 'Santé et bien etre' },
+        { id: 'exp-sub-10-9', name: 'Communication et divertissement' },
+        { id: 'exp-sub-10-10', name: 'Enfant et education' },
+        { id: 'exp-sub-10-11', name: 'Habillement & Textile' },
+        { id: 'exp-sub-10-12', name: 'Assurance divers' },
+        { id: 'exp-sub-10-13', name: 'Impots & obligation fiscales' },
+        { id: 'exp-sub-10-14', name: 'DIvers et imprévus' },
     ] },
     { id: 'exp-main-11', name: 'Loisirs et plaisirs', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Sorties et restaurants' },
-        { id: uuidv4(), name: 'Abonnement digitaux' },
-        { id: uuidv4(), name: 'Hobbies et passion' },
-        { id: uuidv4(), name: 'Shopping' },
-        { id: uuidv4(), name: 'Soins personnel' },
+        { id: 'exp-sub-11-1', name: 'Sorties et restaurants' },
+        { id: 'exp-sub-11-2', name: 'Abonnement digitaux' },
+        { id: 'exp-sub-11-3', name: 'Hobbies et passion' },
+        { id: 'exp-sub-11-4', name: 'Shopping' },
+        { id: 'exp-sub-11-5', name: 'Soins personnel' },
     ]},
     { id: 'exp-main-12', name: 'Dons et cadeaux', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Cadeaux pour occasions' },
-        { id: uuidv4(), name: 'Célébration' },
-        { id: uuidv4(), name: 'Charité' },
+        { id: 'exp-sub-12-1', name: 'Cadeaux pour occasions' },
+        { id: 'exp-sub-12-2', name: 'Célébration' },
+        { id: 'exp-sub-12-3', name: 'Charité' },
     ]},
     { id: 'exp-main-13', name: 'Achat pour revente', isFixed: true, subCategories: [
-        { id: uuidv4(), name: 'Matière premiere' },
-        { id: uuidv4(), name: 'Marchandises' },
-        { id: uuidv4(), name: 'Emballage' },
-        { id: uuidv4(), name: 'Etude et prestation de service' },
-        { id: uuidv4(), name: 'Equipement et travaux' },
+        { id: 'exp-sub-13-1', name: 'Matière premiere' },
+        { id: 'exp-sub-13-2', name: 'Marchandises' },
+        { id: 'exp-sub-13-3', name: 'Emballage' },
+        { id: 'exp-sub-13-4', name: 'Etude et prestation de service' },
+        { id: 'exp-sub-13-5', name: 'Equipement et travaux' },
     ]},
   ]
 };
@@ -1203,9 +1213,58 @@ export const BudgetProvider = ({ children }) => {
                   parent = finalCategories.expense.find(m => m.id === sub.parent_id);
               }
               if (parent && !parent.subCategories.some(s => s.id === sub.id)) {
-                  parent.subCategories.push({ id: sub.id, name: sub.name });
+                  parent.subCategories.push({ id: sub.id, name: sub.name, isFixed: sub.is_fixed });
               }
           });
+
+          // --- Data Migration for VAT categories ---
+          const taxMainCategory = finalCategories.expense.find(mc => mc.id === 'exp-main-7');
+          if (taxMainCategory) {
+              const subCategoriesToUpsert = [];
+              const subCategoriesToEnsure = [
+                  { id: 'exp-sub-7-2', name: 'TVA collectée', isFixed: true },
+                  { id: 'exp-sub-7-3', name: 'TVA déductible', isFixed: true },
+                  { id: 'exp-sub-7-5', name: 'TVA à payer', isFixed: true }
+              ];
+              
+              const otherRevenueCategory = finalCategories.revenue.find(mc => mc.id === 'rev-main-3');
+              if (otherRevenueCategory) {
+                  subCategoriesToEnsure.push({ id: 'rev-sub-3-3', name: 'Crédit de TVA', isFixed: true, parent_id: 'rev-main-3', type: 'revenue' });
+              }
+
+              // Remove old "TVA" category if it exists in the local state object
+              taxMainCategory.subCategories = taxMainCategory.subCategories.filter(sc => sc.name.toLowerCase() !== 'tva' && sc.name.toLowerCase() !== 'tva collectible');
+              
+              // Check and add new VAT categories if they don't exist
+              subCategoriesToEnsure.forEach(ensureSub => {
+                  const parentCat = ensureSub.type === 'revenue' ? otherRevenueCategory : taxMainCategory;
+                  if (parentCat) {
+                      const exists = parentCat.subCategories.some(sc => sc.id === ensureSub.id);
+                      if (!exists) {
+                          parentCat.subCategories.push({id: ensureSub.id, name: ensureSub.name, isFixed: ensureSub.isFixed});
+                          subCategoriesToUpsert.push({
+                              id: ensureSub.id,
+                              user_id: user.id,
+                              parent_id: ensureSub.parent_id || taxMainCategory.id,
+                              name: ensureSub.name,
+                              type: ensureSub.type || 'expense',
+                              is_fixed: ensureSub.isFixed,
+                          });
+                      }
+                  }
+              });
+
+              if (subCategoriesToUpsert.length > 0) {
+                  const { error: upsertError } = await supabase
+                      .from('user_categories')
+                      .upsert(subCategoriesToUpsert, { onConflict: 'id' });
+
+                  if (upsertError) {
+                      console.error("Error ensuring VAT subcategories:", upsertError);
+                  }
+              }
+          }
+          // --- End of Data Migration ---
 
           const vatRates = (vatRatesRes.data || []).reduce((acc, rate) => {
               if (!acc[rate.project_id]) acc[rate.project_id] = [];

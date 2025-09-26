@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Edit, Eye, Search, Gem, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, Maximize, Minimize, AreaChart, BarChart, Hash, ArrowRightLeft, Archive, Calendar, PieChart, FilePlus, HandCoins, Banknote, AlertTriangle, ChevronUp, MessageSquare, Lock } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
-import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone } from '../utils/budgetCalculations';
+import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, expandVatEntries } from '../utils/budgetCalculations';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
@@ -175,7 +175,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
         relevantActuals = project ? (allActuals[project.id] || []) : [];
     }
 
-    // Filter out final provision payments from the list of actuals used by the Trezo table.
     const filteredActuals = relevantActuals.filter(a => !a.isFinalProvisionPayment);
 
     return {
@@ -412,15 +411,29 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return entries;
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
 
+  const expandedEntries = useMemo(() => {
+    return expandVatEntries(filteredBudgetEntries, categories);
+  }, [filteredBudgetEntries, categories]);
+
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
-  const handleEditEntry = (entry) => { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry }); };
+  const handleEditEntry = (entry) => { 
+    const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
+    const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
+    if (originalEntry) {
+        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
+    }
+  };
   const handleDeleteEntry = (entry) => {
+    const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
+    const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
+    if (!originalEntry) return;
+
     dispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
-        title: `Supprimer "${entry.supplier}" ?`,
+        title: `Supprimer "${originalEntry.supplier}" ?`,
         message: "Cette action est irréversible et supprimera l'entrée budgétaire et ses prévisions.",
-        onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId: entry.id, entryProjectId: entry.projectId || activeProjectId } }),
+        onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId: originalEntry.id, entryProjectId: originalEntry.projectId || activeProjectId } }),
       }
     });
   };
@@ -429,8 +442,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const getResteColor = (reste, isEntree) => reste === 0 ? 'text-text-secondary' : isEntree ? (reste <= 0 ? 'text-success-600' : 'text-danger-600') : (reste >= 0 ? 'text-success-600' : 'text-danger-600');
   
   const isRowVisibleInPeriods = (entry) => { for (const period of periods) { if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; } return false; };
-  const hasOffBudgetRevenues = budgetEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
-  const hasOffBudgetExpenses = budgetEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
+  const hasOffBudgetRevenues = expandedEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
+  const hasOffBudgetExpenses = expandedEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
 
   const handleOpenPaymentDrawer = (entry, period) => {
     const entryActuals = actualTransactions.filter(actual => actual.budgetId === entry.id);
@@ -450,12 +463,12 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     let relevantActuals;
     const type = subCategoryName === 'Entrées Hors Budget' ? 'revenu' : (subCategoryName === 'Sorties Hors Budget' ? 'depense' : null);
     if (type) {
-        const offBudgetEntryIds = budgetEntries.filter(e => e.isOffBudget && e.type === type).map(e => e.id);
+        const offBudgetEntryIds = expandedEntries.filter(e => e.isOffBudget && e.type === type).map(e => e.id);
         relevantActuals = actualTransactions.filter(t => offBudgetEntryIds.includes(t.budgetId));
     } else {
         relevantActuals = actualTransactions.filter(t => {
             if (t.category !== subCategoryName || !t.budgetId) return false;
-            const budgetEntry = budgetEntries.find(e => e.id === t.budgetId);
+            const budgetEntry = expandedEntries.find(e => e.id === t.budgetId);
             return !budgetEntry || !budgetEntry.isOffBudget;
         });
     }
@@ -469,7 +482,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     let payments = [];
     let title = '';
     if (context.entryId) {
-      const entry = budgetEntries.find(e => e.id === context.entryId);
+      const entry = expandedEntries.find(e => e.id === context.entryId);
       payments = actualTransactions.filter(t => t.budgetId === context.entryId).flatMap(t => (t.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).map(p => ({ ...p, thirdParty: t.thirdParty, type: t.type })));
       title = `Détails pour ${entry.supplier}`;
     } else if (context.mainCategory) {
@@ -502,18 +515,21 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
   const handleCloseDrawer = () => setDrawerData({ isOpen: false, transactions: [], title: '' });
   const groupedData = useMemo(() => {
-    const entriesToGroup = filteredBudgetEntries.filter(e => !e.isOffBudget);
+    const entriesToGroup = expandedEntries.filter(e => !e.isOffBudget);
     const groupByType = (type) => {
       const catType = type === 'entree' ? 'revenue' : 'expense';
       if (!categories || !categories[catType]) return [];
       return categories[catType].map(mainCat => {
         if (!mainCat.subCategories) return null;
-        const entriesForMainCat = entriesToGroup.filter(entry => mainCat.subCategories.some(sc => sc.name === entry.category) && isRowVisibleInPeriods(entry));
+        const entriesForMainCat = entriesToGroup.filter(entry => 
+            (mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible')))
+            && isRowVisibleInPeriods(entry)
+        );
         return entriesForMainCat.length > 0 ? { ...mainCat, entries: entriesForMainCat } : null;
       }).filter(Boolean);
     };
     return { entree: groupByType('entree'), sortie: groupByType('sortie') };
-  }, [filteredBudgetEntries, categories, periods]);
+  }, [expandedEntries, categories, periods]);
 
   const handleDrillDown = () => {
     const newCollapsedState = {};
@@ -537,7 +553,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return { budget, actual, reste: budget - actual };
   };
   const calculateOffBudgetTotalsForPeriod = (type, period) => {
-      const offBudgetEntries = filteredBudgetEntries.filter(e => e.isOffBudget && e.type === type);
+      const offBudgetEntries = expandedEntries.filter(e => e.isOffBudget && e.type === type);
       const budget = offBudgetEntries.reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
       const actual = offBudgetEntries.reduce((sum, entry) => sum + getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate), 0);
       return { budget, actual, reste: budget - actual };
@@ -763,8 +779,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
               {!isMainCollapsed && mainCategory.entries.map((entry) => {
                 const project = (isConsolidated || isCustomConsolidated) ? projects.find(p => p.id === entry.projectId) : null;
                 return (
-                  <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50 group">
-                    <td className="px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10">{entry.category}</td>
+                  <tr key={entry.id} className={`border-b border-gray-100 hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : ''}`}>
+                    <td className={`px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10 ${entry.is_vat_child ? 'pl-8' : ''}`}>{entry.category}</td>
                     <td className="px-4 py-1 text-gray-700 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${supplierColLeft}px` }}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 truncate" title={getFrequencyTitle(entry)}>
@@ -937,7 +953,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
       
       {mode === 'lecture' ? (
         <LectureView 
-            entries={filteredBudgetEntries} 
+            entries={expandedEntries} 
             periods={periods}
             settings={settings}
             actuals={actualTransactions}
