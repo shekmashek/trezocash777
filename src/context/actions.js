@@ -356,7 +356,6 @@ export const updateSettings = async (dispatch, user, newSettings) => {
             currency: newSettings.currency,
             display_unit: newSettings.displayUnit,
             decimal_places: newSettings.decimalPlaces,
-            language: newSettings.language,
             timezone_offset: newSettings.timezoneOffset
         };
 
@@ -373,7 +372,6 @@ export const updateSettings = async (dispatch, user, newSettings) => {
             currency: data.currency,
             displayUnit: data.display_unit,
             decimalPlaces: data.decimal_places,
-            language: data.language,
             timezoneOffset: data.timezone_offset,
         };
         dispatch({ type: 'UPDATE_SETTINGS_SUCCESS', payload: updatedSettings });

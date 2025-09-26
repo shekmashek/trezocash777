@@ -9,7 +9,7 @@ const CashAccountsView = () => {
   const { state, dispatch } = useBudget();
   const { allCashAccounts, settings, allActuals, activeProjectId, projects } = state;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
-  const isConsolidated = activeProjectId === 'consolidated';
+  const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
 
   const userCashAccounts = useMemo(() => {
     if (isConsolidated) return [];

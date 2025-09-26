@@ -38,7 +38,7 @@ const ProjectSettingsView = () => {
     });
   };
   
-  const isConsolidated = activeProjectId === 'consolidated';
+  const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
 
   if (isConsolidated) {
     return (

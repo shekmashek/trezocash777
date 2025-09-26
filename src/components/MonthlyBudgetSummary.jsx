@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
-import { getEntryAmountForMonth } from '../utils/budgetCalculations';
+import { getEntryAmountForMonth, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
 import { Calendar } from 'lucide-react';
 
 const MonthlyBudgetSummary = () => {
   const { state } = useBudget();
-  const { allEntries, activeProjectId, settings, projects } = state;
+  const { allEntries, activeProjectId, settings, projects, categories, vatRegimes } = state;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const activeProjectName = useMemo(() => {
@@ -29,26 +29,40 @@ const MonthlyBudgetSummary = () => {
 
   const monthlyData = useMemo(() => {
     const data = [];
-    for (let i = 0; i < 12; i++) {
-      const monthName = new Date(currentYear, i, 1).toLocaleString('fr-FR', { month: 'long' });
-      
-      const totalIncome = budgetEntries
-        .filter(e => e.type === 'revenu')
-        .reduce((sum, entry) => sum + getEntryAmountForMonth(entry, i, currentYear), 0);
-        
-      const totalExpense = budgetEntries
-        .filter(e => e.type === 'depense')
-        .reduce((sum, entry) => sum + getEntryAmountForMonth(entry, i, currentYear), 0);
+    const vatRegime = vatRegimes[activeProjectId];
 
-      data.push({
-        month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-        income: totalIncome,
-        expense: totalExpense,
-        net: totalIncome - totalExpense,
-      });
+    for (let i = 0; i < 12; i++) {
+        const monthName = new Date(currentYear, i, 1).toLocaleString('fr-FR', { month: 'long' });
+        const period = {
+            startDate: new Date(currentYear, i, 1),
+            endDate: new Date(currentYear, i + 1, 0),
+            label: monthName
+        };
+
+        let entriesForMonth = expandVatEntries(budgetEntries, categories);
+        
+        if (vatRegime && !isConsolidated) {
+            const dynamicVatEntries = generateVatPaymentEntries(entriesForMonth, period, vatRegime);
+            entriesForMonth = [...entriesForMonth, ...dynamicVatEntries];
+        }
+
+        const totalIncome = entriesForMonth
+            .filter(e => e.type === 'revenu')
+            .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
+            
+        const totalExpense = entriesForMonth
+            .filter(e => e.type === 'depense')
+            .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
+
+        data.push({
+            month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            income: totalIncome,
+            expense: totalExpense,
+            net: totalIncome - totalExpense,
+        });
     }
     return data;
-  }, [budgetEntries, currentYear]);
+  }, [budgetEntries, categories, currentYear, vatRegimes, activeProjectId, isConsolidated]);
 
   const totals = useMemo(() => {
     return monthlyData.reduce((acc, month) => {

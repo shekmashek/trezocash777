@@ -7,7 +7,6 @@ import EmptyState from './EmptyState';
 import { formatCurrency } from '../utils/formatting';
 import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
 import { resolveScenarioEntries } from '../utils/scenarioCalculations';
-import { useTranslation } from '../utils/i18n';
 import ScenarioEntriesDrawer from './ScenarioEntriesDrawer';
 import { supabase } from '../utils/supabase';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,7 +23,6 @@ const defaultColors = colorMap['#8b5cf6'];
 const ScenarioView = ({ isFocusMode = false }) => {
   const { state, dispatch } = useBudget();
   const { activeProjectId, projects, scenarios, allEntries, allActuals, allCashAccounts, scenarioEntries, settings, timeUnit, horizonLength, periodOffset, activeQuickSelect, session } = state;
-  const { t } = useTranslation();
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -81,8 +79,8 @@ const ScenarioView = ({ isFocusMode = false }) => {
     }
     dispatch({ type: 'SET_QUICK_PERIOD', payload });
   };
-  const timeUnitLabels = { day: t('sidebar.day'), week: t('sidebar.week'), fortnightly: t('sidebar.fortnightly'), month: t('sidebar.month'), bimonthly: t('sidebar.bimonthly'), quarterly: t('sidebar.quarterly'), semiannually: t('sidebar.semiannually'), annually: t('sidebar.annually'), };
-  const periodLabel = useMemo(() => { if (periodOffset === 0) return 'Actuel'; const label = timeUnitLabels[timeUnit] || 'Période'; const plural = Math.abs(periodOffset) > 1 ? 's' : ''; return `${periodOffset > 0 ? '+' : ''}${periodOffset} ${label}${plural}`; }, [periodOffset, timeUnit, timeUnitLabels, t]);
+  const timeUnitLabels = { day: 'Jour', week: 'Semaine', fortnightly: 'Quinzaine', month: 'Mois', bimonthly: 'Bimestre', quarterly: 'Trimestre', semiannually: 'Semestre', annually: 'Année' };
+  const periodLabel = useMemo(() => { if (periodOffset === 0) return 'Actuel'; const label = timeUnitLabels[timeUnit] || 'Période'; const plural = Math.abs(periodOffset) > 1 ? 's' : ''; return `${periodOffset > 0 ? '+' : ''}${periodOffset} ${label}${plural}`; }, [periodOffset, timeUnit, timeUnitLabels]);
 
   const periods = useMemo(() => {
     const today = getTodayInTimezone(settings.timezoneOffset);

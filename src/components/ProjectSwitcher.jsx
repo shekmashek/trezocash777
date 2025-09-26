@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'lucide-react';
 import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
-import { useTranslation } from '../utils/i18n';
 import { supabase } from '../utils/supabase';
 import { deleteConsolidatedView, deleteProject } from '../context/actions';
 import Avatar from './Avatar';
@@ -10,7 +9,6 @@ import Avatar from './Avatar';
 const ProjectSwitcher = () => {
   const { state, dispatch } = useBudget();
   const { projects, activeProjectId, consolidatedViews, collaborators, allProfiles } = state;
-  const { t } = useTranslation();
   const activeProjects = projects.filter(p => !p.isArchived);
   
   const isConsolidated = activeProjectId === 'consolidated';
@@ -18,7 +16,7 @@ const ProjectSwitcher = () => {
 
   const activeProject = useMemo(() => {
     if (isConsolidated) {
-      return { id: 'consolidated', name: t('subHeader.consolidatedBudget') };
+      return { id: 'consolidated', name: 'Mes projets consolidé' };
     }
     if (isCustomConsolidated) {
       const viewId = activeProjectId.replace('consolidated_view_', '');
@@ -26,7 +24,7 @@ const ProjectSwitcher = () => {
       return view ? { id: activeProjectId, name: view.name } : { id: activeProjectId, name: 'Vue Inconnue' };
     }
     return projects.find(p => p.id === activeProjectId);
-  }, [activeProjectId, projects, consolidatedViews, isConsolidated, isCustomConsolidated, t]);
+  }, [activeProjectId, projects, consolidatedViews, isConsolidated, isCustomConsolidated]);
 
   const [isListOpen, setIsListOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -245,7 +243,7 @@ const ProjectSwitcher = () => {
             })}
             <li><hr className="my-1" /></li>
             <li><button onClick={() => handleOpenConsolidatedViewModal()} className="flex items-center w-full px-4 py-2 text-left text-purple-600 hover:bg-purple-50"><Layers className="w-4 h-4 mr-2" />Créer une vue consolidée</button></li>
-            <li><button onClick={handleStartOnboarding} className="flex items-center w-full px-4 py-2 text-left text-blue-600 hover:bg-blue-50"><Plus className="w-4 h-4 mr-2" />{t('subHeader.newProject')}</button></li>
+            <li><button onClick={handleStartOnboarding} className="flex items-center w-full px-4 py-2 text-left text-blue-600 hover:bg-blue-50"><Plus className="w-4 h-4 mr-2" />Nouveau projet</button></li>
           </ul>
         </div>
       )}

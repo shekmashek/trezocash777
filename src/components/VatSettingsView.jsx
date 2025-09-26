@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
 import { Save, Plus, Trash2, AlertTriangle, Loader } from 'lucide-react';
 
 const VatSettingsView = () => {
     const { state, dispatch } = useBudget();
-    const { activeProjectId } = state;
+    const { activeProjectId, vatRates, vatRegimes } = state;
     const isConsolidated = activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_');
 
     const [rates, setRates] = useState([]);
     const [regime, setRegime] = useState({ collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' });
     const [loading, setLoading] = useState(true);
+
+    const projectRates = useMemo(() => vatRates[activeProjectId] || null, [vatRates, activeProjectId]);
+    const projectRegime = useMemo(() => vatRegimes[activeProjectId] || null, [vatRegimes, activeProjectId]);
 
     useEffect(() => {
         if (isConsolidated || !activeProjectId) {
@@ -18,72 +21,67 @@ const VatSettingsView = () => {
             return;
         }
 
-        const fetchSettings = async () => {
-            setLoading(true);
-            
-            const { data: ratesData, error: ratesError } = await supabase
-                .from('vat_rates')
-                .select('*')
-                .eq('project_id', activeProjectId);
+        setLoading(true);
 
-            if (ratesError) {
-                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement taux TVA: ${ratesError.message}`, type: 'error' } });
-            } else if (ratesData && ratesData.length === 0) {
-                const defaultRatesPayload = [
-                    { project_id: activeProjectId, name: 'Taux normal', rate: 20, is_default: true },
-                    { project_id: activeProjectId, name: 'Taux intermédiaire', rate: 10, is_default: false },
-                    { project_id: activeProjectId, name: 'Taux réduit', rate: 5.5, is_default: false },
-                    { project_id: activeProjectId, name: 'Taux super-réduit', rate: 2.1, is_default: false },
-                    { project_id: activeProjectId, name: 'Taux zéro', rate: 0, is_default: false },
-                ];
-                const { data: newRates, error: insertError } = await supabase
+        const ensureSettingsExist = async () => {
+            let currentRates = projectRates;
+            let currentRegime = projectRegime;
+
+            if (!currentRates) {
+                const { data: existingRates, error: ratesError } = await supabase
                     .from('vat_rates')
-                    .insert(defaultRatesPayload)
-                    .select();
+                    .select('*')
+                    .eq('project_id', activeProjectId);
 
-                if (insertError) {
-                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux par défaut: ${insertError.message}`, type: 'error' } });
-                    setRates([]);
+                if (ratesError) {
+                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement taux TVA: ${ratesError.message}`, type: 'error' } });
+                } else if (existingRates && existingRates.length > 0) {
+                    currentRates = existingRates;
                 } else {
-                    setRates(newRates);
-                    dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés pour ce projet.', type: 'info' } });
+                    const defaultRatesPayload = [
+                        { project_id: activeProjectId, name: 'Taux normal', rate: 20, is_default: true },
+                        { project_id: activeProjectId, name: 'Taux intermédiaire', rate: 10, is_default: false },
+                        { project_id: activeProjectId, name: 'Taux réduit', rate: 5.5, is_default: false },
+                        { project_id: activeProjectId, name: 'Taux super-réduit', rate: 2.1, is_default: false },
+                        { project_id: activeProjectId, name: 'Taux zéro', rate: 0, is_default: false },
+                    ];
+                    const { data: newRates, error: insertError } = await supabase.from('vat_rates').insert(defaultRatesPayload).select();
+                    
+                    if (insertError) {
+                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux par défaut: ${insertError.message}`, type: 'error' } });
+                    } else {
+                        currentRates = newRates;
+                        dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés.', type: 'info' } });
+                    }
                 }
-            } else {
-                setRates(ratesData || []);
+                dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: currentRates || [] } });
             }
             
-            const { data: regimeData, error: regimeError } = await supabase
-                .from('vat_regimes')
-                .select('id, project_id, collection_periodicity, payment_delay_months, regime_type')
-                .eq('project_id', activeProjectId)
-                .single();
-
-            if (regimeError && regimeError.code !== 'PGRST116') { // PGRST116 = no rows found
-                 dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement régime TVA: ${regimeError.message}`, type: 'error' } });
-            } else if (regimeData) {
-                setRegime(regimeData);
-            } else {
-                const { data: newRegimeData, error: insertError } = await supabase
-                    .from('vat_regimes')
-                    .insert({ 
-                        project_id: activeProjectId, 
-                        collection_periodicity: 'monthly', 
-                        payment_delay_months: 1,
-                        regime_type: 'reel_normal' 
-                    })
-                    .select('id, project_id, collection_periodicity, payment_delay_months, regime_type')
-                    .single();
-                if (insertError) {
-                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
-                } else if (newRegimeData) {
-                    setRegime(newRegimeData);
+            if (!currentRegime) {
+                const { data: existingRegime, error: regimeError } = await supabase.from('vat_regimes').select('*').eq('project_id', activeProjectId).single();
+                if (regimeError && regimeError.code !== 'PGRST116') {
+                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement régime TVA: ${regimeError.message}`, type: 'error' } });
+                } else if (existingRegime) {
+                    currentRegime = existingRegime;
+                } else {
+                    const { data: newRegime, error: insertError } = await supabase.from('vat_regimes').insert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' }).select().single();
+                    if (insertError) {
+                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
+                    } else {
+                        currentRegime = newRegime;
+                    }
                 }
+                dispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: currentRegime } });
             }
+
+            setRates(currentRates || []);
+            setRegime(currentRegime || { collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' });
             setLoading(false);
         };
 
-        fetchSettings();
-    }, [activeProjectId, isConsolidated, dispatch]);
+        ensureSettingsExist();
+
+    }, [activeProjectId, isConsolidated, dispatch, projectRates, projectRegime]);
 
     const handleRateChange = (index, field, value) => {
         const newRates = [...rates];
@@ -106,6 +104,7 @@ const VatSettingsView = () => {
         }
         const newRates = rates.filter((_, i) => i !== index);
         setRates(newRates);
+        dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux supprimé.', type: 'success' } });
     };
 
@@ -119,15 +118,18 @@ const VatSettingsView = () => {
 
     const handleSaveSettings = async () => {
         setLoading(true);
-        const { error: regimeError } = await supabase
+        const { data: savedRegime, error: regimeError } = await supabase
             .from('vat_regimes')
-            .upsert({ ...regime, project_id: activeProjectId }, { onConflict: 'project_id' });
+            .upsert({ ...regime, project_id: activeProjectId }, { onConflict: 'project_id' })
+            .select()
+            .single();
 
         if (regimeError) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur régime: ${regimeError.message}`, type: 'error' } });
             setLoading(false);
             return;
         }
+        dispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: savedRegime } });
 
         const ratesToUpsert = rates.map(rate => ({
             id: rate.id?.toString().startsWith('temp-') ? undefined : rate.id,
@@ -137,14 +139,14 @@ const VatSettingsView = () => {
             is_default: rate.is_default
         }));
 
-        const { error: ratesError } = await supabase.from('vat_rates').upsert(ratesToUpsert, { onConflict: 'id' });
+        const { data: upsertedRates, error: ratesError } = await supabase.from('vat_rates').upsert(ratesToUpsert, { onConflict: 'id' }).select();
 
         if (ratesError) {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur taux: ${ratesError.message}`, type: 'error' } });
         } else {
             dispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres TVA enregistrés.', type: 'success' } });
-            const { data: freshRates } = await supabase.from('vat_rates').select('*').eq('project_id', activeProjectId);
-            if (freshRates) setRates(freshRates);
+            dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: upsertedRates } });
+            setRates(upsertedRates);
         }
         setLoading(false);
     };
@@ -180,7 +182,7 @@ const VatSettingsView = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Périodicité de déclaration</label>
-                        <select value={regime.collection_periodicity} onChange={e => setRegime({...regime, collection_periodicity: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white">
+                        <select value={regime.collection_periodicity || 'monthly'} onChange={e => setRegime({...regime, collection_periodicity: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white">
                             <option value="monthly">Mensuelle</option>
                             <option value="quarterly">Trimestrielle</option>
                             <option value="annually">Annuelle</option>
@@ -188,7 +190,7 @@ const VatSettingsView = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Délai de paiement (en mois)</label>
-                        <input type="number" value={regime.payment_delay_months} onChange={e => setRegime({...regime, payment_delay_months: parseInt(e.target.value, 10)})} className="w-full px-3 py-2 border rounded-lg" min="0" />
+                        <input type="number" value={regime.payment_delay_months || 1} onChange={e => setRegime({...regime, payment_delay_months: parseInt(e.target.value, 10)})} className="w-full px-3 py-2 border rounded-lg" min="0" />
                     </div>
                 </div>
             </div>

@@ -216,12 +216,13 @@ export const expandVatEntries = (entries, categories) => {
           amount: vatAmount,
           description: `TVA sur ${entry.supplier}`,
           is_vat_child: true,
-          amount_type: 'ttc',
+          amount_type: 'ttc', // VAT is always TTC in itself
           vat_rate_id: null,
           ht_amount: vatAmount,
           ttc_amount: vatAmount,
         });
       } else {
+        // If VAT is zero, just push the original entry
         expanded.push(entry);
       }
     } else {
@@ -229,4 +230,61 @@ export const expandVatEntries = (entries, categories) => {
     }
   }
   return expanded;
+};
+
+export const generateVatPaymentEntries = (entries, period, vatRegime) => {
+    if (!vatRegime || vatRegime.regime_type === 'franchise_en_base') {
+        return [];
+    }
+
+    const tvaCollected = entries.reduce((sum, entry) => {
+        if (entry.category === 'TVA collectée') {
+            return sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate);
+        }
+        return sum;
+    }, 0);
+
+    const tvaDeductible = entries.reduce((sum, entry) => {
+        if (entry.category === 'TVA déductible') {
+            return sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate);
+        }
+        return sum;
+    }, 0);
+
+    const netVat = tvaCollected - tvaDeductible;
+
+    if (Math.abs(netVat) < 0.01) {
+        return [];
+    }
+    
+    const paymentDueDate = new Date(period.endDate);
+    paymentDueDate.setMonth(paymentDueDate.getMonth() + (vatRegime.payment_delay_months || 1));
+
+    if (netVat > 0) {
+        return [{
+            id: `vat_payment_${period.startDate.toISOString()}`,
+            type: 'depense',
+            category: 'TVA à payer',
+            supplier: 'État - TVA',
+            amount: netVat,
+            frequency: 'ponctuel',
+            date: paymentDueDate.toISOString().split('T')[0],
+            startDate: paymentDueDate.toISOString().split('T')[0],
+            is_vat_payment: true,
+            description: `TVA à payer pour la période ${period.label}`
+        }];
+    } else {
+        return [{
+            id: `vat_credit_${period.startDate.toISOString()}`,
+            type: 'revenu',
+            category: 'Crédit de TVA',
+            supplier: 'État - TVA',
+            amount: -netVat,
+            frequency: 'ponctuel',
+            date: paymentDueDate.toISOString().split('T')[0],
+            startDate: paymentDueDate.toISOString().split('T')[0],
+            is_vat_payment: true,
+            description: `Crédit de TVA pour la période ${period.label}`
+        }];
+    }
 };

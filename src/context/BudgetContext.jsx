@@ -136,7 +136,6 @@ const initialSettings = {
   decimalPlaces: 2,
   currency: '€',
   exchangeRates: {},
-  language: 'fr',
   timezoneOffset: 0,
 };
 
@@ -208,8 +207,6 @@ const getInitialState = () => ({
     actualsSearchTerm: '',
     actualsViewFilter: null,
     activeQuickSelect: null,
-    isScenarioModalOpen: false,
-    editingScenario: null,
     isTourActive: false,
     tourHighlightId: null,
     isLoading: true,
@@ -248,6 +245,15 @@ const budgetReducer = (state, action) => {
         return {
             ...state,
             vatRates: newVatRates,
+        };
+    }
+    case 'SET_PROJECT_VAT_REGIME': {
+        const { projectId, regime } = action.payload;
+        const newVatRegimes = { ...state.vatRegimes };
+        newVatRegimes[projectId] = regime;
+        return {
+            ...state,
+            vatRegimes: newVatRegimes,
         };
     }
     case 'OPEN_COMMENT_DRAWER':
@@ -1006,7 +1012,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset, role, email, notifications')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, timezone_offset, role, email, notifications')
             .eq('id', user.id)
             .single();
 
@@ -1033,7 +1039,6 @@ export const BudgetProvider = ({ children }) => {
             currency: profileData.currency || '€',
             displayUnit: profileData.display_unit || 'standard',
             decimalPlaces: profileData.decimal_places ?? 2,
-            language: profileData.language || 'fr',
             timezoneOffset: profileData.timezone_offset ?? 0,
           };
 

@@ -1,11 +1,9 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
 import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock, ListChecks } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
-import FlagIcon from './FlagIcon';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SubscriptionBadge from './SubscriptionBadge';
 import ProjectCollaborators from './ProjectCollaborators';
@@ -28,15 +26,12 @@ const SettingsLink = ({ item, onClick }) => {
   );
 };
 
-const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isConsolidated }) => {
+const SubHeader = () => {
   const { state, dispatch } = useBudget();
   const { settings, isTourActive, tourHighlightId, profile, session } = state;
-  const { t, lang } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isLangPopoverOpen, setIsLangPopoverOpen] = useState(false);
-  const langPopoverRef = useRef(null);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -44,18 +39,12 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (langPopoverRef.current && !langPopoverRef.current.contains(event.target)) setIsLangPopoverOpen(false);
       if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target)) setIsAvatarMenuOpen(false);
       if (settingsPopoverRef.current && !settingsPopoverRef.current.contains(event.target)) setIsSettingsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleLanguageChange = (newLang) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { ...settings, language: newLang } });
-    setIsLangPopoverOpen(false);
-  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -80,8 +69,8 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   ];
 
   const advancedNavItems = [
-    { id: 'journal-budget', label: t('nav.budgetJournal'), icon: BookOpen, color: 'text-yellow-600', path: '/app/journal-budget' },
-    { id: 'journal-paiements', label: t('nav.paymentJournal'), icon: Receipt, color: 'text-blue-600', path: '/app/journal-paiements' },
+    { id: 'journal-budget', label: 'Journal du Budget', icon: BookOpen, color: 'text-yellow-600', path: '/app/journal-budget' },
+    { id: 'journal-paiements', label: 'Journal des Paiements', icon: Receipt, color: 'text-blue-600', path: '/app/journal-paiements' },
   ];
 
   const settingsItems = [
@@ -90,18 +79,18 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { id: '/app/templates', label: 'Mes Modèles', icon: LayoutTemplate, color: 'text-indigo-500' },
     { id: '/app/provisions', label: 'Suivi des Provisions', icon: Lock, color: 'text-orange-500' },
     { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
-    { id: '/app/categories', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
-    { id: '/app/tiers', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },
-    { id: '/app/comptes', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
+    { id: '/app/categories', label: 'Catégories', icon: FolderKanban, color: 'text-orange-500' },
+    { id: '/app/tiers', label: 'Tiers', icon: Users, color: 'text-pink-500' },
+    { id: '/app/comptes', label: 'Comptes', icon: Wallet, color: 'text-teal-500' },
     { id: 'timezoneSettings', label: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500' },
-    { id: '/app/archives', label: t('advancedSettings.archives'), icon: Archive, color: 'text-slate-500' },
+    { id: '/app/archives', label: 'Archives', icon: Archive, color: 'text-slate-500' },
   ];
 
   const handleSettingsItemClick = (itemId) => {
     if (itemId.startsWith('/app/')) {
         handleNavigate(itemId);
     } else if (typeof onOpenSettingsDrawer === 'function') {
-      onOpenSettingsDrawer(itemId);
+      dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: itemId });
     }
     setIsSettingsOpen(false);
   };
@@ -175,34 +164,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
             {/* Right Group */}
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                    <div className="relative" ref={langPopoverRef}>
-                        <button
-                            onClick={() => setIsLangPopoverOpen(p => !p)}
-                            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                            title="Changer la langue"
-                        >
-                            <FlagIcon lang={lang} className="w-6 h-auto rounded-sm" />
-                        </button>
-                        <AnimatePresence>
-                        {isLangPopoverOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg border z-20 p-1"
-                            >
-                                <button onClick={() => handleLanguageChange('fr')} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-3">
-                                    <FlagIcon lang="fr" className="w-5 h-auto rounded-sm" />
-                                    Français
-                                </button>
-                                <button onClick={() => handleLanguageChange('en')} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-3">
-                                    <FlagIcon lang="en" className="w-5 h-auto rounded-sm" />
-                                    English
-                                </button>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
                     <div className="relative" ref={settingsPopoverRef}>
                         <button
                             onClick={() => setIsSettingsOpen(p => !p)}

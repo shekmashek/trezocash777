@@ -3,12 +3,9 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import TrezocashLogo from '../components/TrezocashLogo';
-import FlagIcon from '../components/FlagIcon';
 
 const PublicLayout = ({ onLogin, onSignUp, children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const [lang, setLang] = useState('fr');
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -42,11 +39,6 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
     }
     setIsMobileMenuOpen(false);
   };
-
-  const handleLanguageChange = (newLang) => {
-    setLang(newLang);
-    setIsLangMenuOpen(false);
-  };
   
   const navLinks = [
     { label: 'Fonctionnalités', path: '/#fonctionnalites' },
@@ -71,30 +63,6 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
               {navLinks.map(link => (
                 <button key={link.label} onClick={() => handleNavClick(link.path)} className="text-sm font-semibold text-gray-600 hover:text-blue-600">{link.label}</button>
               ))}
-              <div className="relative">
-                <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-blue-600">
-                  <FlagIcon lang={lang} className="w-6 h-auto rounded-sm" />
-                </button>
-                <AnimatePresence>
-                  {isLangMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 p-1"
-                    >
-                      <button onClick={() => handleLanguageChange('fr')} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-                        <FlagIcon lang="fr" className="w-5 h-auto rounded-sm" />
-                        Français
-                      </button>
-                      <button onClick={() => handleLanguageChange('en')} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-                        <FlagIcon lang="en" className="w-5 h-auto rounded-sm" />
-                        English
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
             </nav>
 
             <div className="hidden md:flex items-center gap-4">

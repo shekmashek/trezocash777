@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Edit, Eye, Search, Gem, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, Maximize, Minimize, AreaChart, BarChart, Hash, ArrowRightLeft, Archive, Calendar, PieChart, FilePlus, HandCoins, Banknote, AlertTriangle, ChevronUp, MessageSquare, Lock } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
-import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, expandVatEntries } from '../utils/budgetCalculations';
+import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
-import { useTranslation } from '../utils/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const getStartOfWeek = (date) => { const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); d.setHours(0, 0, 0, 0); return new Date(d.setDate(diff)); };
@@ -111,9 +110,7 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
 
 const BudgetTracker = ({ mode = 'edition' }) => {
   const { state, dispatch } = useBudget();
-  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, allComments } = state;
-  const { t } = useTranslation();
-
+  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, allComments, vatRegimes } = state;
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
@@ -301,14 +298,14 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   };
 
   const timeUnitLabels = {
-    day: t('sidebar.day'),
-    week: t('sidebar.week'),
-    fortnightly: t('sidebar.fortnightly'),
-    month: t('sidebar.month'),
-    bimonthly: t('sidebar.bimonthly'),
-    quarterly: t('sidebar.quarterly'),
-    semiannually: t('sidebar.semiannually'),
-    annually: t('sidebar.annually'),
+    day: 'Jour',
+    week: 'Semaine',
+    fortnightly: 'Quinzaine',
+    month: 'Mois',
+    bimonthly: 'Bimestre',
+    quarterly: 'Trimestre',
+    semiannually: 'Semestre',
+    annually: 'Année',
   };
   
   const periodLabel = useMemo(() => {
@@ -411,12 +408,22 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return entries;
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
 
-  const expandedEntries = useMemo(() => {
-    return expandVatEntries(filteredBudgetEntries, categories);
-  }, [filteredBudgetEntries, categories]);
+  const expandedAndVatEntries = useMemo(() => {
+    const expanded = expandVatEntries(filteredBudgetEntries, categories);
+    const vatRegime = vatRegimes[activeProjectId];
+
+    if (isConsolidated || isCustomConsolidated || !vatRegime) {
+      return expanded;
+    }
+    
+    const dynamicVatEntries = periods.flatMap(period => generateVatPaymentEntries(expanded, period, vatRegime));
+    
+    return [...expanded, ...dynamicVatEntries];
+  }, [filteredBudgetEntries, categories, periods, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated]);
 
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
+    if (entry.is_vat_payment) return; // Cannot edit automatic VAT payments
     const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
     const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
     if (originalEntry) {
@@ -424,6 +431,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     }
   };
   const handleDeleteEntry = (entry) => {
+    if (entry.is_vat_payment) return;
     const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
     const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
     if (!originalEntry) return;
@@ -442,8 +450,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const getResteColor = (reste, isEntree) => reste === 0 ? 'text-text-secondary' : isEntree ? (reste <= 0 ? 'text-success-600' : 'text-danger-600') : (reste >= 0 ? 'text-success-600' : 'text-danger-600');
   
   const isRowVisibleInPeriods = (entry) => { for (const period of periods) { if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; } return false; };
-  const hasOffBudgetRevenues = expandedEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
-  const hasOffBudgetExpenses = expandedEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
+  const hasOffBudgetRevenues = expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
+  const hasOffBudgetExpenses = expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
 
   const handleOpenPaymentDrawer = (entry, period) => {
     const entryActuals = actualTransactions.filter(actual => actual.budgetId === entry.id);
@@ -463,12 +471,12 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     let relevantActuals;
     const type = subCategoryName === 'Entrées Hors Budget' ? 'revenu' : (subCategoryName === 'Sorties Hors Budget' ? 'depense' : null);
     if (type) {
-        const offBudgetEntryIds = expandedEntries.filter(e => e.isOffBudget && e.type === type).map(e => e.id);
+        const offBudgetEntryIds = expandedAndVatEntries.filter(e => e.isOffBudget && e.type === type).map(e => e.id);
         relevantActuals = actualTransactions.filter(t => offBudgetEntryIds.includes(t.budgetId));
     } else {
         relevantActuals = actualTransactions.filter(t => {
             if (t.category !== subCategoryName || !t.budgetId) return false;
-            const budgetEntry = expandedEntries.find(e => e.id === t.budgetId);
+            const budgetEntry = expandedAndVatEntries.find(e => e.id === t.budgetId);
             return !budgetEntry || !budgetEntry.isOffBudget;
         });
     }
@@ -482,7 +490,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     let payments = [];
     let title = '';
     if (context.entryId) {
-      const entry = expandedEntries.find(e => e.id === context.entryId);
+      const entry = expandedAndVatEntries.find(e => e.id === context.entryId);
       payments = actualTransactions.filter(t => t.budgetId === context.entryId).flatMap(t => (t.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).map(p => ({ ...p, thirdParty: t.thirdParty, type: t.type })));
       title = `Détails pour ${entry.supplier}`;
     } else if (context.mainCategory) {
@@ -515,21 +523,21 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
   const handleCloseDrawer = () => setDrawerData({ isOpen: false, transactions: [], title: '' });
   const groupedData = useMemo(() => {
-    const entriesToGroup = expandedEntries.filter(e => !e.isOffBudget);
+    const entriesToGroup = expandedAndVatEntries.filter(e => !e.isOffBudget);
     const groupByType = (type) => {
       const catType = type === 'entree' ? 'revenue' : 'expense';
       if (!categories || !categories[catType]) return [];
       return categories[catType].map(mainCat => {
         if (!mainCat.subCategories) return null;
         const entriesForMainCat = entriesToGroup.filter(entry => 
-            (mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible')))
+            (mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible')) || (entry.is_vat_payment && (entry.category === 'TVA à payer' || entry.category === 'Crédit de TVA')))
             && isRowVisibleInPeriods(entry)
         );
         return entriesForMainCat.length > 0 ? { ...mainCat, entries: entriesForMainCat } : null;
       }).filter(Boolean);
     };
     return { entree: groupByType('entree'), sortie: groupByType('sortie') };
-  }, [expandedEntries, categories, periods]);
+  }, [expandedAndVatEntries, categories, periods]);
 
   const handleDrillDown = () => {
     const newCollapsedState = {};
@@ -553,7 +561,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return { budget, actual, reste: budget - actual };
   };
   const calculateOffBudgetTotalsForPeriod = (type, period) => {
-      const offBudgetEntries = expandedEntries.filter(e => e.isOffBudget && e.type === type);
+      const offBudgetEntries = expandedAndVatEntries.filter(e => e.isOffBudget && e.type === type);
       const budget = offBudgetEntries.reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
       const actual = offBudgetEntries.reduce((sum, entry) => sum + getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate), 0);
       return { budget, actual, reste: budget - actual };
@@ -779,7 +787,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
               {!isMainCollapsed && mainCategory.entries.map((entry) => {
                 const project = (isConsolidated || isCustomConsolidated) ? projects.find(p => p.id === entry.projectId) : null;
                 return (
-                  <tr key={entry.id} className={`border-b border-gray-100 hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : ''}`}>
+                  <tr key={entry.id} className={`border-b border-gray-100 hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : (entry.is_vat_payment ? 'bg-blue-50/50' : '')}`}>
                     <td className={`px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10 ${entry.is_vat_child ? 'pl-8' : ''}`}>{entry.category}</td>
                     <td className="px-4 py-1 text-gray-700 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${supplierColLeft}px` }}>
                       <div className="flex items-center justify-between">
@@ -953,7 +961,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
       
       {mode === 'lecture' ? (
         <LectureView 
-            entries={expandedEntries} 
+            entries={expandedAndVatEntries} 
             periods={periods}
             settings={settings}
             actuals={actualTransactions}

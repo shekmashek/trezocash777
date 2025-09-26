@@ -5,6 +5,7 @@ import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search, Lock,
 import EmptyState from './EmptyState';
 import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
+import { expandVatEntries } from '../utils/budgetCalculations';
 
 const LectureView = ({ entries, settings, tiers, setMode }) => {
     const sortedEntries = useMemo(() => {
@@ -141,25 +142,37 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
         };
     }, [activeProjectId, projects, allEntries, consolidatedViews]);
 
+    const expandedEntries = useMemo(() => {
+        return expandVatEntries(budgetEntries, categories);
+    }, [budgetEntries, categories]);
+
     const filteredBudgetEntries = useMemo(() => {
         if (!searchTerm) {
-            return budgetEntries;
+            return expandedEntries;
         }
-        return budgetEntries.filter(entry => 
+        return expandedEntries.filter(entry => 
             entry.supplier.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [budgetEntries, searchTerm]);
+    }, [expandedEntries, searchTerm]);
 
     const handleAddEntry = (categoryName, mainCategoryType, mainCategoryId) => {
         dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
 
     const handleEditEntry = (entry) => {
-        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry });
+        const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
+        const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
+        if (originalEntry) {
+            dispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
+        }
     };
 
     const handleDeleteEntry = (entry) => {
-        deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId });
+        const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
+        const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
+        if (originalEntry) {
+            deleteEntry(dispatch, { entryId: originalEntry.id, entryProjectId: originalEntry.projectId });
+        }
     };
 
     const handleCategorySelectedForNewEntry = (mainCategoryId) => {
@@ -200,7 +213,7 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                     <tbody>
                         {mainCategories.map(mainCat => {
                             const entriesForMainCat = sectionEntries.filter(entry => 
-                                mainCat.subCategories.some(sc => sc.name === entry.category)
+                                mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible') && mainCat.name === 'Impôts et Taxes')
                             );
                             if (entriesForMainCat.length === 0) return null;
 
@@ -217,7 +230,7 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                                                     {mainCat.name}
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                                                    {mainCat.subCategories.map(sc => (
+                                                    {mainCat.subCategories.filter(sc => !sc.isFixed).map(sc => (
                                                         <button key={sc.id} onClick={(e) => { e.stopPropagation(); handleAddEntry(sc.name, type, mainCat.id); }} className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full hover:bg-gray-300 text-xs font-normal">
                                                             <Plus size={12} /> {sc.name}
                                                         </button>
@@ -236,8 +249,8 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                                         </td>
                                     </tr>
                                     {entriesForMainCat.map(entry => (
-                                        <tr key={entry.id} className="border-b hover:bg-gray-50 group">
-                                            <td className="py-3 px-4 text-blue-600 font-medium">{entry.category}</td>
+                                        <tr key={entry.id} className={`border-b hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : ''}`}>
+                                            <td className={`py-3 px-4 font-medium ${entry.is_vat_child ? 'pl-8 text-slate-600' : 'text-blue-600'}`}>{entry.category}</td>
                                             <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
                                             <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
                                             <td className="py-3 px-4 text-gray-600">

@@ -4,15 +4,12 @@ import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import ReactECharts from 'echarts-for-react';
 import EmptyState from './EmptyState';
-import { getTodayInTimezone, getEntryAmountForPeriod } from '../utils/budgetCalculations';
-import { useTranslation } from '../utils/i18n';
+import { getTodayInTimezone, getEntryAmountForPeriod, expandVatEntries } from '../utils/budgetCalculations';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, rangeEnd: rangeEndProp, analysisType: analysisTypeProp, analysisMode: analysisModeProp, setAnalysisMode: setAnalysisModeProp }) => {
   const { state, dispatch } = useBudget();
   const { activeProjectId, projects, categories, allActuals, settings, allEntries, consolidatedViews } = state;
-  const { t } = useTranslation();
-
   const [localTimeUnit, setLocalTimeUnit] = useState('month');
   const [localHorizonLength, setLocalHorizonLength] = useState(1);
   const [localPeriodOffset, setLocalPeriodOffset] = useState(0);
@@ -20,7 +17,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
   const [localAnalysisType, setLocalAnalysisType] = useState('expense');
   const [localAnalysisMode, setLocalAnalysisMode] = useState('category');
   const [visibleData, setVisibleData] = useState({ budget: true, actual: true });
-  
   const [drillDownState, setDrillDownState] = useState({
     level: 0, // 0: main, 1: sub-category, 2: supplier
     mainCategoryName: null,
@@ -28,18 +24,15 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     dataType: null, // 'budget' or 'actual'
     color: null,
   });
-
   const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
   const periodMenuRef = useRef(null);
   const [isAnalysisTypeMenuOpen, setIsAnalysisTypeMenuOpen] = useState(false);
   const analysisTypeMenuRef = useRef(null);
   const [isAnalysisModeMenuOpen, setIsAnalysisModeMenuOpen] = useState(false);
   const analysisModeMenuRef = useRef(null);
-
   const analysisType = isFocusMode ? analysisTypeProp : localAnalysisType;
   const analysisMode = isFocusMode ? analysisModeProp : localAnalysisMode;
   const setAnalysisMode = isFocusMode ? setAnalysisModeProp : setLocalAnalysisMode;
-
   useEffect(() => {
     const handleClickOutside = (event) => {
         if (periodMenuRef.current && !periodMenuRef.current.contains(event.target)) {
@@ -57,7 +50,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
   useEffect(() => {
     if (drillDownState.level > 0) {
         setDrillDownState({
@@ -69,7 +61,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         });
     }
   }, [analysisMode]);
-
   useEffect(() => {
     if (!rangeStartProp) {
         setLocalTimeUnit('month');
@@ -78,15 +69,12 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         setLocalActiveQuickSelect('month');
     }
   }, [settings.timezoneOffset, rangeStartProp]);
-
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
-
   const handlePeriodChange = (direction) => {
     setLocalPeriodOffset(prev => prev + direction);
     setLocalActiveQuickSelect(null);
   };
-
   const handleQuickPeriodSelect = (quickSelectType) => {
     let payload;
     switch (quickSelectType) {
@@ -112,7 +100,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     setLocalPeriodOffset(payload.periodOffset);
     setLocalActiveQuickSelect(quickSelectType);
   };
-
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (rangeStartProp && rangeEndProp) {
         return { rangeStart: rangeStartProp, rangeEnd: rangeEndProp };
@@ -153,13 +140,10 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     }
     return { rangeStart: firstPeriodStart, rangeEnd: lastPeriodEnd };
   }, [rangeStartProp, rangeEndProp, localTimeUnit, localHorizonLength, localPeriodOffset, settings.timezoneOffset]);
-  
   const analysisPeriodName = useMemo(() => {
     if (!rangeStart) return '';
-
     const year = rangeStart.getFullYear();
     const month = rangeStart.getMonth();
-
     switch (localTimeUnit) {
         case 'month':
             return rangeStart.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
@@ -179,10 +163,8 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             return '';
     }
   }, [rangeStart, localTimeUnit]);
-
   const projectActuals = useMemo(() => {
     if (!rangeStart || !rangeEnd) return [];
-    
     let relevant;
     if (isConsolidated) {
         relevant = Object.values(allActuals).flat();
@@ -194,7 +176,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     } else {
         relevant = allActuals[activeProjectId] || [];
     }
-    
     return relevant.filter(actual => 
         actual.type === (analysisType === 'expense' ? 'payable' : 'receivable') && 
         (actual.payments || []).some(p => {
@@ -203,7 +184,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         })
     );
   }, [isConsolidated, isCustomConsolidated, consolidatedViews, allActuals, activeProjectId, rangeStart, rangeEnd, analysisType]);
-
   const projectEntries = useMemo(() => {
     let relevant;
     if (isConsolidated) {
@@ -218,21 +198,20 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     }
     return relevant.filter(e => e.type === (analysisType === 'expense' ? 'depense' : 'revenu'));
   }, [isConsolidated, isCustomConsolidated, consolidatedViews, allEntries, activeProjectId, analysisType]);
-
+  const expandedProjectEntries = useMemo(() => {
+    return expandVatEntries(projectEntries, categories);
+  }, [projectEntries, categories]);
   const categoryAnalysisData = useMemo(() => {
     if (!rangeStart || !rangeEnd) {
         return { categories: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
     }
-
     const mainCategories = analysisType === 'expense' ? categories.expense : categories.revenue;
-    
     const data = mainCategories.map(mainCat => {
-        const budgetAmount = projectEntries
-            .filter(entry => mainCat.subCategories.some(sc => sc.name === entry.category))
+        const budgetAmount = expandedProjectEntries
+            .filter(entry => entry.category === mainCat.name || mainCat.subCategories.some(sc => sc.name === entry.category))
             .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, rangeStart, rangeEnd), 0);
-
         const actualAmount = projectActuals
-            .filter(actual => mainCat.subCategories.some(sc => sc.name === actual.category))
+            .filter(actual => actual.category === mainCat.name || mainCat.subCategories.some(sc => sc.name === actual.category))
             .reduce((sum, actual) => {
                 const paymentsInPeriod = (actual.payments || []).filter(p => {
                     const paymentDate = new Date(p.paymentDate);
@@ -240,15 +219,11 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 });
                 return sum + paymentsInPeriod.reduce((pSum, p) => pSum + p.paidAmount, 0);
             }, 0);
-
         return { name: mainCat.name, budget: budgetAmount, actual: actualAmount };
     }).filter(item => item.budget > 0 || item.actual > 0);
-
     data.sort((a, b) => b.actual - a.actual);
-
     const totalBudget = data.reduce((sum, item) => sum + item.budget, 0);
     const totalActual = data.reduce((sum, item) => sum + item.actual, 0);
-
     return { 
         categories: data.map(item => item.name), 
         budgetData: data.map(item => item.budget), 
@@ -256,20 +231,16 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         totalBudget, 
         totalActual 
     };
-  }, [categories.expense, categories.revenue, projectActuals, projectEntries, rangeStart, rangeEnd, analysisType]);
-
+  }, [categories.expense, categories.revenue, projectActuals, expandedProjectEntries, rangeStart, rangeEnd, analysisType]);
   const subCategoryDrillDownData = useMemo(() => {
     if (drillDownState.level < 1) {
         return { labels: [], data: [], total: 0 };
     }
-
     const mainCategories = analysisType === 'expense' ? categories.expense : categories.revenue;
     const mainCat = mainCategories.find(mc => mc.name === drillDownState.mainCategoryName);
-
     if (!mainCat || !mainCat.subCategories) {
         return { labels: [], data: [], total: 0 };
     }
-
     const subCategoryData = mainCat.subCategories.map(subCat => {
         let amount = 0;
         if (drillDownState.dataType === 'actual') {
@@ -283,32 +254,26 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                     return sum + paymentsInPeriod.reduce((pSum, p) => pSum + p.paidAmount, 0);
                 }, 0);
         } else { // 'budget'
-            amount = projectEntries
+            amount = expandedProjectEntries
                 .filter(entry => entry.category === subCat.name)
                 .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, rangeStart, rangeEnd), 0);
         }
         return { name: subCat.name, value: amount };
     }).filter(item => item.value > 0);
-    
     subCategoryData.sort((a, b) => b.value - a.value);
-
     const total = subCategoryData.reduce((sum, item) => sum + item.value, 0);
-
     return {
         labels: subCategoryData.map(item => item.name),
         data: subCategoryData,
         total,
     };
-  }, [drillDownState, categories, projectActuals, projectEntries, rangeStart, rangeEnd, analysisType]);
-
+  }, [drillDownState, categories, projectActuals, expandedProjectEntries, rangeStart, rangeEnd, analysisType]);
   const supplierDrillDownData = useMemo(() => {
     if (drillDownState.level !== 2) {
         return { labels: [], data: [], total: 0 };
     }
-
     const { subCategoryName, dataType } = drillDownState;
     const supplierData = new Map();
-
     if (dataType === 'actual') {
         projectActuals
             .filter(actual => actual.category === subCategoryName)
@@ -318,14 +283,13 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                     return paymentDate >= rangeStart && paymentDate < rangeEnd;
                 });
                 const totalPaidInPeriod = paymentsInPeriod.reduce((pSum, p) => pSum + p.paidAmount, 0);
-
                 if (totalPaidInPeriod > 0) {
                     const currentAmount = supplierData.get(actual.thirdParty) || 0;
                     supplierData.set(actual.thirdParty, currentAmount + totalPaidInPeriod);
                 }
             });
     } else { // 'budget'
-        projectEntries
+        expandedProjectEntries
             .filter(entry => entry.category === subCategoryName)
             .forEach(entry => {
                 const amount = getEntryAmountForPeriod(entry, rangeStart, rangeEnd);
@@ -335,26 +299,21 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
                 }
             });
     }
-
     const formattedData = Array.from(supplierData.entries())
         .map(([name, value]) => ({ name, value }))
         .filter(item => item.value > 0)
         .sort((a, b) => b.value - a.value);
-
     const total = formattedData.reduce((sum, item) => sum + item.value, 0);
-
     return {
         labels: formattedData.map(item => item.name),
         data: formattedData,
         total,
     };
-  }, [drillDownState, projectActuals, projectEntries, rangeStart, rangeEnd]);
-
+  }, [drillDownState, projectActuals, expandedProjectEntries, rangeStart, rangeEnd]);
   const projectAnalysisData = useMemo(() => {
     if ((!isConsolidated && !isCustomConsolidated) || !rangeStart || !rangeEnd) {
       return { projects: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
     }
-  
     let projectsToAnalyze = [];
     if (isConsolidated) {
         projectsToAnalyze = projects.filter(p => !p.isArchived);
@@ -364,16 +323,13 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         if (!view || !view.project_ids) return { projects: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
         projectsToAnalyze = projects.filter(p => view.project_ids.includes(p.id) && !p.isArchived);
     }
-
     const projectData = projectsToAnalyze
       .map(project => {
         const projectEntries = allEntries[project.id] || [];
         const projectActuals = allActuals[project.id] || [];
-  
         const budgetAmount = projectEntries
           .filter(e => e.type === (analysisType === 'expense' ? 'depense' : 'revenu'))
           .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, rangeStart, rangeEnd), 0);
-  
         const actualAmount = projectActuals
           .filter(actual => actual.type === (analysisType === 'expense' ? 'payable' : 'receivable'))
           .reduce((sum, actual) => {
@@ -383,16 +339,12 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             });
             return sum + paymentsInPeriod.reduce((pSum, p) => pSum + p.paidAmount, 0);
           }, 0);
-  
         return { name: project.name, budget: budgetAmount, actual: actualAmount };
       })
       .filter(p => p.budget > 0 || p.actual > 0);
-
     projectData.sort((a, b) => b.actual - a.actual);
-  
     const totalBudget = projectData.reduce((sum, p) => sum + p.budget, 0);
     const totalActual = projectData.reduce((sum, p) => sum + p.actual, 0);
-  
     return {
       projects: projectData.map(p => p.name),
       budgetData: projectData.map(p => p.budget),
@@ -401,35 +353,28 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
       totalActual,
     };
   }, [projects, allEntries, allActuals, rangeStart, rangeEnd, analysisType, isConsolidated, isCustomConsolidated, consolidatedViews, activeProjectId]);
-
   const tierAnalysisData = useMemo(() => {
     if (!rangeStart || !rangeEnd) {
       return { tiers: [], budgetData: [], actualData: [], totalBudget: 0, totalActual: 0 };
     }
-  
     const tierBudgetMap = new Map();
     const tierActualMap = new Map();
-  
-    projectEntries.forEach(entry => {
+    expandedProjectEntries.forEach(entry => {
       const amount = getEntryAmountForPeriod(entry, rangeStart, rangeEnd);
       if (amount > 0) {
         tierBudgetMap.set(entry.supplier, (tierBudgetMap.get(entry.supplier) || 0) + amount);
       }
     });
-  
     projectActuals.forEach(actual => {
       const actualAmount = (actual.payments || []).filter(p => {
         const paymentDate = new Date(p.paymentDate);
         return paymentDate >= rangeStart && paymentDate < rangeEnd;
       }).reduce((sum, p) => sum + p.paidAmount, 0);
-  
       if (actualAmount > 0) {
         tierActualMap.set(actual.thirdParty, (tierActualMap.get(actual.thirdParty) || 0) + actualAmount);
       }
     });
-  
     const allTiers = new Set([...tierBudgetMap.keys(), ...tierActualMap.keys()]);
-    
     const tierData = Array.from(allTiers)
       .map(tier => ({
         name: tier,
@@ -438,10 +383,8 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
       }))
       .sort((a, b) => b.actual - a.actual)
       .slice(0, 10);
-  
     const totalBudget = tierData.reduce((sum, p) => sum + p.budget, 0);
     const totalActual = tierData.reduce((sum, p) => sum + p.actual, 0);
-  
     return {
       tiers: tierData.map(p => p.name),
       budgetData: tierData.map(p => p.budget),
@@ -449,8 +392,7 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
       totalBudget,
       totalActual,
     };
-  }, [projectEntries, projectActuals, rangeStart, rangeEnd]);
-
+  }, [expandedProjectEntries, projectActuals, rangeStart, rangeEnd]);
   const handleBack = () => {
     if (drillDownState.level === 2) {
         setDrillDownState(prev => ({
@@ -468,10 +410,8 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         });
     }
   };
-
   const onChartClick = (params) => {
     if (params.componentType !== 'series' || analysisMode !== 'category') return;
-
     if (drillDownState.level === 0) {
         setDrillDownState({
             level: 1,
@@ -488,20 +428,15 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         }));
     }
   };
-
   const onEvents = {
       'click': onChartClick,
   };
-
   const getChartOptions = () => {
     const { categories, budgetData, actualData, totalBudget, totalActual } = categoryAnalysisData;
-    
     const chartColors = analysisType === 'expense'
       ? { budget: '#fca5a5', actual: '#ef4444', budgetLabel: '#b91c1c', actualLabel: '#7f1d1d' }
       : { budget: '#6ee7b7', actual: '#10b981', budgetLabel: '#047857', actualLabel: '#065f46' };
-
     const series = [];
-
     if (visibleData.budget) {
         series.push({
             name: `Budget: ${formatCurrency(totalBudget, settings)}`,
@@ -521,7 +456,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             }
         });
     }
-
     if (visibleData.actual) {
         series.push({
             name: `Réel: ${formatCurrency(totalActual, settings)}`,
@@ -541,14 +475,12 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             }
         });
     }
-
     if (series.length === 0) {
         return {
             title: { text: 'Aucune donnée à analyser', left: 'center', top: 'center' },
             series: []
         };
     }
-
     return {
         title: { text: 'Analyse par Catégorie', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: {
@@ -589,7 +521,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         series: series
     };
   };
-
   const getSubCategoryDrillDownChartOptions = () => {
     const { data, total } = subCategoryDrillDownData;
     const barColor = drillDownState.color;
@@ -599,7 +530,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     };
     const defaultLabelColor = analysisType === 'expense' ? '#7f1d1d' : '#065f46';
     const labelColor = labelColorMap[barColor] || defaultLabelColor;
-
     return {
         title: { text: `Détail de : ${drillDownState.mainCategoryName}`, left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: {
@@ -632,7 +562,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         }]
     };
   };
-
   const getSupplierDrillDownChartOptions = () => {
     const { data, total } = supplierDrillDownData;
     const barColor = drillDownState.color;
@@ -642,7 +571,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     };
     const defaultLabelColor = analysisType === 'expense' ? '#7f1d1d' : '#065f46';
     const labelColor = labelColorMap[barColor] || defaultLabelColor;
-
     return {
         title: { text: `Détail de : ${drillDownState.subCategoryName}`, left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: {
@@ -675,15 +603,12 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         }]
     };
   };
-
   const getProjectChartOptions = () => {
     const { projects, budgetData, actualData } = projectAnalysisData;
     const chartColors = analysisType === 'expense'
       ? { budget: '#fca5a5', actual: '#ef4444', budgetLabel: '#b91c1c', actualLabel: '#7f1d1d' }
       : { budget: '#6ee7b7', actual: '#10b981', budgetLabel: '#047857', actualLabel: '#065f46' };
-
     if (projects.length === 0) return { title: { text: 'Aucune donnée de projet à analyser', left: 'center', top: 'center' }, series: [] };
-
     const series = [];
     if (visibleData.budget) {
         series.push({ name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } });
@@ -691,7 +616,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     if (visibleData.actual) {
         series.push({ name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } });
     }
-
     return {
         title: { text: 'Analyse par Projet', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -702,15 +626,12 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         series: series
     };
   };
-
   const getTierChartOptions = () => {
     const { tiers, budgetData, actualData } = tierAnalysisData;
     const chartColors = analysisType === 'expense'
       ? { budget: '#fca5a5', actual: '#ef4444', budgetLabel: '#b91c1c', actualLabel: '#7f1d1d' }
       : { budget: '#6ee7b7', actual: '#10b981', budgetLabel: '#047857', actualLabel: '#065f46' };
-
     if (tiers.length === 0) return { title: { text: 'Aucune donnée par tiers à analyser', left: 'center', top: 'center' }, series: [] };
-
     const series = [];
     if (visibleData.budget) {
         series.push({ name: 'Budget', type: 'bar', data: budgetData, itemStyle: { color: chartColors.budget, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.budgetLabel } });
@@ -718,7 +639,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     if (visibleData.actual) {
         series.push({ name: 'Réel', type: 'bar', data: actualData, itemStyle: { color: chartColors.actual, borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: chartColors.actualLabel } });
     }
-    
     return {
         title: { text: 'Analyse par Tiers (Top 10)', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: '600', color: '#475569' } },
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -729,7 +649,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         series: series
     };
   };
-
   const renderChart = () => {
     if (analysisMode === 'category') {
         if (drillDownState.level === 0) {
@@ -745,7 +664,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
         return tierAnalysisData.tiers.length > 0 ? <ReactECharts option={getTierChartOptions()} style={{ height: '500px', width: '100%' }} /> : <EmptyState icon={User} title="Aucune donnée par tiers" message="Aucune transaction trouvée pour la période sélectionnée." />;
     }
   };
-  
   const quickPeriodOptions = [
     { id: 'month', label: 'Mois' },
     { id: 'bimester', label: 'Bimestre' },
@@ -754,21 +672,18 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
     { id: 'year', label: 'Année' },
   ];
   const selectedPeriodLabel = quickPeriodOptions.find(opt => opt.id === localActiveQuickSelect)?.label || 'Période';
-  
   const analysisTypeOptions = [
     { id: 'expense', label: 'Sorties', icon: TrendingDown, color: 'text-red-600' },
     { id: 'revenue', label: 'Entrées', icon: TrendingUp, color: 'text-green-600' }
   ];
   const selectedAnalysisTypeOption = analysisTypeOptions.find(opt => opt.id === analysisType);
   const SelectedIcon = selectedAnalysisTypeOption.icon;
-
   const analysisModeOptions = [
     { id: 'category', label: 'Par catégorie' },
     ...(isConsolidated || isCustomConsolidated ? [{ id: 'project', label: 'Par projet' }] : []),
     { id: 'tier', label: 'Par tiers' },
   ];
   const selectedAnalysisModeOption = analysisModeOptions.find(opt => opt.id === analysisMode);
-
   return (
     <div className={isFocusMode ? "h-full flex flex-col" : "container mx-auto p-6 max-w-full"}>
       {!isFocusMode && (
@@ -783,7 +698,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             </div>
         </div>
       )}
-
       {!isFocusMode && (
         <div className="mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -926,7 +840,6 @@ const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, 
             </div>
         </div>
       )}
-
       <div className="bg-white p-6 rounded-lg shadow">
         {drillDownState.level > 0 && (
             <div className="mb-4">

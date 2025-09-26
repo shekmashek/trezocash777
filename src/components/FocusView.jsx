@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useBudget } from '../context/BudgetContext';
-import { useTranslation } from '../utils/i18n';
 import { Plus, Table, AreaChart, Calendar, Layers, PieChart, Minimize, ChevronLeft, ChevronRight, Eye, TrendingDown, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -14,7 +13,6 @@ import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations'
 const FocusView = () => {
     const { state, dispatch } = useBudget();
     const { focusView, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, settings } = state;
-    const { t } = useTranslation();
     const isConsolidated = activeProjectId === 'consolidated';
     const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 

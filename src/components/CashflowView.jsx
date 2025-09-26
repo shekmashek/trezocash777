@@ -6,8 +6,7 @@ import BudgetModal from './BudgetModal';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
 import { generateScenarioActuals, resolveScenarioEntries } from '../utils/scenarioCalculations';
-import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useTranslation } from '../utils/i18n';
+import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek, expandVatEntries } from '../utils/budgetCalculations';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function renderBudgetLine(params, api) {
@@ -50,8 +49,7 @@ function renderBudgetLine(params, api) {
 
 const CashflowView = ({ isFocusMode = false }) => {
   const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews } = state;
-  const { t } = useTranslation();
+  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, categories } = state;
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
@@ -149,14 +147,14 @@ const CashflowView = ({ isFocusMode = false }) => {
   };
   
   const timeUnitLabels = {
-    day: t('sidebar.day'),
-    week: t('sidebar.week'),
-    fortnightly: t('sidebar.fortnightly'),
-    month: t('sidebar.month'),
-    bimonthly: t('sidebar.bimonthly'),
-    quarterly: t('sidebar.quarterly'),
-    semiannually: t('sidebar.semiannually'),
-    annually: t('sidebar.annually'),
+    day: 'Jour',
+    week: 'Semaine',
+    fortnightly: 'Quinzaine',
+    month: 'Mois',
+    bimonthly: 'Bimestre',
+    quarterly: 'Trimestre',
+    semiannually: 'Semestre',
+    annually: 'Année',
   };
   
   const periodLabel = useMemo(() => {
@@ -164,7 +162,7 @@ const CashflowView = ({ isFocusMode = false }) => {
     const label = timeUnitLabels[timeUnit] || 'Période';
     const plural = Math.abs(periodOffset) > 1 ? 's' : '';
     return `${periodOffset > 0 ? '+' : ''}${periodOffset} ${label}${plural}`;
-  }, [periodOffset, timeUnit, timeUnitLabels, t]);
+  }, [periodOffset, timeUnit, timeUnitLabels]);
 
   const handleScenarioSelectionChange = (scenarioId) => {
     setSelectedScenarios(prev => ({ ...prev, [scenarioId]: !prev[scenarioId] }));
@@ -356,8 +354,7 @@ const CashflowView = ({ isFocusMode = false }) => {
         const initialBalancesSum = userCashAccounts.reduce((sum, acc) => sum + (parseFloat(acc.initialBalance) || 0), 0);
         
         const allActualsFlat = Object.values(allActuals).flat();
-        const pastPayments = allActualsFlat.flatMap(actual => actual.payments || []).filter(p => new Date(p.paymentDate) < chartStartDate);
-        const netFlowOfPastPayments = pastPayments.reduce((sum, p) => {
+        const netFlowOfPastPayments = allActualsFlat.flatMap(actual => actual.payments || []).filter(p => new Date(p.paymentDate) < chartStartDate).reduce((sum, p) => {
             const actual = allActualsFlat.find(a => (a.payments || []).some(payment => payment.id === p.id));
             if (!actual) return sum;
             return actual.type === 'receivable' ? sum + p.paidAmount : sum - p.paidAmount;
@@ -411,12 +408,13 @@ const CashflowView = ({ isFocusMode = false }) => {
         };
     };
 
-    const baseFlow = calculateCashflowData(baseActuals, baseBudgetEntries);
+    const expandedBaseBudgetEntries = expandVatEntries(baseBudgetEntries, categories);
+    const baseFlow = calculateCashflowData(baseActuals, expandedBaseBudgetEntries);
     
     return { base: baseFlow };
-  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, state.scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset]);
+  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, state.scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset, categories]);
   
-  const getCashflowChartOptions = () => {
+  const getChartOptions = () => {
     const { base } = cashflowData;
 
     if (!base || !base.labels || base.labels.length === 0) {
@@ -684,7 +682,7 @@ const CashflowView = ({ isFocusMode = false }) => {
         </div>
         <div className="flex-grow p-4 min-h-0">
             <ReactECharts 
-                option={getCashflowChartOptions()} 
+                option={getChartOptions()} 
                 style={{ height: '100%', width: '100%' }} 
                 onEvents={onEvents}
                 notMerge={true}
