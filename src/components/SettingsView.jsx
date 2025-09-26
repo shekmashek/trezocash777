@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Globe } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 
 const SettingsView = () => {
-  const { state, dispatch } = useBudget();
-  const { settings } = state;
+  const { dataState, dataDispatch } = useData();
+  const { settings } = dataState;
 
   const [currency, setCurrency] = useState(settings.currency);
   const [customCurrency, setCustomCurrency] = useState('');
@@ -24,7 +25,7 @@ const SettingsView = () => {
   }, [settings.currency]);
   
   const handleUpdateSettings = (newSettings) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: newSettings });
+    dataDispatch({ type: 'UPDATE_SETTINGS', payload: newSettings });
   };
 
   const handleCurrencyChange = (e) => {

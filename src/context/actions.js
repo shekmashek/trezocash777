@@ -9,7 +9,7 @@ const getDefaultExpenseTargets = () => ({
   'exp-main-9': 5, 'exp-main-10': 0,
 });
 
-export const initializeProject = async (dispatch, payload, user, existingTiersData, allTemplates) => {
+export const initializeProject = async ({ dataDispatch, uiDispatch }, payload, user, existingTiersData, allTemplates) => {
   try {
     const { projectName, projectStartDate, projectEndDate, isEndDateIndefinite, templateId, startOption } = payload;
     
@@ -38,7 +38,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
             .select().single();
         if (accountError) throw accountError;
 
-        dispatch({ 
+        dataDispatch({ 
             type: 'INITIALIZE_PROJECT_SUCCESS', 
             payload: {
                 newProject: {
@@ -53,6 +53,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
                 newAllEntries: [], newAllActuals: [], newTiers: [], newLoans: [], newCategories: null,
             }
         });
+        uiDispatch({ type: 'CANCEL_ONBOARDING' });
         return;
     }
 
@@ -120,7 +121,7 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
         if (actualsError) throw actualsError;
     }
     
-    dispatch({ 
+    dataDispatch({ 
         type: 'INITIALIZE_PROJECT_SUCCESS', 
         payload: {
             newProject: {
@@ -143,15 +144,16 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
             newCategories,
         }
     });
+    uiDispatch({ type: 'CANCEL_ONBOARDING' });
 
   } catch (error) {
     console.error("Onboarding failed:", error);
-    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la création du projet: ${error.message}`, type: 'error' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la création du projet: ${error.message}`, type: 'error' } });
     throw error;
   }
 };
 
-export const updateProjectSettings = async (dispatch, { projectId, newSettings }) => {
+export const updateProjectSettings = async ({ dataDispatch, uiDispatch }, { projectId, newSettings }) => {
     try {
         const updates = {
             name: newSettings.name,
@@ -168,7 +170,7 @@ export const updateProjectSettings = async (dispatch, { projectId, newSettings }
 
         if (error) throw error;
 
-        dispatch({
+        dataDispatch({
             type: 'UPDATE_PROJECT_SETTINGS_SUCCESS',
             payload: {
                 projectId,
@@ -179,14 +181,14 @@ export const updateProjectSettings = async (dispatch, { projectId, newSettings }
                 }
             }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres du projet mis à jour.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres du projet mis à jour.', type: 'success' } });
     } catch (error) {
         console.error("Error updating project settings:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const saveEntry = async (dispatch, { entryData, editingEntry, activeProjectId, tiers, user, cashAccounts }) => {
+export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editingEntry, activeProjectId, tiers, user, cashAccounts }) => {
     try {
         const { supplier, type } = entryData;
         const tierType = type === 'revenu' ? 'client' : 'fournisseur';
@@ -296,7 +298,7 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
             if (insertError) throw insertError;
         }
 
-        dispatch({
+        dataDispatch({
             type: 'SAVE_ENTRY_SUCCESS',
             payload: {
                 savedEntry: savedEntryForClient,
@@ -305,18 +307,19 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
                 newTier: newTierData ? { id: newTierData.id, name: newTierData.name, type: newTierData.type } : null,
             }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire enregistrée.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire enregistrée.', type: 'success' } });
+        uiDispatch({ type: 'CLOSE_BUDGET_MODAL' });
 
     } catch (error) {
         console.error("Error saving entry:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'enregistrement: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'enregistrement: ${error.message}`, type: 'error' } });
     }
 };
 
-export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
+export const deleteEntry = async ({ dataDispatch, uiDispatch }, { entryId, entryProjectId }) => {
     try {
         if (!entryProjectId || entryProjectId === 'consolidated' || entryProjectId.startsWith('consolidated_view_')) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une entrée en vue consolidée.", type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une entrée en vue consolidée.", type: 'error' } });
             return;
         }
 
@@ -334,21 +337,22 @@ export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
 
         if (deleteEntryError) throw deleteEntryError;
 
-        dispatch({
+        dataDispatch({
             type: 'DELETE_ENTRY_SUCCESS',
             payload: { entryId, entryProjectId }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire supprimée.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire supprimée.', type: 'success' } });
+        uiDispatch({ type: 'CLOSE_BUDGET_MODAL' });
 
     } catch (error) {
         console.error("Error deleting entry:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression: ${error.message}`, type: 'error' } });
     }
 };
 
-export const updateSettings = async (dispatch, user, newSettings) => {
+export const updateSettings = async ({ dataDispatch, uiDispatch }, user, newSettings) => {
     if (!user) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
         return;
     }
     try {
@@ -374,15 +378,15 @@ export const updateSettings = async (dispatch, user, newSettings) => {
             decimalPlaces: data.decimal_places,
             timezoneOffset: data.timezone_offset,
         };
-        dispatch({ type: 'UPDATE_SETTINGS_SUCCESS', payload: updatedSettings });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Préférences mises à jour.', type: 'success' } });
+        dataDispatch({ type: 'UPDATE_SETTINGS_SUCCESS', payload: updatedSettings });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Préférences mises à jour.', type: 'success' } });
     } catch (error) {
         console.error("Error updating settings:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const updateUserCashAccount = async (dispatch, { projectId, accountId, accountData }) => {
+export const updateUserCashAccount = async ({ dataDispatch, uiDispatch }, { projectId, accountId, accountData }) => {
     try {
         const updates = {
             name: accountData.name,
@@ -399,7 +403,7 @@ export const updateUserCashAccount = async (dispatch, { projectId, accountId, ac
 
         if (error) throw error;
 
-        dispatch({
+        dataDispatch({
             type: 'UPDATE_USER_CASH_ACCOUNT_SUCCESS',
             payload: {
                 projectId,
@@ -411,14 +415,14 @@ export const updateUserCashAccount = async (dispatch, { projectId, accountId, ac
                 }
             }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Compte mis à jour.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Compte mis à jour.', type: 'success' } });
     } catch (error) {
         console.error("Error updating cash account:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const saveActual = async (dispatch, { actualData, editingActual, user, tiers }) => {
+export const saveActual = async ({ dataDispatch, uiDispatch }, { actualData, editingActual, user, tiers }) => {
   try {
     const { thirdParty, type } = actualData;
     const tierType = type === 'receivable' ? 'client' : 'fournisseur';
@@ -473,34 +477,35 @@ export const saveActual = async (dispatch, { actualData, editingActual, user, ti
         payments: []
     };
 
-    dispatch({
+    dataDispatch({
       type: 'SAVE_ACTUAL_SUCCESS',
       payload: {
         finalActualData,
         newTier: newTierData ? { id: newTierData.id, name: newTierData.name, type: newTierData.type } : null,
       }
     });
-    dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction enregistrée.', type: 'success' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction enregistrée.', type: 'success' } });
+    uiDispatch({ type: 'CLOSE_ACTUAL_TRANSACTION_MODAL' });
 
   } catch (error) {
     console.error("Error saving actual transaction:", error);
-    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
   }
 };
 
-export const deleteActual = async (dispatch, actualId) => {
+export const deleteActual = async ({ dataDispatch, uiDispatch }, actualId) => {
     try {
         const { error } = await supabase.from('actual_transactions').delete().eq('id', actualId);
         if (error) throw error;
-        dispatch({ type: 'DELETE_ACTUAL_SUCCESS', payload: actualId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction supprimée.', type: 'success' } });
+        dataDispatch({ type: 'DELETE_ACTUAL_SUCCESS', payload: actualId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction supprimée.', type: 'success' } });
     } catch (error) {
         console.error("Error deleting actual:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const recordPayment = async (dispatch, { actualId, paymentData, allActuals, user }) => {
+export const recordPayment = async ({ dataDispatch, uiDispatch }, { actualId, paymentData, allActuals, user }) => {
     try {
         if (!user || !user.id) {
             throw new Error("ID utilisateur manquant.");
@@ -531,15 +536,16 @@ export const recordPayment = async (dispatch, { actualId, paymentData, allActual
             .single();
         if (actualError) throw actualError;
 
-        dispatch({ type: 'RECORD_PAYMENT_SUCCESS', payload: { updatedActual } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Paiement enregistré.', type: 'success' } });
+        dataDispatch({ type: 'RECORD_PAYMENT_SUCCESS', payload: { updatedActual } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Paiement enregistré.', type: 'success' } });
+        uiDispatch({ type: 'CLOSE_PAYMENT_MODAL' });
     } catch (error) {
         console.error("Error recording payment:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const writeOffActual = async (dispatch, actualId) => {
+export const writeOffActual = async ({ dataDispatch, uiDispatch }, actualId) => {
     try {
         const { data: updatedActual, error } = await supabase
             .from('actual_transactions')
@@ -553,16 +559,16 @@ export const writeOffActual = async (dispatch, actualId) => {
 
         if (error) throw error;
         
-        dispatch({ type: 'WRITE_OFF_ACTUAL_SUCCESS', payload: updatedActual });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction passée en perte.', type: 'success' } });
+        dataDispatch({ type: 'WRITE_OFF_ACTUAL_SUCCESS', payload: updatedActual });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction passée en perte.', type: 'success' } });
 
     } catch (error) {
         console.error("Error writing off actual:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const saveConsolidatedView = async (dispatch, { viewData, editingView, user }) => {
+export const saveConsolidatedView = async ({ dataDispatch, uiDispatch }, { viewData, editingView, user }) => {
   try {
     const dataToSave = {
       user_id: user.id,
@@ -580,8 +586,8 @@ export const saveConsolidatedView = async (dispatch, { viewData, editingView, us
         .single();
       if (error) throw error;
       savedView = data;
-      dispatch({ type: 'UPDATE_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée mise à jour.', type: 'success' } });
+      dataDispatch({ type: 'UPDATE_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée mise à jour.', type: 'success' } });
     } else {
       const { data, error } = await supabase
         .from('consolidated_views')
@@ -590,29 +596,29 @@ export const saveConsolidatedView = async (dispatch, { viewData, editingView, us
         .single();
       if (error) throw error;
       savedView = data;
-      dispatch({ type: 'ADD_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée créée.', type: 'success' } });
+      dataDispatch({ type: 'ADD_CONSOLIDATED_VIEW_SUCCESS', payload: { id: savedView.id, name: savedView.name, project_ids: savedView.project_ids } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée créée.', type: 'success' } });
     }
-    dispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' });
+    uiDispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' });
   } catch (error) {
     console.error("Error saving consolidated view:", error);
-    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
   }
 };
 
-export const deleteConsolidatedView = async (dispatch, viewId) => {
+export const deleteConsolidatedView = async ({ dataDispatch, uiDispatch }, viewId) => {
     try {
         const { error } = await supabase.from('consolidated_views').delete().eq('id', viewId);
         if (error) throw error;
-        dispatch({ type: 'DELETE_CONSOLIDATED_VIEW_SUCCESS', payload: viewId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée supprimée.', type: 'success' } });
+        dataDispatch({ type: 'DELETE_CONSOLIDATED_VIEW_SUCCESS', payload: viewId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée supprimée.', type: 'success' } });
     } catch (error) {
         console.error("Error deleting consolidated view:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const inviteCollaborator = async (dispatch, { email, role, permissionScope, projectIds, ownerId }) => {
+export const inviteCollaborator = async ({ dataDispatch, uiDispatch }, { email, role, permissionScope, projectIds, ownerId }) => {
     try {
         const { data, error } = await supabase
             .from('collaborators')
@@ -629,10 +635,7 @@ export const inviteCollaborator = async (dispatch, { email, role, permissionScop
 
         if (error) throw error;
 
-        // Optionally, trigger a Supabase Edge Function to send an email invite
-        // await supabase.functions.invoke('send-invite-email', { body: { email, ownerName } });
-
-        dispatch({
+        dataDispatch({
             type: 'INVITE_COLLABORATOR_SUCCESS',
             payload: {
                 id: data.id,
@@ -645,26 +648,26 @@ export const inviteCollaborator = async (dispatch, { email, role, permissionScop
                 permissionScope: data.permission_scope,
             }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Invitation envoyée à ${email}.`, type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Invitation envoyée à ${email}.`, type: 'success' } });
     } catch (error) {
         console.error("Error inviting collaborator:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const revokeCollaborator = async (dispatch, collaboratorId) => {
+export const revokeCollaborator = async ({ dataDispatch, uiDispatch }, collaboratorId) => {
     try {
         const { error } = await supabase.from('collaborators').delete().eq('id', collaboratorId);
         if (error) throw error;
-        dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: collaboratorId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'info' } });
+        dataDispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: collaboratorId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Accès révoqué.', type: 'info' } });
     } catch (error) {
         console.error("Error revoking collaborator access:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const acceptInvite = async (dispatch, invite, user) => {
+export const acceptInvite = async ({ dataDispatch, uiDispatch }, invite, user) => {
     try {
         const { error: updateError } = await supabase
             .from('collaborators')
@@ -720,15 +723,15 @@ export const acceptInvite = async (dispatch, invite, user) => {
             permissionScope: updatedData.permission_scope,
         };
 
-        dispatch({ type: 'ACCEPT_INVITE_SUCCESS', payload: acceptedInvite });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation acceptée !', type: 'success' } });
+        dataDispatch({ type: 'ACCEPT_INVITE_SUCCESS', payload: acceptedInvite });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation acceptée !', type: 'success' } });
     } catch (error) {
         console.error("Error accepting invite:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const declineInvite = async (dispatch, invite, user) => {
+export const declineInvite = async ({ dataDispatch, uiDispatch }, invite, user) => {
     try {
         const { data: ownerProfile, error: ownerError } = await supabase
             .from('profiles')
@@ -761,15 +764,15 @@ export const declineInvite = async (dispatch, invite, user) => {
         const { error } = await supabase.from('collaborators').delete().eq('id', invite.id);
         if (error) throw error;
         
-        dispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: invite.id });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation refusée.', type: 'info' } });
+        dataDispatch({ type: 'REVOKE_COLLABORATOR_SUCCESS', payload: invite.id });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Invitation refusée.', type: 'info' } });
     } catch (error) {
         console.error("Error declining invite:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const dismissNotification = async (dispatch, notificationId, user) => {
+export const dismissNotification = async ({ dataDispatch, uiDispatch }, notificationId, user) => {
     try {
         const { data: profile, error } = await supabase
             .from('profiles')
@@ -786,16 +789,16 @@ export const dismissNotification = async (dispatch, notificationId, user) => {
             .eq('id', user.id);
         if (updateError) throw updateError;
 
-        dispatch({ type: 'UPDATE_PROFILE_NOTIFICATIONS', payload: updatedNotifications });
+        dataDispatch({ type: 'UPDATE_PROFILE_NOTIFICATIONS', payload: updatedNotifications });
     } catch (error) {
         console.error("Error dismissing notification:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
 const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef'];
 
-export const saveScenario = async (dispatch, { scenarioData, editingScenario, activeProjectId, user, existingScenariosCount }) => {
+export const saveScenario = async ({ dataDispatch, uiDispatch }, { scenarioData, editingScenario, activeProjectId, user, existingScenariosCount }) => {
     try {
         if (activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_')) {
             throw new Error("Les scénarios ne peuvent être créés que sur des projets individuels.");
@@ -815,7 +818,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 .single();
             if (error) throw error;
             savedScenario = data;
-            dispatch({ type: 'UPDATE_SCENARIO_SUCCESS', payload: {
+            dataDispatch({ type: 'UPDATE_SCENARIO_SUCCESS', payload: {
                 id: savedScenario.id,
                 projectId: savedScenario.project_id,
                 name: savedScenario.name,
@@ -824,7 +827,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 isVisible: savedScenario.is_visible,
                 isArchived: savedScenario.is_archived
             }});
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario mis à jour.', type: 'success' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario mis à jour.', type: 'success' } });
         } else {
             const dataToInsert = {
                 project_id: activeProjectId,
@@ -841,7 +844,7 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 .single();
             if (error) throw error;
             savedScenario = data;
-            dispatch({ type: 'ADD_SCENARIO_SUCCESS', payload: {
+            dataDispatch({ type: 'ADD_SCENARIO_SUCCESS', payload: {
                 id: savedScenario.id,
                 projectId: savedScenario.project_id,
                 name: savedScenario.name,
@@ -850,15 +853,15 @@ export const saveScenario = async (dispatch, { scenarioData, editingScenario, ac
                 isVisible: savedScenario.is_visible,
                 isArchived: savedScenario.is_archived
             }});
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario créé.', type: 'success' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario créé.', type: 'success' } });
         }
     } catch (error) {
         console.error("Error saving scenario:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la sauvegarde du scénario: ${error.message}`, type: 'error' } });
     }
 };
 
-export const archiveScenario = async (dispatch, scenarioId) => {
+export const archiveScenario = async ({ dataDispatch, uiDispatch }, scenarioId) => {
     try {
         const { error } = await supabase
             .from('scenarios')
@@ -867,16 +870,16 @@ export const archiveScenario = async (dispatch, scenarioId) => {
         
         if (error) throw error;
 
-        dispatch({ type: 'ARCHIVE_SCENARIO_SUCCESS', payload: scenarioId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario archivé.', type: 'success' } });
+        dataDispatch({ type: 'ARCHIVE_SCENARIO_SUCCESS', payload: scenarioId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Scénario archivé.', type: 'success' } });
 
     } catch (error) {
         console.error("Error archiving scenario:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const deleteScenarioEntry = async (dispatch, { scenarioId, entryId }) => {
+export const deleteScenarioEntry = async ({ dataDispatch, uiDispatch }, { scenarioId, entryId }) => {
     try {
         const { error } = await supabase
             .from('scenario_entries')
@@ -886,20 +889,20 @@ export const deleteScenarioEntry = async (dispatch, { scenarioId, entryId }) => 
 
         if (error) throw error;
 
-        dispatch({
+        dataDispatch({
             type: 'DELETE_SCENARIO_ENTRY_SUCCESS',
             payload: { scenarioId, entryId },
         });
 
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario supprimée.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario supprimée.', type: 'success' } });
 
     } catch (error) {
         console.error("Error deleting scenario entry:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const addComment = async (dispatch, { projectId, rowId, columnId, content, authorId }) => {
+export const addComment = async ({ dataDispatch, uiDispatch }, { projectId, rowId, columnId, content, authorId }) => {
     try {
         const mentions = content.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
         const mentionedUserIds = mentions.map(mention => {
@@ -935,15 +938,15 @@ export const addComment = async (dispatch, { projectId, rowId, columnId, content
             mentionedUsers: savedComment.mentioned_users,
         };
 
-        dispatch({ type: 'ADD_COMMENT_SUCCESS', payload: { newComment: newCommentForState } });
+        dataDispatch({ type: 'ADD_COMMENT_SUCCESS', payload: { newComment: newCommentForState } });
 
     } catch (error) {
         console.error("Error adding comment:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'ajout du commentaire: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'ajout du commentaire: ${error.message}`, type: 'error' } });
     }
 };
 
-export const saveTemplate = async (dispatch, { templateData, editingTemplate, projectStructure, user }) => {
+export const saveTemplate = async ({ dataDispatch, uiDispatch }, { templateData, editingTemplate, projectStructure, user }) => {
   try {
     const dataToSave = {
       user_id: user.id,
@@ -967,7 +970,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
         .single();
       if (error) throw error;
       savedTemplate = data;
-      dispatch({ type: 'UPDATE_TEMPLATE_SUCCESS', payload: {
+      dataDispatch({ type: 'UPDATE_TEMPLATE_SUCCESS', payload: {
           id: savedTemplate.id,
           userId: savedTemplate.user_id,
           name: savedTemplate.name,
@@ -979,7 +982,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
           color: savedTemplate.color,
           purpose: savedTemplate.purpose,
       }});
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle mis à jour.', type: 'success' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle mis à jour.', type: 'success' } });
     } else {
       const { data, error } = await supabase
         .from('templates')
@@ -988,7 +991,7 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
         .single();
       if (error) throw error;
       savedTemplate = data;
-      dispatch({ type: 'SAVE_TEMPLATE_SUCCESS', payload: {
+      dataDispatch({ type: 'SAVE_TEMPLATE_SUCCESS', payload: {
           id: savedTemplate.id,
           userId: savedTemplate.user_id,
           name: savedTemplate.name,
@@ -1000,28 +1003,28 @@ export const saveTemplate = async (dispatch, { templateData, editingTemplate, pr
           color: savedTemplate.color,
           purpose: savedTemplate.purpose,
       }});
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle créé.', type: 'success' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle créé.', type: 'success' } });
     }
-    dispatch({ type: 'CLOSE_SAVE_TEMPLATE_MODAL' });
+    uiDispatch({ type: 'CLOSE_SAVE_TEMPLATE_MODAL' });
   } catch (error) {
     console.error("Error saving template:", error);
-    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
   }
 };
 
-export const deleteTemplate = async (dispatch, templateId) => {
+export const deleteTemplate = async ({ dataDispatch, uiDispatch }, templateId) => {
     try {
         const { error } = await supabase.from('templates').delete().eq('id', templateId);
         if (error) throw error;
-        dispatch({ type: 'DELETE_TEMPLATE_SUCCESS', payload: templateId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle supprimé.', type: 'success' } });
+        dataDispatch({ type: 'DELETE_TEMPLATE_SUCCESS', payload: templateId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Modèle supprimé.', type: 'success' } });
     } catch (error) {
         console.error("Error deleting template:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const saveMainCategory = async (dispatch, { type, name, user }) => {
+export const saveMainCategory = async ({ dataDispatch, uiDispatch }, { type, name, user }) => {
     try {
         const { data, error } = await supabase
             .from('user_categories')
@@ -1042,17 +1045,17 @@ export const saveMainCategory = async (dispatch, { type, name, user }) => {
             subCategories: []
         };
 
-        dispatch({ type: 'ADD_MAIN_CATEGORY_SUCCESS', payload: { type, newMainCategory } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale ajoutée.', type: 'success' } });
+        dataDispatch({ type: 'ADD_MAIN_CATEGORY_SUCCESS', payload: { type, newMainCategory } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale ajoutée.', type: 'success' } });
         return newMainCategory;
     } catch (error) {
         console.error("Error saving main category:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         return null;
     }
 };
 
-export const saveSubCategory = async (dispatch, { type, mainCategoryId, subCategoryName, user }) => {
+export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId, subCategoryName, user }) => {
     try {
         const { data, error } = await supabase
             .from('user_categories')
@@ -1072,17 +1075,17 @@ export const saveSubCategory = async (dispatch, { type, mainCategoryId, subCateg
             name: data.name,
         };
 
-        dispatch({ type: 'ADD_SUB_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newSubCategory } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Sous-catégorie ajoutée.', type: 'success' } });
+        dataDispatch({ type: 'ADD_SUB_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newSubCategory } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Sous-catégorie ajoutée.', type: 'success' } });
         return newSubCategory;
     } catch (error) {
         console.error("Error saving sub category:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         return null;
     }
 };
 
-export const updateMainCategory = async (dispatch, { type, mainCategoryId, newName }) => {
+export const updateMainCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId, newName }) => {
     try {
         const { data, error } = await supabase
             .from('user_categories')
@@ -1092,16 +1095,16 @@ export const updateMainCategory = async (dispatch, { type, mainCategoryId, newNa
             .single();
         if (error) throw error;
         
-        dispatch({ type: 'UPDATE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newName: data.name } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale mise à jour.', type: 'success' } });
+        dataDispatch({ type: 'UPDATE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newName: data.name } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale mise à jour.', type: 'success' } });
 
     } catch (error) {
         console.error("Error updating main category:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const deleteMainCategory = async (dispatch, { type, mainCategoryId }) => {
+export const deleteMainCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId }) => {
     try {
         const { error } = await supabase
             .from('user_categories')
@@ -1109,16 +1112,16 @@ export const deleteMainCategory = async (dispatch, { type, mainCategoryId }) => 
             .eq('id', mainCategoryId);
         if (error) throw error;
 
-        dispatch({ type: 'DELETE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale supprimée.', type: 'success' } });
+        dataDispatch({ type: 'DELETE_MAIN_CATEGORY_SUCCESS', payload: { type, mainCategoryId } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Catégorie principale supprimée.', type: 'success' } });
 
     } catch (error) {
         console.error("Error deleting main category:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
 
-export const deleteProject = async (dispatch, projectId) => {
+export const deleteProject = async ({ dataDispatch, uiDispatch }, projectId) => {
     try {
         const { error } = await supabase
             .from('projects')
@@ -1127,16 +1130,16 @@ export const deleteProject = async (dispatch, projectId) => {
 
         if (error) throw error;
 
-        dispatch({ type: 'DELETE_PROJECT_SUCCESS', payload: projectId });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Projet supprimé.', type: 'success' } });
+        dataDispatch({ type: 'DELETE_PROJECT_SUCCESS', payload: projectId });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Projet supprimé.', type: 'success' } });
 
     } catch (error) {
         console.error("Error deleting project:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression du projet: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression du projet: ${error.message}`, type: 'error' } });
     }
 };
 
-export const updateTierPaymentTerms = async (dispatch, { tierId, terms }) => {
+export const updateTierPaymentTerms = async ({ dataDispatch, uiDispatch }, { tierId, terms }) => {
     try {
         const { data, error } = await supabase
             .from('tiers')
@@ -1146,16 +1149,16 @@ export const updateTierPaymentTerms = async (dispatch, { tierId, terms }) => {
             .single();
         if (error) throw error;
         
-        dispatch({
+        dataDispatch({
             type: 'UPDATE_TIER_PAYMENT_TERMS_SUCCESS',
             payload: {
                 tierId: data.id,
                 payment_terms: data.payment_terms
             }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Conditions de paiement mises à jour.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Conditions de paiement mises à jour.', type: 'success' } });
     } catch (error) {
         console.error("Error updating payment terms:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

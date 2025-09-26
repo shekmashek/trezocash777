@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Send, AtSign } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { addComment } from '../context/actions';
 import Avatar from './Avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CommentDrawer = ({ isOpen, onClose, context }) => {
-    const { state, dispatch } = useBudget();
-    const { allComments, allProfiles, session, activeProjectId, collaborators } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiDispatch } = useUI();
+    const { allComments, allProfiles, session, collaborators } = dataState;
+    const { activeProjectId } = useUI();
     const [newComment, setNewComment] = useState('');
     const [mentionQuery, setMentionQuery] = useState('');
     const [isMentioning, setIsMentioning] = useState(false);
@@ -85,7 +88,7 @@ const CommentDrawer = ({ isOpen, onClose, context }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!newComment.trim()) return;
-        addComment(dispatch, {
+        addComment({dataDispatch, uiDispatch}, {
             projectId: activeProjectId,
             rowId: context.rowId,
             columnId: context.columnId,

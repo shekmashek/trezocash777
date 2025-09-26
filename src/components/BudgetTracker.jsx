@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Edit, Eye, Search, Gem, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, Maximize, Minimize, AreaChart, BarChart, Hash, ArrowRightLeft, Archive, Calendar, PieChart, FilePlus, HandCoins, Banknote, AlertTriangle, ChevronUp, MessageSquare, Lock } from 'lucide-react';
+import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown, Layers, ChevronLeft, ChevronRight, Filter, XCircle, Trash2, ArrowRightLeft, Calendar, Lock, MessageSquare, ChevronUp } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const getStartOfWeek = (date) => { const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); d.setHours(0, 0, 0, 0); return new Date(d.setDate(diff)); };
@@ -109,17 +110,21 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
 };
 
 const BudgetTracker = ({ mode = 'edition' }) => {
-  const { state, dispatch } = useBudget();
-  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, allComments, vatRegimes } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { projects, categories, settings, allCashAccounts, allEntries, allActuals, consolidatedViews, allComments, vatRegimes } = dataState;
+  const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
+  
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
-
   const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
   const periodMenuRef = useRef(null);
 
   const CommentButton = ({ rowId, columnId, rowName, columnName }) => {
-    const { state: budgetState, dispatch: budgetDispatch } = useBudget();
-    const { allComments: budgetAllComments, activeProjectId: budgetActiveProjectId } = budgetState;
+    const { dataState: budgetDataState } = useData();
+    const { uiState: budgetUIState, uiDispatch: budgetUIDispatch } = useUI();
+    const { allComments: budgetAllComments } = budgetDataState;
+    const { activeProjectId: budgetActiveProjectId } = budgetUIState;
 
     const commentsForCell = useMemo(() => {
         const projectId = budgetActiveProjectId === 'consolidated' || budgetActiveProjectId.startsWith('consolidated_view_') ? null : budgetActiveProjectId;
@@ -128,7 +133,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
     const handleOpenCommentDrawer = (e) => {
         e.stopPropagation();
-        budgetDispatch({ type: 'OPEN_COMMENT_DRAWER', payload: { rowId, columnId, rowName, columnName } });
+        budgetUIDispatch({ type: 'OPEN_COMMENT_DRAWER', payload: { rowId, columnId, rowName, columnName } });
     };
 
     const hasComments = commentsForCell.length > 0;
@@ -225,7 +230,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const currencySettings = { ...settings, currency: projectCurrency };
 
   const handlePeriodChange = (direction) => {
-    dispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
+    uiDispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
   };
 
   const handleQuickPeriodSelect = (quickSelectType) => {
@@ -294,7 +299,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
       default:
         return;
     }
-    dispatch({ type: 'SET_QUICK_PERIOD', payload });
+    uiDispatch({ type: 'SET_QUICK_PERIOD', payload });
   };
 
   const timeUnitLabels = {
@@ -421,13 +426,13 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return [...expanded, ...dynamicVatEntries];
   }, [filteredBudgetEntries, categories, periods, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated]);
 
-  const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
+  const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
     if (entry.is_vat_payment) return; // Cannot edit automatic VAT payments
     const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
     const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
     if (originalEntry) {
-        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
+        uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
     }
   };
   const handleDeleteEntry = (entry) => {
@@ -436,12 +441,12 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
     if (!originalEntry) return;
 
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer "${originalEntry.supplier}" ?`,
         message: "Cette action est irréversible et supprimera l'entrée budgétaire et ses prévisions.",
-        onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId: originalEntry.id, entryProjectId: originalEntry.projectId || activeProjectId } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_ENTRY', payload: { entryId: originalEntry.id, entryProjectId: originalEntry.projectId || activeProjectId } }),
       }
     });
   };
@@ -456,7 +461,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const handleOpenPaymentDrawer = (entry, period) => {
     const entryActuals = actualTransactions.filter(actual => actual.budgetId === entry.id);
 
-    dispatch({
+    uiDispatch({
         type: 'OPEN_INLINE_PAYMENT_DRAWER',
         payload: {
             actuals: entryActuals,
@@ -844,47 +849,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
             </React.Fragment>
           );
         })}
-        
-        {/* Off-budget rows */}
-        {(type === 'entree' ? hasOffBudgetRevenues : hasOffBudgetExpenses) && (
-          <tr className="bg-purple-50 text-purple-800">
-            <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 sticky left-0 z-10 bg-purple-50">
-              <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4" />{isEntree ? 'Entrées Hors Budget' : 'Sorties Hors Budget'}</div>
-            </td>
-            <td className="bg-surface"></td>
-            {periods.map((period, periodIndex) => {
-              const totals = calculateOffBudgetTotalsForPeriod(isEntree ? 'revenu' : 'depense', period);
-              const reste = totals.budget - totals.actual;
-              const columnIdBase = period.startDate.toISOString();
-              const rowId = `off_budget_${type}`;
-              return (
-                <React.Fragment key={periodIndex}>
-                  <td className="px-2 py-2">
-                    {numVisibleCols > 0 && (
-                      <div className="flex gap-2 justify-around text-xs">
-                        {visibleColumns.budget && <div className="relative group/subcell flex-1 text-center">
-                            {formatCurrency(totals.budget, currencySettings)}
-                            <CommentButton rowId={rowId} columnId={`${columnIdBase}_budget`} rowName="Hors Budget" columnName={`${period.label} (Prév.)`} />
-                        </div>}
-                        {visibleColumns.actual && <div className="relative group/subcell flex-1 text-center">
-                            <button onClick={() => totals.actual !== 0 && handleActualClick({ category: isEntree ? 'Entrées Hors Budget' : 'Sorties Hors Budget', period })} disabled={totals.actual === 0} className="hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                                {formatCurrency(totals.actual, currencySettings)}
-                            </button>
-                            <CommentButton rowId={rowId} columnId={`${columnIdBase}_actual`} rowName="Hors Budget" columnName={`${period.label} (Réel)`} />
-                        </div>}
-                        {visibleColumns.reste && <div className={`relative group/subcell flex-1 text-center ${getResteColor(reste, isEntree)}`}>
-                            {formatCurrency(reste, currencySettings)}
-                            <CommentButton rowId={rowId} columnId={`${columnIdBase}_reste`} rowName="Hors Budget" columnName={`${period.label} (Reste)`} />
-                        </div>}
-                      </div>
-                    )}
-                  </td>
-                  <td className="bg-surface"></td>
-                </React.Fragment>
-              );
-            })}
-          </tr>
-        )}
       </>
     );
   };
@@ -1044,7 +1008,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                     </tr>
                     </thead>
                     <tbody>
-                    <tr className="bg-gray-200 text-gray-800"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><LogIn className="w-4 h-4" />Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+                    <tr className="bg-gray-200 text-gray-800"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2">Trésorerie début de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.initial || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
                     <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
                     {renderBudgetRows('entree')}
                     <tr className="bg-surface"><td colSpan={totalCols} className="py-2"></td></tr>
@@ -1088,7 +1052,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                             );
                         })}
                     </tr>
-                    <tr className="bg-gray-300 text-gray-900"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2"><Flag className="w-4 h-4" />Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
+                    <tr className="bg-gray-300 text-gray-900"><td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 bg-gray-300 sticky left-0 z-10"><div className="flex items-center gap-2">Trésorerie fin de période</div></td><td className="bg-surface"></td>{periods.map((_, periodIndex) => (<React.Fragment key={periodIndex}><td className="px-2 py-2 text-center font-normal" colSpan={1}>{formatCurrency(periodPositions[periodIndex]?.final || 0, currencySettings)}</td><td className="bg-surface"></td></React.Fragment>))}</tr>
                     </tbody>
                 </table>
             </div>

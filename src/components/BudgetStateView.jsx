@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency, formatPaymentTerms } from '../utils/formatting';
 import { HandCoins, TrendingDown, Briefcase, Plus, Trash2, Folder, Search, Lock, Edit } from 'lucide-react';
 import EmptyState from './EmptyState';
@@ -105,8 +106,10 @@ const LectureView = ({ entries, settings, tiers, setMode }) => {
 };
 
 const BudgetStateView = ({ mode = 'lecture', setMode }) => {
-    const { state, dispatch } = useBudget();
-    const { allEntries, activeProjectId, projects, categories, settings, consolidatedViews, tiers } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { allEntries, projects, categories, settings, consolidatedViews, tiers } = dataState;
+    const { activeProjectId } = uiState;
     
     const [isAddCategoryFlowModalOpen, setIsAddCategoryFlowModalOpen] = useState(false);
     const [addCategoryFlowType, setAddCategoryFlowType] = useState(null);
@@ -156,14 +159,14 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
     }, [expandedEntries, searchTerm]);
 
     const handleAddEntry = (categoryName, mainCategoryType, mainCategoryId) => {
-        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
+        uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: { category: categoryName, type: mainCategoryType, mainCategoryId } });
     };
 
     const handleEditEntry = (entry) => {
         const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
         const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
         if (originalEntry) {
-            dispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
+            uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: originalEntry });
         }
     };
 
@@ -171,13 +174,13 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
         const originalEntryId = entry.is_vat_child ? entry.id.replace('_vat', '') : entry.id;
         const originalEntry = budgetEntries.find(e => e.id === originalEntryId);
         if (originalEntry) {
-            deleteEntry(dispatch, { entryId: originalEntry.id, entryProjectId: originalEntry.projectId });
+            deleteEntry({dataDispatch, uiDispatch}, { entryId: originalEntry.id, entryProjectId: originalEntry.projectId });
         }
     };
 
     const handleCategorySelectedForNewEntry = (mainCategoryId) => {
         setIsAddCategoryFlowModalOpen(false);
-        dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: addCategoryFlowType, mainCategoryId } });
+        uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: addCategoryFlowType, mainCategoryId } });
     };
 
     const renderSection = (type) => {

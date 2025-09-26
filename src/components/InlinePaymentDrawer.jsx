@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Edit, Trash2, Plus, Save, Wallet, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { getEntryAmountForPeriod } from '../utils/budgetCalculations';
 import { recordPayment } from '../context/actions';
 
 const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLabel }) => {
-  const { state, dispatch } = useBudget();
-  const { allCashAccounts, settings, activeProjectId, projects } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { allCashAccounts, settings, projects } = dataState;
+  const { activeProjectId } = uiState;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
 
   const [editingPaymentId, setEditingPaymentId] = useState(null);
@@ -77,7 +80,7 @@ const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLa
   };
 
   const handleSaveEdit = (payment) => {
-    dispatch({
+    dataDispatch({
       type: 'UPDATE_PAYMENT',
       payload: {
         actualId: payment.actualId,
@@ -88,12 +91,12 @@ const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLa
   };
 
   const handleDeletePayment = (payment) => {
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: 'Supprimer ce paiement ?',
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_PAYMENT', payload: { actualId: payment.actualId, paymentId: payment.id } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_PAYMENT', payload: { actualId: payment.actualId, paymentId: payment.id } }),
       }
     });
   };
@@ -102,23 +105,23 @@ const InlinePaymentDrawer = ({ isOpen, onClose, actuals, entry, period, periodLa
     e.preventDefault();
     const amount = parseFloat(addForm.paidAmount);
     if (!addForm.targetActualId) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: "Aucune échéance prévisionnelle n'est disponible pour y attacher le paiement.", type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: "Aucune échéance prévisionnelle n'est disponible pour y attacher le paiement.", type: 'error' } });
         return;
     }
     if (!amount || amount <= 0 || !addForm.paymentDate || !addForm.cashAccount) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs pour ajouter un paiement.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs pour ajouter un paiement.', type: 'error' } });
       return;
     }
 
-    recordPayment(dispatch, {
+    recordPayment({dataDispatch, uiDispatch}, {
       actualId: addForm.targetActualId,
       paymentData: {
         paidAmount: amount,
         paymentDate: addForm.paymentDate,
         cashAccount: addForm.cashAccount,
       },
-      allActuals: state.allActuals,
-      user: state.session.user,
+      allActuals: dataState.allActuals,
+      user: dataState.session.user,
     });
     setAddForm(prev => ({ ...prev, paidAmount: '' }));
   };

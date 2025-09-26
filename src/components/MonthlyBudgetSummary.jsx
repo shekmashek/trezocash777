@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
-import { getEntryAmountForMonth, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
+import { getEntryAmountForPeriod, expandVatEntries, generateVatPaymentEntries } from '../utils/budgetCalculations';
 import { Calendar } from 'lucide-react';
 
 const MonthlyBudgetSummary = () => {
-  const { state } = useBudget();
-  const { allEntries, activeProjectId, settings, projects, categories, vatRegimes } = state;
+  const { dataState } = useData();
+  const { uiState } = useUI();
+  const { allEntries, settings, projects, categories, vatRegimes } = dataState;
+  const { activeProjectId } = uiState;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const activeProjectName = useMemo(() => {

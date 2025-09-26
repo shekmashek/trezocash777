@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
@@ -11,8 +12,14 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
     const visibleTransactions = transactions.slice(0, maxVisibleItems);
     const hiddenCount = transactions.length - maxVisibleItems;
 
-    const totalPayable = useMemo(() => transactions.filter(tx => tx.type === 'payable').reduce((sum, tx) => sum + tx.amount, 0), [transactions]);
-    const totalReceivable = useMemo(() => transactions.filter(tx => tx.type === 'receivable').reduce((sum, tx) => sum + tx.amount, 0), [transactions]);
+    const totalPayable = useMemo(() => transactions.filter(tx => tx.type === 'payable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
+    const totalReceivable = useMemo(() => transactions.filter(tx => tx.type === 'receivable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
+
+    // Force standard display for the schedule to avoid compacting small amounts.
+    const scheduleCurrencySettings = useMemo(() => ({
+        ...currencySettings,
+        displayUnit: 'standard'
+    }), [currencySettings]);
 
     const getTransactionStyle = (tx) => {
         const dueDate = new Date(tx.date);
@@ -42,13 +49,13 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
             <div className="flex justify-between items-start">
                 <div className="text-left flex-grow space-y-0.5 pr-1">
                     {totalReceivable > 0 && (
-                        <div className="text-xs font-semibold text-green-600 truncate" title={`Entrées: ${formatCurrency(totalReceivable, currencySettings)}`}>
-                            +{formatCurrency(totalReceivable, { ...currencySettings, decimalPlaces: 0, displayUnit: 'thousands' })}
+                        <div className="text-xs font-semibold text-green-600" title={`Entrées: ${formatCurrency(totalReceivable, scheduleCurrencySettings)}`}>
+                            +{formatCurrency(totalReceivable, scheduleCurrencySettings)}
                         </div>
                     )}
                     {totalPayable > 0 && (
-                        <div className="text-xs font-semibold text-red-600 truncate" title={`Sorties: ${formatCurrency(totalPayable, currencySettings)}`}>
-                            -{formatCurrency(totalPayable, { ...currencySettings, decimalPlaces: 0, displayUnit: 'thousands' })}
+                        <div className="text-xs font-semibold text-red-600" title={`Sorties: ${formatCurrency(totalPayable, scheduleCurrencySettings)}`}>
+                            -{formatCurrency(totalPayable, scheduleCurrencySettings)}
                         </div>
                     )}
                 </div>
@@ -67,7 +74,7 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
                     >
                         <div className="flex justify-between items-center">
                             <span className="font-semibold truncate flex-1" title={tx.thirdParty}>{tx.thirdParty}</span>
-                            <span className="font-mono ml-2 whitespace-nowrap">{formatCurrency(tx.amount, currencySettings)}</span>
+                            <span className="font-mono ml-2 whitespace-nowrap">{formatCurrency(tx.amount, scheduleCurrencySettings)}</span>
                         </div>
                     </button>
                 ))}
@@ -82,8 +89,9 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
 };
 
 const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewMode: propViewMode }) => {
-    const { state, dispatch } = useBudget();
-    const { allActuals, settings, projects, activeProjectId, consolidatedViews } = state;
+    const { dataState } = useData();
+    const { uiDispatch } = useUI();
+    const { allActuals, settings, projects, activeProjectId, consolidatedViews } = dataState;
 
     const [localCurrentDate, setLocalCurrentDate] = useState(new Date());
     const [localViewMode, setLocalViewMode] = useState('month');
@@ -234,7 +242,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
     const handleTransactionClick = (e, tx) => {
         e.preventDefault();
         e.stopPropagation();
-        dispatch({
+        uiDispatch({
             type: 'OPEN_TRANSACTION_ACTION_MENU',
             payload: {
                 x: e.clientX,

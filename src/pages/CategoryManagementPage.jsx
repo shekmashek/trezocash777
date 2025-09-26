@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Edit, Trash2, Plus, Save, X, FolderKanban, Folder, Filter } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
-import { v4 as uuidv4 } from 'uuid';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import EmptyState from '../components/EmptyState';
 import { saveMainCategory } from '../context/actions';
 
 const CategoryManagementPage = () => {
-  const { state, dispatch } = useBudget();
-  const { categories, allEntries, allActuals, projects, session } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { categories, allEntries, allActuals, projects, session } = dataState;
 
   const [editingSubCategory, setEditingSubCategory] = useState(null);
   const [newSubCategory, setNewSubCategory] = useState({});
@@ -23,7 +24,7 @@ const CategoryManagementPage = () => {
       const mainCat = categories[editingSubCategory.type]?.find(mc => mc.id === editingSubCategory.mainId);
       const oldSubCat = mainCat?.subCategories.find(sc => sc.id === editingSubCategory.subId);
       
-      dispatch({ 
+      dataDispatch({ 
         type: 'UPDATE_SUB_CATEGORY', 
         payload: { 
           type: editingSubCategory.type, 
@@ -35,17 +36,17 @@ const CategoryManagementPage = () => {
       });
       handleCancelEdit();
     } else {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
     }
   };
 
   const handleAddSubCategory = (type, mainId) => {
     const name = newSubCategory[mainId]?.trim();
     if (name) {
-      dispatch({ type: 'ADD_SUB_CATEGORY', payload: { type, mainCategoryId: mainId, subCategoryName: name } });
+      dataDispatch({ type: 'ADD_SUB_CATEGORY', payload: { type, mainCategoryId: mainId, subCategoryName: name } });
       setNewSubCategory(prev => ({ ...prev, [mainId]: '' }));
     } else {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez entrer un nom pour la nouvelle sous-catégorie.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez entrer un nom pour la nouvelle sous-catégorie.", type: 'error' } });
     }
   };
   
@@ -85,16 +86,16 @@ const CategoryManagementPage = () => {
     if (!subCat) return;
 
     if (isSubCategoryUsedAnywhere(subCat.name)) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: la catégorie "${subCat.name}" est utilisée.`, type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: la catégorie "${subCat.name}" est utilisée.`, type: 'error' } });
       return;
     }
 
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer "${subCat.name}" ?`,
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_SUB_CATEGORY', payload: { type, mainId, subId } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_SUB_CATEGORY', payload: { type, mainId, subId } }),
       }
     });
   };
@@ -102,10 +103,10 @@ const CategoryManagementPage = () => {
   const handleAddMainCategory = (type) => {
     const name = newMainCategoryName[type].trim();
     if (name) {
-      saveMainCategory(dispatch, { type, name, user: session.user });
+      saveMainCategory({dataDispatch, uiDispatch}, { type, name, user: session.user });
       setNewMainCategoryName(prev => ({ ...prev, [type]: '' }));
     } else {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
     }
   };
 
@@ -119,7 +120,7 @@ const CategoryManagementPage = () => {
 
   const handleSaveEditMain = () => {
     if (editingMainCategory.name.trim()) {
-      dispatch({ 
+      dataDispatch({ 
         type: 'UPDATE_MAIN_CATEGORY', 
         payload: { 
           type: editingMainCategory.type, 
@@ -129,7 +130,7 @@ const CategoryManagementPage = () => {
       });
       handleCancelEditMain();
     } else {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom ne peut pas être vide.", type: 'error' } });
     }
   };
 
@@ -139,19 +140,19 @@ const CategoryManagementPage = () => {
 
   const handleDeleteMainCategory = (type, mainCat) => {
     if (mainCat.isFixed) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une catégorie principale fixe.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une catégorie principale fixe.", type: 'error' } });
       return;
     }
     if (isMainCategoryUsed(mainCat)) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: la catégorie "${mainCat.name}" contient des sous-catégories utilisées.`, type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: la catégorie "${mainCat.name}" contient des sous-catégories utilisées.`, type: 'error' } });
       return;
     }
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer la catégorie "${mainCat.name}" ?`,
         message: 'Toutes ses sous-catégories (si existentes) seront également supprimées. Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_MAIN_CATEGORY', payload: { type, mainCategoryId: mainCat.id } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_MAIN_CATEGORY', payload: { type, mainCategoryId: mainCat.id } }),
       }
     });
   };

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, LayoutTemplate } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { saveTemplate } from '../context/actions';
 import IconPicker from './IconPicker';
 
 const SaveTemplateModal = ({ isOpen, onClose, editingTemplate }) => {
-    const { state, dispatch } = useBudget();
-    const { session, activeProjectId, categories, allCashAccounts, tiers, allEntries, allActuals } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { session, categories, allCashAccounts, tiers, allEntries, allActuals } = dataState;
+    const { activeProjectId } = uiState;
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -35,7 +38,7 @@ const SaveTemplateModal = ({ isOpen, onClose, editingTemplate }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!name.trim()) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du modèle est obligatoire.", type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du modèle est obligatoire.", type: 'error' } });
             return;
         }
 
@@ -53,7 +56,7 @@ const SaveTemplateModal = ({ isOpen, onClose, editingTemplate }) => {
         
         const templateData = { name, description, is_public: isPublic, icon: icon.icon, color: icon.color, purpose };
 
-        saveTemplate(dispatch, { templateData, editingTemplate, projectStructure, user: session.user });
+        saveTemplate({dataDispatch, uiDispatch}, { templateData, editingTemplate, projectStructure, user: session.user });
     };
 
     if (!isOpen) return null;

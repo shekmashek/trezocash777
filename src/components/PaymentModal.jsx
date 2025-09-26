@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Check } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { recordPayment } from '../context/actions';
 
 const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
-  const { state, dispatch } = useBudget();
-  const { allCashAccounts, settings, activeProjectId, projects } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiDispatch } = useUI();
+  const { allCashAccounts, settings, projects } = dataState;
+  const { activeProjectId } = useUI();
 
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
 
@@ -34,28 +37,28 @@ const PaymentModal = ({ isOpen, onClose, actualToPay, type }) => {
   const handleSubmit = (isFinalPayment) => {
     const amount = parseFloat(paidAmount);
     if (isNaN(amount) || amount <= 0) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez entrer un montant valide.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez entrer un montant valide.', type: 'error' } });
       return;
     }
     if (!cashAccount) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner un compte de trésorerie.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner un compte de trésorerie.', type: 'error' } });
       return;
     }
 
     const paymentData = { paymentDate, paidAmount: amount, cashAccount, isFinalPayment };
 
     const doSave = () => {
-        recordPayment(dispatch, {
+        recordPayment({dataDispatch, uiDispatch}, {
             actualId: actualToPay.id,
             paymentData,
-            allActuals: state.allActuals,
-            user: state.session.user,
+            allActuals: dataState.allActuals,
+            user: dataState.session.user,
         });
         onClose();
     };
 
     if (amount > remainingAmount && !isFinalPayment) {
-      dispatch({
+      uiDispatch({
         type: 'OPEN_CONFIRMATION_MODAL',
         payload: {
           title: 'Montant supérieur au restant dû',

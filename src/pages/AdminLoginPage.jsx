@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import TrezocashLogo from '../components/TrezocashLogo';
 import { LogIn, Loader } from 'lucide-react';
 
 const AdminLoginPage = () => {
-    const { state } = useBudget();
-    const { session, profile } = state;
+    const { dataState } = useData();
+    const { session, profile } = dataState;
     const navigate = useNavigate();
 
     const [email, setEmail] = useState('');
@@ -39,7 +39,7 @@ const AdminLoginPage = () => {
             setError('Identifiants invalides ou problème de connexion.');
             setLoading(false);
         }
-        // En cas de succès, l'écouteur onAuthStateChange dans BudgetContext se déclenchera,
+        // En cas de succès, l'écouteur onAuthStateChange dans DataContext se déclenchera,
         // mettra à jour l'état de la session et du profil.
         // Le useEffect de ce composant se chargera alors de la redirection.
     };

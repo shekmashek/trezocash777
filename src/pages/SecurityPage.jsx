@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 import { Shield, Save, Loader } from 'lucide-react';
 
 const SecurityPage = () => {
-    const { dispatch } = useBudget();
+    const { uiDispatch } = useUI();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -12,19 +12,19 @@ const SecurityPage = () => {
     const handlePasswordChange = async (e) => {
         e.preventDefault();
         if (password.length < 6) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Le mot de passe doit faire au moins 6 caractères.', type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Le mot de passe doit faire au moins 6 caractères.', type: 'error' } });
             return;
         }
         if (password !== confirmPassword) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Les mots de passe ne correspondent pas.', type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Les mots de passe ne correspondent pas.', type: 'error' } });
             return;
         }
         setLoading(true);
         const { error } = await supabase.auth.updateUser({ password });
         if (error) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         } else {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Mot de passe mis à jour avec succès.', type: 'success' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Mot de passe mis à jour avec succès.', type: 'success' } });
             setPassword('');
             setConfirmPassword('');
         }

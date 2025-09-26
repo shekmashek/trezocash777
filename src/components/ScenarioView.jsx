@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Layers, Eye, EyeOff, Archive, ChevronLeft, ChevronRight, List, ChevronDown } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import BudgetModal from './BudgetModal';
 import EmptyState from './EmptyState';
 import { formatCurrency } from '../utils/formatting';
@@ -21,8 +22,10 @@ const colorMap = {
 const defaultColors = colorMap['#8b5cf6'];
 
 const ScenarioView = ({ isFocusMode = false }) => {
-  const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, scenarios, allEntries, allActuals, allCashAccounts, scenarioEntries, settings, timeUnit, horizonLength, periodOffset, activeQuickSelect, session } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { projects, scenarios, allEntries, allActuals, allCashAccounts, scenarioEntries, settings, session } = dataState;
+  const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -62,7 +65,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
       .map(s => ({ ...s, displayName: s.name }));
   }, [scenarios, activeProjectId, isConsolidated, projects]);
 
-  const handlePeriodChange = (direction) => dispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
+  const handlePeriodChange = (direction) => uiDispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
   const handleQuickPeriodSelect = (quickSelectType) => {
     const today = getTodayInTimezone(settings.timezoneOffset);
     let payload;
@@ -77,7 +80,7 @@ const ScenarioView = ({ isFocusMode = false }) => {
       case 'long_term': { payload = { timeUnit: 'annually', horizonLength: 10, periodOffset: 0, activeQuickSelect: 'long_term' }; break; }
       default: return;
     }
-    dispatch({ type: 'SET_QUICK_PERIOD', payload });
+    uiDispatch({ type: 'SET_QUICK_PERIOD', payload });
   };
   const timeUnitLabels = { day: 'Jour', week: 'Semaine', fortnightly: 'Quinzaine', month: 'Mois', bimonthly: 'Bimestre', quarterly: 'Trimestre', semiannually: 'Semestre', annually: 'Année' };
   const periodLabel = useMemo(() => { if (periodOffset === 0) return 'Actuel'; const label = timeUnitLabels[timeUnit] || 'Période'; const plural = Math.abs(periodOffset) > 1 ? 's' : ''; return `${periodOffset > 0 ? '+' : ''}${periodOffset} ${label}${plural}`; }, [periodOffset, timeUnit, timeUnitLabels]);
@@ -259,19 +262,19 @@ const ScenarioView = ({ isFocusMode = false }) => {
     };
   };
 
-  const handleOpenScenarioModal = (scenario = null) => dispatch({ type: 'OPEN_SCENARIO_MODAL', payload: scenario });
-  const handleDeleteScenario = (scenarioId) => dispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: 'Supprimer ce scénario ?', message: 'Cette action est irréversible.', onConfirm: () => dispatch({ type: 'DELETE_SCENARIO', payload: scenarioId }) } });
+  const handleOpenScenarioModal = (scenario = null) => uiDispatch({ type: 'OPEN_SCENARIO_MODAL', payload: scenario });
+  const handleDeleteScenario = (scenarioId) => uiDispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: 'Supprimer ce scénario ?', message: 'Cette action est irréversible.', onConfirm: () => dataDispatch({ type: 'DELETE_SCENARIO', payload: scenarioId }) } });
   const handleArchiveScenario = (scenarioId) => {
     const scenarioToArchive = scenarios.find(s => s.id === scenarioId);
     if (!scenarioToArchive) return;
-    dispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: `Archiver le scénario "${scenarioToArchive.name}" ?`, message: "L'archivage d'un scénario le masquera de la liste, mais toutes ses données seront conservées. Vous pourrez le restaurer à tout moment.", onConfirm: () => dispatch({ type: 'ARCHIVE_SCENARIO', payload: scenarioId }), confirmText: 'Archiver', cancelText: 'Annuler', confirmColor: 'primary' } });
+    uiDispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: `Archiver le scénario "${scenarioToArchive.name}" ?`, message: "L'archivage d'un scénario le masquera de la liste, mais toutes ses données seront conservées. Vous pourrez le restaurer à tout moment.", onConfirm: () => dataDispatch({ type: 'ARCHIVE_SCENARIO', payload: scenarioId }), confirmText: 'Archiver', cancelText: 'Annuler', confirmColor: 'primary' } });
   };
   const handleAddEntryToScenario = (scenarioId) => { setActiveScenarioId(scenarioId); setEditingEntry(null); setIsBudgetModalOpen(true); };
   
   const handleSaveScenarioEntry = async (entryData) => {
     const user = session?.user;
     if (!user) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
         return;
     }
 
@@ -318,25 +321,25 @@ const ScenarioView = ({ isFocusMode = false }) => {
             payments: savedEntry.payments,
         };
 
-        dispatch({
+        dataDispatch({
             type: 'SAVE_SCENARIO_ENTRY_SUCCESS',
             payload: {
                 scenarioId: activeScenarioId,
                 savedEntry: savedEntryForClient,
             },
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario enregistrée.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Modification du scénario enregistrée.', type: 'success' } });
 
     } catch (error) {
         console.error("Error saving scenario entry:", error);
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 
     setIsBudgetModalOpen(false);
     setActiveScenarioId(null);
   };
   
-  const handleToggleVisibility = (scenarioId) => dispatch({ type: 'TOGGLE_SCENARIO_VISIBILITY', payload: scenarioId });
+  const handleToggleVisibility = (scenarioId) => dataDispatch({ type: 'TOGGLE_SCENARIO_VISIBILITY', payload: scenarioId });
 
   const handleOpenDrawer = (scenario) => {
     setSelectedScenario(scenario);
@@ -364,12 +367,12 @@ const ScenarioView = ({ isFocusMode = false }) => {
 
   const handleDeleteEntryInDrawer = (entryId) => {
     if (!selectedScenario) return;
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: 'Supprimer cette modification ?',
         message: "Cette modification sera retirée du scénario. Si c'est une nouvelle entrée, elle sera supprimée. Si c'est une modification d'une entrée de base, l'entrée de base sera restaurée.",
-        onConfirm: () => deleteScenarioEntry(dispatch, { scenarioId: selectedScenario.id, entryId }),
+        onConfirm: () => deleteScenarioEntry({dataDispatch, uiDispatch}, { scenarioId: selectedScenario.id, entryId }),
       }
     });
   };

@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { supabase } from '../utils/supabase';
 import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye, LayoutTemplate, Lock, ListChecks } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ProjectSwitcher from './ProjectSwitcher';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SubscriptionBadge from './SubscriptionBadge';
 import ProjectCollaborators from './ProjectCollaborators';
+import ProjectSwitcher from './ProjectSwitcher';
 
 const SettingsLink = ({ item, onClick }) => {
   const Icon = item.icon;
@@ -15,7 +16,7 @@ const SettingsLink = ({ item, onClick }) => {
       <button 
         onClick={onClick} 
         disabled={item.disabled}
-        className={`flex items-center w-full h-10 px-4 rounded-lg text-sm font-medium transition-colors text-text-secondary hover:bg-secondary-100 hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`flex items-center w-full h-10 px-4 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <Icon className={`w-5 h-5 shrink-0 ${item.color}`} />
         <span className={`ml-4`}>
@@ -27,8 +28,10 @@ const SettingsLink = ({ item, onClick }) => {
 };
 
 const SubHeader = () => {
-  const { state, dispatch } = useBudget();
-  const { settings, isTourActive, tourHighlightId, profile, session } = state;
+  const { dataState } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { profile, session } = dataState;
+  const { isTourActive, tourHighlightId } = uiState;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,7 +52,7 @@ const SubHeader = () => {
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la déconnexion: ${error.message}`, type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la déconnexion: ${error.message}`, type: 'error' } });
     }
   };
 
@@ -89,8 +92,8 @@ const SubHeader = () => {
   const handleSettingsItemClick = (itemId) => {
     if (itemId.startsWith('/app/')) {
         handleNavigate(itemId);
-    } else if (typeof onOpenSettingsDrawer === 'function') {
-      dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: itemId });
+    } else {
+      uiDispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: itemId });
     }
     setIsSettingsOpen(false);
   };
@@ -224,8 +227,8 @@ const SubHeader = () => {
                                       className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
                                   >
                                       <div className="px-4 py-3 border-b">
-                                          <p className="text-sm font-semibold text-gray-800">{state.profile?.fullName || 'Utilisateur'}</p>
-                                          <p className="text-xs text-gray-500 truncate">{state.session?.user?.email}</p>
+                                          <p className="text-sm font-semibold text-gray-800">{profile?.fullName || 'Utilisateur'}</p>
+                                          <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
                                           {subscriptionDetails && <p className="text-xs font-semibold text-blue-600 mt-1">{subscriptionDetails}</p>}
                                       </div>
                                       <div className="p-1">

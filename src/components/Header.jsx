@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown, Users, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
 import TrezocashLogo from './TrezocashLogo';
@@ -11,8 +12,10 @@ import Avatar from './Avatar';
 import { useNavigate } from 'react-router-dom';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
-  const { state, dispatch } = useBudget();
-  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView, consolidatedViews, projects, collaborators, allProfiles, categories } = state;
+  const { dataState } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { settings, allCashAccounts, allActuals, allEntries, loans, consolidatedViews, projects, collaborators, allProfiles, categories } = dataState;
+  const { activeProjectId } = uiState;
   const navigate = useNavigate();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
@@ -30,14 +33,14 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
-  const handleNavigate = (view) => {
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
+  const handleNavigate = (path) => {
+    navigate(path);
   };
 
   const handleOverdueClick = (type) => {
     const view = type === 'payable' ? 'payables' : 'receivables';
-    dispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
+    uiDispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
+    navigate(`/app/${view}`);
   };
 
   const userCashAccounts = useMemo(() => {
@@ -342,11 +345,10 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
   return (
     <>
-      <aside className={`flex flex-col bg-surface shadow-lg transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
-        <div className="flex items-center justify-center h-20 px-4 border-b">
+      <div className="flex items-center justify-center h-20 px-4 border-b">
           <button 
             onClick={onToggleCollapse} 
-            className="flex items-center justify-center w-full transition-colors rounded-lg hover:bg-secondary-100 p-2"
+            className="flex items-center justify-center w-full transition-colors rounded-lg hover:bg-gray-100 p-2"
             title={isCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
           >
             <TrezocashLogo className="w-10 h-10 shrink-0 animate-spin-y-slow" />
@@ -388,7 +390,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                     <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
                                 </div>
                             </div>
-                            <button onClick={() => navigate('/app/provisions')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <button onClick={() => navigate('/app/provisions')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
                                 <div className="flex items-center gap-2" title="Total Provisions">
                                     <Lock className="w-5 h-5 shrink-0 text-gray-500" />
                                     <div className="flex justify-between items-center w-full">
@@ -403,7 +405,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     </div>
 
                     <div className={`px-2 pt-2`}>
-                        <hr className="my-2 border-secondary-200" />
+                        <hr className="my-2 border-gray-200" />
                         <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
                             {isCollapsed ? '👥' : <><Users className="w-4 h-4 text-purple-600" /><span>Équipe</span></>}
                         </h3>
@@ -448,7 +450,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                         <AnimatePresence>
                         {!collapsedSections.overdue && (
                             <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                            <button onClick={() => handleOverdueClick('payable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <button onClick={() => handleOverdueClick('payable')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
                                 <div className="flex items-center gap-2" title="Total des factures fournisseurs dont la date d'échéance est passée">
                                     <FileWarning className="w-5 h-5 shrink-0 text-gray-500" />
                                     <div className="flex justify-between items-center w-full">
@@ -457,7 +459,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                     </div>
                                 </div>
                             </button>
-                            <button onClick={() => handleOverdueClick('receivable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <button onClick={() => handleOverdueClick('receivable')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
                                 <div className="flex items-center gap-2" title="Total des factures clients dont la date d'échéance est passée">
                                     <Hourglass className="w-5 h-5 shrink-0 text-gray-500" />
                                     <div className="flex justify-between items-center w-full">
@@ -478,7 +480,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                         <AnimatePresence>
                         {!collapsedSections.loans && (
                             <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                            <button onClick={() => navigate('borrowings')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'borrowings' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                            <button onClick={() => navigate('/app/borrowings')} className={`w-full text-left rounded-lg transition-colors hover:bg-gray-100`}>
                                 <div className="flex items-center gap-2" title="Gérer vos emprunts">
                                     <Banknote className="w-5 h-5 shrink-0 text-gray-500" />
                                     <div className="flex justify-between items-center w-full">
@@ -487,7 +489,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                     </div>
                                 </div>
                             </button>
-                            <button onClick={() => navigate('loans')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'loans' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                            <button onClick={() => navigate('/app/loans')} className={`w-full text-left rounded-lg transition-colors hover:bg-gray-100`}>
                                 <div className="flex items-center gap-2" title="Gérer vos prêts">
                                     <Coins className="w-5 h-5 shrink-0 text-gray-500" />
                                     <div className="flex justify-between items-center w-full">
@@ -501,7 +503,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                         </AnimatePresence>
                     </div>
                     <div className="pt-2">
-                        <hr className="my-2 border-secondary-200" />
+                        <hr className="my-2 border-gray-200" />
                         <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <LineChart className="w-4 h-4 text-blue-600" />
                             Tendance de la Trésorerie
@@ -518,7 +520,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
             )}
 
             <div className={`px-2 pt-2`}>
-                <hr className="my-2 border-secondary-200" />
+                <hr className="my-2 border-gray-200" />
                 <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
                     {isCollapsed ? '🏦' : <><Wallet className="w-4 h-4 text-teal-600" /><span>Liquidités</span></>}
                 </h3>
@@ -529,7 +531,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     <button 
                         key={account.id} 
                         onClick={() => handleWalletClick(account.id)} 
-                        className={`w-full text-left flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-secondary-100 ${isCollapsed ? 'justify-center' : ''} ${account.isClosed ? 'opacity-50' : ''}`}
+                        className={`w-full text-left flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-100 ${isCollapsed ? 'justify-center' : ''} ${account.isClosed ? 'opacity-50' : ''}`}
                         title={isCollapsed ? `${account.name}: ${formatCurrency(account.actionableBalance, settings)}` : ''}
                     >
                         <Icon className="w-5 h-5 text-gray-500 shrink-0" />
@@ -554,7 +556,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     {!isCollapsed && 'Ajouter un compte'}
                 </button>
                 <button 
-                    onClick={() => dispatch({ type: 'OPEN_TRANSFER_MODAL' })}
+                    onClick={() => uiDispatch({ type: 'OPEN_TRANSFER_MODAL' })}
                     className={`w-full flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-800 p-2 rounded-lg hover:bg-purple-50 ${isCollapsed ? 'justify-center' : ''}`}
                     title={isCollapsed ? 'Transfert entre comptes' : ''}
                 >
@@ -564,7 +566,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                 </div>
             </div>
         </div>
-      </aside>
       <ActionableBalanceDrawer 
         isOpen={isBalanceDrawerOpen}
         onClose={handleCloseDrawer}

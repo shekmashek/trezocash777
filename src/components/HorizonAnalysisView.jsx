@@ -1,17 +1,17 @@
 import React from 'react';
 import { Calendar, Clock } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 
 const HorizonAnalysisView = () => {
-  const { state, dispatch } = useBudget();
-  const { timeUnit, horizonLength } = state;
+  const { uiState, uiDispatch } = useUI();
+  const { timeUnit, horizonLength } = uiState;
 
   const handleTimeUnitChange = (value) => {
-    dispatch({ type: 'SET_TIME_UNIT', payload: value });
+    uiDispatch({ type: 'SET_TIME_UNIT', payload: value });
   };
 
   const handleHorizonLengthChange = (value) => {
-    dispatch({ type: 'SET_HORIZON_LENGTH', payload: Number(value) });
+    uiDispatch({ type: 'SET_HORIZON_LENGTH', payload: Number(value) });
   };
 
   const timeUnitOptions = {

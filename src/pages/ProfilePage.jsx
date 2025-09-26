@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { supabase } from '../utils/supabase';
 import { User, Save, Loader } from 'lucide-react';
 
 const ProfilePage = () => {
-    const { state, dispatch } = useBudget();
-    const { session, profile } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiDispatch } = useUI();
+    const { session, profile } = dataState;
 
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
@@ -32,7 +34,7 @@ const ProfilePage = () => {
             .single();
 
         if (profileError) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${profileError.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${profileError.message}`, type: 'error' } });
             setLoading(false);
             return;
         }
@@ -41,7 +43,7 @@ const ProfilePage = () => {
         await supabase.auth.updateUser({ data: { full_name: fullName } });
 
         // Update local state with the full, fresh profile object
-        dispatch({ 
+        dataDispatch({ 
             type: 'SET_PROFILE', 
             payload: {
                 id: updatedProfile.id,
@@ -51,7 +53,7 @@ const ProfilePage = () => {
                 planId: updatedProfile.plan_id,
             } 
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Profil mis à jour avec succès.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Profil mis à jour avec succès.', type: 'success' } });
         
         setLoading(false);
     };
@@ -63,9 +65,9 @@ const ProfilePage = () => {
         const { error } = await supabase.auth.updateUser({ email });
 
         if (error) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         } else {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Un e-mail de confirmation a été envoyé à votre nouvelle adresse.', type: 'info' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Un e-mail de confirmation a été envoyé à votre nouvelle adresse.', type: 'info' } });
         }
         setLoading(false);
     };

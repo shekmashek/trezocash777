@@ -1,13 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { Wallet, Edit, Plus, Trash2, AlertTriangle, Archive, ArchiveRestore, X, Save, ArrowRightLeft } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget, mainCashAccountCategories } from '../context/BudgetContext';
+import { useData, mainCashAccountCategories } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import AddAccountForm from './AddAccountForm';
 import EmptyState from './EmptyState';
 
 const CashAccountsView = () => {
-  const { state, dispatch } = useBudget();
-  const { allCashAccounts, settings, allActuals, activeProjectId, projects } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { allCashAccounts, settings, allActuals, projects } = dataState;
+  const { activeProjectId } = uiState;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
   const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
 
@@ -43,10 +46,10 @@ const CashAccountsView = () => {
 
   const handleSaveEdit = () => {
     if (!editingAccount.name.trim()) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du compte ne peut pas être vide.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du compte ne peut pas être vide.", type: 'error' } });
       return;
     }
-    dispatch({
+    dataDispatch({
       type: 'UPDATE_USER_CASH_ACCOUNT',
       payload: {
         projectId: activeProjectId,
@@ -62,7 +65,7 @@ const CashAccountsView = () => {
   };
 
   const handleAddAccount = (formData) => {
-    dispatch({
+    dataDispatch({
       type: 'ADD_USER_CASH_ACCOUNT',
       payload: {
         projectId: activeProjectId,
@@ -77,25 +80,25 @@ const CashAccountsView = () => {
 
   const handleDeleteAccount = (accountId) => {
     if (isAccountUsed(accountId)) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Suppression impossible: ce compte est utilisé dans des transactions.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Suppression impossible: ce compte est utilisé dans des transactions.", type: 'error' } });
       return;
     }
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: 'Supprimer ce compte ?',
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_USER_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_USER_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } }),
       }
     });
   };
 
   const handleStartClose = (account) => {
-    dispatch({ type: 'OPEN_CLOSE_ACCOUNT_MODAL', payload: account });
+    uiDispatch({ type: 'OPEN_CLOSE_ACCOUNT_MODAL', payload: account });
   };
 
   const handleReopen = (accountId) => {
-    dispatch({ type: 'REOPEN_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } });
+    dataDispatch({ type: 'REOPEN_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } });
   };
   
   if (isConsolidated) {
@@ -117,7 +120,7 @@ const CashAccountsView = () => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-lg text-gray-800">Vos Comptes</h3>
             <button 
-              onClick={() => dispatch({ type: 'OPEN_TRANSFER_MODAL' })}
+              onClick={() => uiDispatch({ type: 'OPEN_TRANSFER_MODAL' })}
               className="bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-1.5 rounded-md font-medium flex items-center gap-2 text-sm"
             >
               <ArrowRightLeft className="w-4 h-4" />

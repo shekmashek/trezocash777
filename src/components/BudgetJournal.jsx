@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Calendar, User, Building, Edit, Trash2, Clock, Repeat, ArrowRight, ListChecks, Folder, Lock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import EmptyState from './EmptyState';
 
 const BudgetJournal = ({ onEditEntry }) => {
-  const { state, dispatch } = useBudget();
-  const { allEntries, activeProjectId, projects, settings } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { allEntries, projects, settings } = dataState;
+  const { activeProjectId } = uiState;
 
   const { activeProject, budgetEntries, isConsolidated } = useMemo(() => {
     const isConsolidatedView = activeProjectId === 'consolidated';
@@ -79,12 +82,12 @@ const BudgetJournal = ({ onEditEntry }) => {
   const processedEntries = filteredAndSortedEntries();
 
   const handleDeleteEntry = (entryId, entryProjectId) => {
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: 'Supprimer cette entrée ?',
         message: 'Cette action est irréversible et supprimera l\'entrée budgétaire.',
-        onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId, entryProjectId } }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_ENTRY', payload: { entryId, entryProjectId } }),
       }
     });
   };

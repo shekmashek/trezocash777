@@ -1,11 +1,14 @@
 import React from 'react';
 import { X, Edit, Trash2 } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 
 const ScenarioEntryDetailDrawer = ({ isOpen, onClose, scenarioId, entryId, onEdit, onDelete }) => {
-  const { state } = useBudget();
-  const { scenarios, scenarioEntries, allEntries, activeProjectId } = state;
+  const { dataState } = useData();
+  const { uiState } = useUI();
+  const { scenarios, scenarioEntries, allEntries, settings } = dataState;
+  const { activeProjectId } = uiState;
 
   if (!isOpen || !scenarioId || !entryId) return null;
 
@@ -46,7 +49,7 @@ const ScenarioEntryDetailDrawer = ({ isOpen, onClose, scenarioId, entryId, onEdi
                 <p><span className="font-semibold">Fournisseur/Client:</span> {entry.supplier}</p>
                 <p><span className="font-semibold">Catégorie:</span> {entry.category}</p>
                 <p><span className="font-semibold">Description:</span> {entry.description || '-'}</p>
-                <p><span className="font-semibold">Montant:</span> {formatCurrency(entry.amount, state.settings)}</p>
+                <p><span className="font-semibold">Montant:</span> {formatCurrency(entry.amount, settings)}</p>
                 <p><span className="font-semibold">Fréquence:</span> {getFrequencyTitle(entry)}</p>
               </div>
 

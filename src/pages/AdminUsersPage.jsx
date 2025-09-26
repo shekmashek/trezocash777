@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../utils/supabase';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 import { Loader, UserX, UserCheck, Search, Folder, UserPlus } from 'lucide-react';
 
 const AdminUsersPage = () => {
-    const { dispatch } = useBudget();
+    const { uiDispatch } = useUI();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -20,7 +20,7 @@ const AdminUsersPage = () => {
 
             if (usersRes.error || projectsRes.error || collaboratorsRes.error) {
                 const error = usersRes.error || projectsRes.error || collaboratorsRes.error;
-                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+                uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
                 setLoading(false);
                 return;
             }
@@ -50,11 +50,11 @@ const AdminUsersPage = () => {
         };
 
         fetchUsersData();
-    }, [dispatch]);
+    }, [uiDispatch]);
 
     const handleToggleBlock = (user) => {
         const isBlocked = user.is_blocked;
-        dispatch({
+        uiDispatch({
             type: 'OPEN_CONFIRMATION_MODAL',
             payload: {
                 title: `${isBlocked ? 'Débloquer' : 'Bloquer'} l'utilisateur ?`,
@@ -62,10 +62,10 @@ const AdminUsersPage = () => {
                 onConfirm: async () => {
                     const { data, error } = await supabase.from('profiles').update({ is_blocked: !isBlocked }).eq('id', user.id).select().single();
                     if (error) {
-                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
                     } else {
                         setUsers(users.map(u => u.id === user.id ? { ...u, is_blocked: data.is_blocked } : u));
-                        dispatch({ type: 'ADD_TOAST', payload: { message: `Utilisateur ${data.is_blocked ? 'bloqué' : 'débloqué'}.`, type: 'success' } });
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Utilisateur ${data.is_blocked ? 'bloqué' : 'débloqué'}.`, type: 'success' } });
                     }
                 },
             }
@@ -75,10 +75,10 @@ const AdminUsersPage = () => {
     const handleSubscriptionChange = async (user, newStatus) => {
         const { data, error } = await supabase.from('profiles').update({ subscription_status: newStatus }).eq('id', user.id).select().single();
         if (error) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
         } else {
             setUsers(users.map(u => u.id === user.id ? { ...u, subscription_status: data.subscription_status } : u));
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Abonnement mis à jour.', type: 'success' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Abonnement mis à jour.', type: 'success' } });
         }
     };
 

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import { X, Save, Banknote, Coins } from 'lucide-react';
 
 const LoanModal = ({ isOpen, onClose, onSave, editingLoan, type }) => {
-    const { state } = useBudget();
-    const { tiers } = state;
+    const { dataState } = useData();
+    const { tiers } = dataState;
 
     const [formData, setFormData] = useState({
         thirdParty: '',

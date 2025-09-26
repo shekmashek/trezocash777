@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Compass, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { getTodayInTimezone, getEntryAmountForPeriod } from '../utils/budgetCalculations';
@@ -9,8 +10,10 @@ import MonthlyBudgetSummary from './MonthlyBudgetSummary';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DashboardView = () => {
-  const { state, dispatch } = useBudget();
-  const { activeProjectId, allActuals, allCashAccounts, settings, categories, allEntries, projects } = state;
+  const { dataState } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { allActuals, allCashAccounts, settings, categories, allEntries, projects, profile } = dataState;
+  const { activeProjectId } = uiState;
   
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -199,8 +202,6 @@ const DashboardView = () => {
     for (let i = 0; i <= todayIndex; i++) {
         if (!monthlyPeriods[i]) continue;
         const period = monthlyPeriods[i];
-        const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
-        const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie');
         const netActual = actuals.reduce((sum, actual) => {
             const paymentInPeriod = (actual.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0);
             return actual.type === 'receivable' ? sum + paymentInPeriod : sum - paymentInPeriod;
@@ -263,18 +264,19 @@ const DashboardView = () => {
   });
 
   const handleActionClick = (e, item) => {
-    dispatch({ type: 'OPEN_TRANSACTION_ACTION_MENU', payload: { x: e.clientX, y: e.clientY, transaction: item } });
+    uiDispatch({ type: 'OPEN_TRANSACTION_ACTION_MENU', payload: { x: e.clientX, y: e.clientY, transaction: item } });
   };
   
   const greetingMessage = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Bonjour Levy";
-    if (hour < 18) return "Bon après-midi Levy";
-    return "Bonsoir Levy";
+    const name = profile?.fullName?.split(' ')[0] || 'Utilisateur';
+    if (hour < 12) return `Bonjour ${name}`;
+    if (hour < 18) return `Bon après-midi ${name}`;
+    return `Bonsoir ${name}`;
   }
 
   const startTour = () => {
-    dispatch({ type: 'START_TOUR' });
+    uiDispatch({ type: 'START_TOUR' });
   };
 
   const tabContentVariants = {

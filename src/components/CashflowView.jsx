@@ -4,7 +4,8 @@ import ReactECharts from 'echarts-for-react';
 import CashflowDetailDrawer from './CashflowDetailDrawer';
 import BudgetModal from './BudgetModal';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { generateScenarioActuals, resolveScenarioEntries } from '../utils/scenarioCalculations';
 import { getEntryAmountForPeriod, getTodayInTimezone, getStartOfWeek, expandVatEntries } from '../utils/budgetCalculations';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,8 +49,11 @@ function renderBudgetLine(params, api) {
 }
 
 const CashflowView = ({ isFocusMode = false }) => {
-  const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews, categories } = state;
+  const { dataState } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { activeProjectId, projects, allEntries, allActuals, allCashAccounts, settings, scenarios, scenarioEntries, consolidatedViews, categories } = dataState;
+  const { timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
+
   const isConsolidated = activeProjectId === 'consolidated';
   const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
@@ -74,7 +78,7 @@ const CashflowView = ({ isFocusMode = false }) => {
   }, []);
 
   const handlePeriodChange = (direction) => {
-    dispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
+    uiDispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
   };
 
   const handleQuickPeriodSelect = (quickSelectType) => {
@@ -143,7 +147,7 @@ const CashflowView = ({ isFocusMode = false }) => {
       default:
         return;
     }
-    dispatch({ type: 'SET_QUICK_PERIOD', payload });
+    uiDispatch({ type: 'SET_QUICK_PERIOD', payload });
   };
   
   const timeUnitLabels = {
@@ -412,7 +416,7 @@ const CashflowView = ({ isFocusMode = false }) => {
     const baseFlow = calculateCashflowData(baseActuals, expandedBaseBudgetEntries);
     
     return { base: baseFlow };
-  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, state.scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset, categories]);
+  }, [baseActuals, baseBudgetEntries, projectScenarios, selectedScenarios, scenarioEntries, activeProjectId, allEntries, allActuals, isConsolidated, isCustomConsolidated, periods, userCashAccounts, allCashAccounts, settings.timezoneOffset, categories]);
   
   const getChartOptions = () => {
     const { base } = cashflowData;
@@ -697,7 +701,7 @@ const CashflowView = ({ isFocusMode = false }) => {
         <BudgetModal
           isOpen={isScenarioBudgetModalOpen}
           onClose={() => { setIsScenarioBudgetModalOpen(false); setActiveScenarioIdForModal(null); }}
-          onSave={handleSaveScenarioEntry}
+          onSave={() => {}}
           editingData={editingScenarioEntry}
         />
       )}

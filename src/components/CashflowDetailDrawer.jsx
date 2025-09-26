@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { X, Calendar, Wallet, User, CheckCircle, Clock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 
 const CashflowDetailDrawer = ({ isOpen, onClose, transactions, title, currency }) => {
-  const { state } = useBudget();
-  const { allCashAccounts, settings } = state;
+  const { dataState } = useData();
+  const { allCashAccounts, settings } = dataState;
 
   const accountNameMap = useMemo(() => {
     const map = new Map();

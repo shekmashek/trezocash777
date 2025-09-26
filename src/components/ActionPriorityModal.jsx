@@ -1,11 +1,11 @@
 import React from 'react';
 import { X, DollarSign, HandCoins, FileX } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 
 const ActionPriorityModal = ({ isOpen, onClose, transaction, onPay, onWriteOff }) => {
-  const { state } = useBudget();
-  const { settings } = state;
+  const { dataState } = useData();
+  const { settings } = dataState;
 
   if (!isOpen || !transaction) return null;
 

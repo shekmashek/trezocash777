@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { X, ArrowUp, ArrowDown, CheckCircle, Clock } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import { formatCurrency } from '../utils/formatting';
 
 const LoanDetailDrawer = ({ isOpen, onClose, loan }) => {
-  const { state } = useBudget();
-  const { allEntries, allActuals, settings } = state;
+  const { dataState } = useData();
+  const { allEntries, allActuals, settings } = dataState;
 
   const transactionsWithBalance = useMemo(() => {
     if (!loan) return [];

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Save, AlertCircle } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { updateProjectSettings } from '../context/actions';
 
 const ProjectSettingsView = () => {
-  const { state, dispatch } = useBudget();
-  const { projects, activeProjectId } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { projects } = dataState;
+  const { activeProjectId } = uiState;
 
   const activeProject = projects.find(p => p.id === activeProjectId);
 
@@ -25,10 +28,10 @@ const ProjectSettingsView = () => {
 
   const handleSaveChanges = () => {
     if (!name.trim() || !startDate) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Le nom et la date de début sont requis.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Le nom et la date de début sont requis.', type: 'error' } });
       return;
     }
-    updateProjectSettings(dispatch, {
+    updateProjectSettings({dataDispatch, uiDispatch}, {
       projectId: activeProjectId,
       newSettings: {
         name,

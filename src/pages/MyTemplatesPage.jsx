@@ -1,35 +1,38 @@
 import React from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { LayoutTemplate, Plus, Edit, Trash2, Globe, Lock } from 'lucide-react';
 import { deleteTemplate } from '../context/actions';
 import EmptyState from '../components/EmptyState';
 import TemplateIcon from '../components/TemplateIcon';
 
 const MyTemplatesPage = () => {
-    const { state, dispatch } = useBudget();
-    const { session, templates, activeProjectId } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiDispatch, uiState } = useUI();
+    const { session, templates } = dataState;
+    const { activeProjectId } = uiState;
 
     const userTemplates = templates.filter(t => t.userId === session.user.id);
 
     const handleCreateFromCurrent = () => {
         if (activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_')) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Vous ne pouvez pas créer de modèle à partir d'une vue consolidée.", type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: "Vous ne pouvez pas créer de modèle à partir d'une vue consolidée.", type: 'error' } });
             return;
         }
-        dispatch({ type: 'OPEN_SAVE_TEMPLATE_MODAL', payload: null });
+        uiDispatch({ type: 'OPEN_SAVE_TEMPLATE_MODAL', payload: null });
     };
 
     const handleEdit = (template) => {
-        dispatch({ type: 'OPEN_SAVE_TEMPLATE_MODAL', payload: template });
+        uiDispatch({ type: 'OPEN_SAVE_TEMPLATE_MODAL', payload: template });
     };
 
     const handleDelete = (templateId) => {
-        dispatch({
+        uiDispatch({
             type: 'OPEN_CONFIRMATION_MODAL',
             payload: {
                 title: 'Supprimer ce modèle ?',
                 message: 'Cette action est irréversible. Le modèle sera supprimé pour tous les utilisateurs.',
-                onConfirm: () => deleteTemplate(dispatch, templateId),
+                onConfirm: () => deleteTemplate({dataDispatch, uiDispatch}, templateId),
             }
         });
     };

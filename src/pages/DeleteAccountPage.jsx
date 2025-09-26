@@ -1,25 +1,27 @@
 import React, { useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { supabase } from '../utils/supabase';
 import { Shield, AlertTriangle, Download, Mail, LogOut, Loader, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportUserDataAsJSON } from '../utils/export';
 
 const DeleteAccountPage = () => {
-    const { state, dispatch } = useBudget();
+    const { dataState } = useData();
+    const { uiDispatch } = useUI();
     const navigate = useNavigate();
     const [reason, setReason] = useState('');
     const [confirmText, setConfirmText] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleExport = () => {
-        exportUserDataAsJSON(state);
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Exportation de vos données en cours...', type: 'info' } });
+        exportUserDataAsJSON(dataState);
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Exportation de vos données en cours...', type: 'info' } });
     };
 
     const handleDeleteAccount = async () => {
         if (confirmText !== 'SUPPRIMER') {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez taper "SUPPRIMER" pour confirmer.', type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez taper "SUPPRIMER" pour confirmer.', type: 'error' } });
             return;
         }
         setLoading(true);
@@ -29,7 +31,7 @@ const DeleteAccountPage = () => {
         setLoading(false);
 
         if (deleteError) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression : ${deleteError.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression : ${deleteError.message}`, type: 'error' } });
         } else {
             await supabase.auth.signOut();
             // The auth listener in App.jsx will handle the redirect

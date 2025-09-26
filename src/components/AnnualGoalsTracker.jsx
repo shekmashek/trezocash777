@@ -1,27 +1,30 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Target } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { getEntryAmountForMonth } from '../utils/budgetCalculations';
 
 const AnnualGoalsTracker = ({ activeProject, budgetEntries, actualTransactions }) => {
-  const { state, dispatch } = useBudget();
-  const { settings, displayYear } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { settings, projects } = dataState;
+  const { displayYear } = uiState;
   const isConsolidated = activeProject.id === 'consolidated';
   const currencySettings = settings;
 
   const handleYearChange = (newYear) => {
     const startYear = !isConsolidated && activeProject ? new Date(activeProject.startDate).getFullYear() : 1970;
     if (!isConsolidated && newYear < startYear) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Le projet commence en ${startYear}.`, type: 'info' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Le projet commence en ${startYear}.`, type: 'info' } });
       return;
     }
-    dispatch({ type: 'SET_DISPLAY_YEAR', payload: newYear });
+    uiDispatch({ type: 'SET_DISPLAY_YEAR', payload: newYear });
   };
 
   const annualGoals = useMemo(() => {
     if (isConsolidated) {
-      return state.projects.reduce((acc, project) => {
+      return projects.reduce((acc, project) => {
         const projectGoals = project.annualGoals?.[displayYear] || { revenue: 0, expense: 0 };
         acc.revenue += projectGoals.revenue;
         acc.expense += projectGoals.expense;
@@ -29,7 +32,7 @@ const AnnualGoalsTracker = ({ activeProject, budgetEntries, actualTransactions }
       }, { revenue: 0, expense: 0 });
     }
     return activeProject?.annualGoals?.[displayYear] || { revenue: 0, expense: 0 };
-  }, [activeProject, displayYear, isConsolidated, state.projects]);
+  }, [activeProject, displayYear, isConsolidated, projects]);
 
   const totalBudgeted = useMemo(() => {
     const totals = { revenue: 0, expense: 0 };
@@ -68,7 +71,7 @@ const AnnualGoalsTracker = ({ activeProject, budgetEntries, actualTransactions }
   const handleGoalChange = (type, value) => {
     if (isConsolidated) return;
     const numericValue = parseFloat(value) || 0;
-    dispatch({
+    dataDispatch({
       type: 'UPDATE_ANNUAL_GOALS',
       payload: {
         projectId: activeProject.id,

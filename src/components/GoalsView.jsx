@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Target } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { getEntryAmountForMonth } from '../utils/budgetCalculations';
 
 const GoalsView = () => {
-  const { state, dispatch } = useBudget();
-  const { settings, displayYear, activeProjectId, projects, allEntries, allActuals } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { settings, projects, allEntries, allActuals } = dataState;
+  const { displayYear, activeProjectId } = uiState;
 
   const { activeProject, budgetEntries, actualTransactions, isConsolidated } = useMemo(() => {
     const isConsolidatedView = activeProjectId === 'consolidated';
@@ -34,10 +37,10 @@ const GoalsView = () => {
   const handleYearChange = (newYear) => {
     const startYear = !isConsolidated && activeProject ? new Date(activeProject.startDate).getFullYear() : 1970;
     if (!isConsolidated && newYear < startYear) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Le projet commence en ${startYear}.`, type: 'info' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Le projet commence en ${startYear}.`, type: 'info' } });
       return;
     }
-    dispatch({ type: 'SET_DISPLAY_YEAR', payload: newYear });
+    uiDispatch({ type: 'SET_DISPLAY_YEAR', payload: newYear });
   };
 
   const annualGoals = useMemo(() => {
@@ -90,7 +93,7 @@ const GoalsView = () => {
   const handleGoalChange = (type, value) => {
     if (isConsolidated) return;
     const numericValue = parseFloat(value) || 0;
-    dispatch({
+    dataDispatch({
       type: 'UPDATE_ANNUAL_GOALS',
       payload: {
         projectId: activeProject.id,

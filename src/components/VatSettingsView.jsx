@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { supabase } from '../utils/supabase';
 import { Save, Plus, Trash2, AlertTriangle, Loader } from 'lucide-react';
 
 const VatSettingsView = () => {
-    const { state, dispatch } = useBudget();
-    const { activeProjectId, vatRates, vatRegimes } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { vatRates, vatRegimes } = dataState;
+    const { activeProjectId } = uiState;
     const isConsolidated = activeProjectId === 'consolidated' || activeProjectId.startsWith('consolidated_view_');
 
     const [rates, setRates] = useState([]);
@@ -34,7 +37,7 @@ const VatSettingsView = () => {
                     .eq('project_id', activeProjectId);
 
                 if (ratesError) {
-                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement taux TVA: ${ratesError.message}`, type: 'error' } });
+                    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement taux TVA: ${ratesError.message}`, type: 'error' } });
                 } else if (existingRates && existingRates.length > 0) {
                     currentRates = existingRates;
                 } else {
@@ -48,30 +51,30 @@ const VatSettingsView = () => {
                     const { data: newRates, error: insertError } = await supabase.from('vat_rates').insert(defaultRatesPayload).select();
                     
                     if (insertError) {
-                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux par défaut: ${insertError.message}`, type: 'error' } });
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux par défaut: ${insertError.message}`, type: 'error' } });
                     } else {
                         currentRates = newRates;
-                        dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés.', type: 'info' } });
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés.', type: 'info' } });
                     }
                 }
-                dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: currentRates || [] } });
+                dataDispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: currentRates || [] } });
             }
             
             if (!currentRegime) {
-                const { data: existingRegime, error: regimeError } = await supabase.from('vat_regimes').select('*').eq('project_id', activeProjectId).single();
+                const { data: existingRegime, error: regimeError } = await supabase.from('vat_regimes').select('*, collection_periodicity, payment_delay_months, regime_type').eq('project_id', activeProjectId).single();
                 if (regimeError && regimeError.code !== 'PGRST116') {
-                    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement régime TVA: ${regimeError.message}`, type: 'error' } });
+                    uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement régime TVA: ${regimeError.message}`, type: 'error' } });
                 } else if (existingRegime) {
                     currentRegime = existingRegime;
                 } else {
                     const { data: newRegime, error: insertError } = await supabase.from('vat_regimes').insert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' }).select().single();
                     if (insertError) {
-                        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
                     } else {
                         currentRegime = newRegime;
                     }
                 }
-                dispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: currentRegime } });
+                dataDispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: currentRegime } });
             }
 
             setRates(currentRates || []);
@@ -81,7 +84,7 @@ const VatSettingsView = () => {
 
         ensureSettingsExist();
 
-    }, [activeProjectId, isConsolidated, dispatch, projectRates, projectRegime]);
+    }, [activeProjectId, isConsolidated, dataDispatch, uiDispatch, projectRates, projectRegime]);
 
     const handleRateChange = (index, field, value) => {
         const newRates = [...rates];
@@ -98,14 +101,14 @@ const VatSettingsView = () => {
         if (rateToDelete.id && !rateToDelete.id.toString().startsWith('temp-')) {
             const { error } = await supabase.from('vat_rates').delete().eq('id', rateToDelete.id);
             if (error) {
-                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+                uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
                 return;
             }
         }
         const newRates = rates.filter((_, i) => i !== index);
         setRates(newRates);
-        dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux supprimé.', type: 'success' } });
+        dataDispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Taux supprimé.', type: 'success' } });
     };
 
     const handleSetDefault = (index) => {
@@ -120,16 +123,16 @@ const VatSettingsView = () => {
         setLoading(true);
         const { data: savedRegime, error: regimeError } = await supabase
             .from('vat_regimes')
-            .upsert({ ...regime, project_id: activeProjectId }, { onConflict: 'project_id' })
+            .upsert({ ...regime, project_id: activeProjectId, regime_type: regime.regime_type || 'reel_normal' }, { onConflict: 'project_id' })
             .select()
             .single();
 
         if (regimeError) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur régime: ${regimeError.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur régime: ${regimeError.message}`, type: 'error' } });
             setLoading(false);
             return;
         }
-        dispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: savedRegime } });
+        dataDispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: savedRegime } });
 
         const ratesToUpsert = rates.map(rate => ({
             id: rate.id?.toString().startsWith('temp-') ? undefined : rate.id,
@@ -142,10 +145,10 @@ const VatSettingsView = () => {
         const { data: upsertedRates, error: ratesError } = await supabase.from('vat_rates').upsert(ratesToUpsert, { onConflict: 'id' }).select();
 
         if (ratesError) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur taux: ${ratesError.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur taux: ${ratesError.message}`, type: 'error' } });
         } else {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres TVA enregistrés.', type: 'success' } });
-            dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: upsertedRates } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Paramètres TVA enregistrés.', type: 'success' } });
+            dataDispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: upsertedRates } });
             setRates(upsertedRates);
         }
         setLoading(false);

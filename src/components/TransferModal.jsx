@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, ArrowRightLeft, Save } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 
 const TransferModal = ({ isOpen, onClose, onSave }) => {
-  const { state, dispatch } = useBudget();
-  const { allCashAccounts, projects, allActuals, settings } = state;
+  const { dataState } = useData();
+  const { uiDispatch } = useUI();
+  const { allCashAccounts, projects, allActuals, settings } = dataState;
 
   const [formData, setFormData] = useState({
     sourceAccountId: '',
@@ -87,11 +89,11 @@ const TransferModal = ({ isOpen, onClose, onSave }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.sourceAccountId || !formData.destinationAccountId || !formData.amount || !formData.date) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs.', type: 'error' } });
       return;
     }
     if (formData.sourceAccountId === formData.destinationAccountId) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Les comptes source et destination doivent être différents.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Les comptes source et destination doivent être différents.', type: 'error' } });
       return;
     }
     onSave({ ...formData, amount: parseFloat(formData.amount) });

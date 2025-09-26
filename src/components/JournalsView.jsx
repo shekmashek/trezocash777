@@ -2,14 +2,14 @@ import React from 'react';
 import { BookOpen, Receipt } from 'lucide-react';
 import BudgetJournal from './BudgetJournal';
 import PaymentJournal from './PaymentJournal';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 
 const JournalsView = ({ type = 'budget' }) => {
-  const { dispatch } = useBudget();
+  const { uiDispatch } = useUI();
 
   const handleEditEntry = (entry) => {
-    dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry });
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: 'budget' });
+    uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry });
+    uiDispatch({ type: 'SET_CURRENT_VIEW', payload: 'budget' });
   };
 
   const config = {

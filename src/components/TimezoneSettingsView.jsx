@@ -1,17 +1,19 @@
 import React from 'react';
 import { Globe } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 
 const TimezoneSettingsView = () => {
-  const { state, dispatch } = useBudget();
-  const { settings } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiDispatch } = useUI();
+  const { settings } = dataState;
 
   const handleTimezoneChange = (value) => {
-    dispatch({
+    dataDispatch({
       type: 'UPDATE_SETTINGS',
       payload: { ...settings, timezoneOffset: parseInt(value, 10) }
     });
-    dispatch({ type: 'ADD_TOAST', payload: { message: 'Fuseau horaire mis à jour.', type: 'success' } });
+    uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Fuseau horaire mis à jour.', type: 'success' } });
   };
 
   const timezones = Array.from({ length: 27 }, (_, i) => i - 12); // GMT-12 to GMT+14

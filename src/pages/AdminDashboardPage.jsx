@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 import { Loader, Users, BarChart, ShieldCheck, Clock, UserX } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
 const AdminDashboardPage = () => {
-    const { dispatch } = useBudget();
+    const { uiDispatch } = useUI();
     const [stats, setStats] = useState({
         totalUsers: 0,
         activeSubs: 0,
@@ -23,7 +23,7 @@ const AdminDashboardPage = () => {
                 .select('subscription_status, is_blocked, created_at');
 
             if (error) {
-                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+                uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
                 setLoading(false);
                 return;
             }
@@ -55,7 +55,7 @@ const AdminDashboardPage = () => {
         };
 
         fetchDashboardData();
-    }, [dispatch]);
+    }, [uiDispatch]);
 
     const getChartOptions = () => ({
         tooltip: { trigger: 'axis' },

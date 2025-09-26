@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
+import { useData } from '../context/DataContext';
 import { Plus, TrendingUp, TrendingDown, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const FloatingActions = () => {
-  const { state, dispatch } = useBudget();
-  const { activeProjectId } = state;
+  const { uiState, uiDispatch } = useUI();
+  const { dataState } = useData();
+  const { activeProjectId } = uiState;
   const [isOpen, setIsOpen] = useState(false);
   const isConsolidated = activeProjectId === 'consolidated';
 
   const handleNewEntry = () => {
-    dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: 'revenu' } });
+    uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: 'revenu' } });
     setIsOpen(false);
   };
 
   const handleNewExpense = () => {
-    dispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: 'depense' } });
+    uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: { type: 'depense' } });
     setIsOpen(false);
   };
 
   const handleNewScenario = () => {
-    dispatch({ type: 'OPEN_SCENARIO_MODAL', payload: null });
+    uiDispatch({ type: 'OPEN_SCENARIO_MODAL', payload: null });
     setIsOpen(false);
   };
 

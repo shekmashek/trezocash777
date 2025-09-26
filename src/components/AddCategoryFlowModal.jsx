@@ -1,11 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { X, Save, FolderPlus, Plus } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { saveMainCategory } from '../context/actions';
 
 const AddCategoryFlowModal = ({ isOpen, onClose, type, onCategorySelected }) => {
-    const { state, dispatch } = useBudget();
-    const { categories, allEntries, activeProjectId, session } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState } = useUI();
+    const { categories, allEntries, session } = dataState;
+    const { activeProjectId } = uiState;
 
     const [newMainCategoryName, setNewMainCategoryName] = useState('');
 
@@ -22,7 +25,7 @@ const AddCategoryFlowModal = ({ isOpen, onClose, type, onCategorySelected }) => 
     const handleCreateAndSelect = async (e) => {
         e.preventDefault();
         if (!newMainCategoryName.trim()) return;
-        const newCategory = await saveMainCategory(dispatch, { type: type === 'revenu' ? 'revenue' : 'expense', name: newMainCategoryName.trim(), user: session.user });
+        const newCategory = await saveMainCategory({dataDispatch, uiDispatch}, { type: type === 'revenu' ? 'revenue' : 'expense', name: newMainCategoryName.trim(), user: session.user });
         if (newCategory) {
             onCategorySelected(newCategory.id);
         }

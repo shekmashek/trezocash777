@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { X, GripVertical, Minimize2, Maximize2 } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { updateNote, deleteNote } from '../context/actions';
 
 const StickyNote = ({ note, index, constraintsRef }) => {
-  const { dispatch, state } = useBudget();
-  const { activeProjectId } = state;
+  const { dataDispatch } = useData();
+  const { uiState } = useUI();
+  const { activeProjectId } = uiState;
   const dragControls = useDragControls();
   
   const [internalContent, setInternalContent] = useState(note.content);
@@ -14,14 +16,14 @@ const StickyNote = ({ note, index, constraintsRef }) => {
   useEffect(() => {
     const handler = setTimeout(() => {
       if (internalContent !== note.content) {
-        updateNote(dispatch, note.id, { content: internalContent });
+        updateNote({dataDispatch}, note.id, { content: internalContent });
       }
     }, 500);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [internalContent, note.id, note.content, dispatch]);
+  }, [internalContent, note.id, note.content, dataDispatch]);
 
   const handleContentChange = (e) => {
     setInternalContent(e.target.value);
@@ -29,16 +31,16 @@ const StickyNote = ({ note, index, constraintsRef }) => {
 
   const handleDragEnd = (event, info) => {
     if (!note.isMinimized) {
-        updateNote(dispatch, note.id, { x: info.point.x, y: info.point.y });
+        updateNote({dataDispatch}, note.id, { x: info.point.x, y: info.point.y });
     }
   };
 
   const handleDelete = () => {
-    deleteNote(dispatch, { noteId: note.id, projectId: activeProjectId });
+    deleteNote({dataDispatch}, { noteId: note.id, projectId: activeProjectId });
   };
 
   const handleToggleMinimize = () => {
-    dispatch({ type: 'TOGGLE_NOTE_MINIMIZE', payload: note.id });
+    dataDispatch({ type: 'TOGGLE_NOTE_MINIMIZE', payload: note.id });
   };
 
   function startDrag(event) {

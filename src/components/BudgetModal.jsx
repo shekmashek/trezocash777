@@ -2,14 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, User, Building, Trash2, Edit, Clock, Repeat, AlertCircle, ListChecks, PlusCircle, Lock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
 import AddCategoryModal from './AddCategoryModal';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { saveSubCategory } from '../context/actions';
 import { supabase } from '../utils/supabase';
 
 const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
-  const { state, dispatch } = useBudget();
-  const { categories, tiers, settings, allCashAccounts, activeProjectId, projects, session, vatRates } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { categories, tiers, settings, allCashAccounts, projects, session, vatRates } = dataState;
+  const { activeProjectId } = uiState;
   const isConsolidated = activeProjectId === 'consolidated';
 
   const isContextualAdd = useMemo(() => editingData && !editingData.id && editingData.category, [editingData]);
@@ -42,16 +45,16 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
                 .select();
 
             if (insertError) {
-                dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux TVA par défaut: ${insertError.message}`, type: 'error' } });
+                uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux TVA par défaut: ${insertError.message}`, type: 'error' } });
             } else if (newRates) {
-                dispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
-                dispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés pour ce projet.', type: 'info' } });
+                dataDispatch({ type: 'SET_PROJECT_VAT_RATES', payload: { projectId: activeProjectId, rates: newRates } });
+                uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Taux de TVA par défaut créés pour ce projet.', type: 'info' } });
             }
         }
     };
 
     ensureVatRates();
-  }, [isOpen, activeProjectId, isConsolidated, vatRates, dispatch]);
+  }, [isOpen, activeProjectId, isConsolidated, vatRates, dataDispatch, uiDispatch]);
 
   const getInitialFormData = () => ({
     type: 'revenu',
@@ -180,7 +183,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.category || !formData.supplier) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs obligatoires.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs obligatoires.', type: 'error' } });
       return;
     }
     let entryData = { 
@@ -193,7 +196,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
     if (entryData.frequency === 'irregulier' || entryData.isProvision) {
       const validPayments = entryData.payments.filter(p => p.date && p.amount);
       if (validPayments.length === 0 && entryData.frequency !== 'irregulier' && !entryData.isProvision) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez ajouter au moins un paiement.', type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez ajouter au moins un paiement.', type: 'error' } });
         return;
       }
       entryData.payments = validPayments;
@@ -208,26 +211,26 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
       }
     } else {
       if (!formData.amount) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir le montant.', type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir le montant.', type: 'error' } });
         return;
       }
       entryData.payments = [];
     }
     if (formData.frequency === 'ponctuel' && !formData.date) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date pour une transaction ponctuelle.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date pour une transaction ponctuelle.', type: 'error' } });
       return;
     }
     if (formData.frequency !== 'ponctuel' && formData.frequency !== 'irregulier' && !formData.startDate) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date de début pour une transaction récurrente.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner une date de début pour une transaction récurrente.', type: 'error' } });
       return;
     }
     if (formData.endDate && formData.startDate && formData.endDate < formData.startDate) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: 'La date de fin ne peut pas être antérieure à la date de début.', type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'La date de fin ne peut pas être antérieure à la date de début.', type: 'error' } });
       return;
     }
     if (formData.isProvision) {
         if (!formData.provisionDetails.finalPaymentDate || !formData.provisionDetails.provisionAccountId) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Pour une provision, veuillez spécifier la date du paiement final et le compte de provision.", type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: "Pour une provision, veuillez spécifier la date du paiement final et le compte de provision.", type: 'error' } });
             return;
         }
     }
@@ -238,7 +241,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
     const total = parseFloat(formData.amount);
     const num = parseInt(formData.numProvisions, 10);
     if (!total || !num || total <= 0 || num <= 0) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez entrer un montant total et un nombre de provisions valides.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez entrer un montant total et un nombre de provisions valides.", type: 'error' } });
       return;
     }
     const provisionAmount = total / num;
@@ -251,7 +254,7 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
 
   const handleDeleteClick = () => {
     if (editingData) {
-      dispatch({
+      uiDispatch({
         type: 'OPEN_CONFIRMATION_MODAL',
         payload: {
           title: 'Supprimer cette entrée ?',
@@ -283,13 +286,13 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
   const handleSaveNewCategory = async (subCategoryName) => {
     const user = session.user;
     if (!user) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
         return;
     }
 
     const typeForDB = formData.type === 'revenu' ? 'revenue' : 'expense';
 
-    const newSubCategory = await saveSubCategory(dispatch, {
+    const newSubCategory = await saveSubCategory({dataDispatch, uiDispatch}, {
         type: typeForDB,
         mainCategoryId: selectedMainCategoryId,
         subCategoryName: subCategoryName,

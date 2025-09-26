@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { CreditCard, CheckCircle, Clock, Loader, Star, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useSearchParams } from 'react-router-dom';
@@ -31,21 +32,22 @@ const BillingToggle = ({ billingCycle, setBillingCycle }) => (
 );
 
 const SubscriptionPage = () => {
-    const { state, dispatch } = useBudget();
-    const { session, profile } = state;
+    const { dataState } = useData();
+    const { uiDispatch } = useUI();
+    const { session, profile } = dataState;
     const [searchParams] = useSearchParams();
     const [loadingPlan, setLoadingPlan] = useState(null);
     const [billingCycle, setBillingCycle] = useState('monthly');
 
     useEffect(() => {
         if (searchParams.get('session_id')) {
-            dispatch({
+            uiDispatch({
                 type: 'ADD_TOAST',
                 payload: { message: 'Abonnement réussi ! Merci pour votre confiance.', type: 'success', duration: 5000 }
             });
             // TODO: Optionally refetch profile to update status immediately
         }
-    }, [searchParams, dispatch]);
+    }, [searchParams, uiDispatch]);
 
     const subscriptionStatus = profile?.subscriptionStatus || 'trialing';
     
@@ -86,7 +88,7 @@ const SubscriptionPage = () => {
             window.location.href = data.url;
 
         } catch (error) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
             setLoadingPlan(null);
         }
     };

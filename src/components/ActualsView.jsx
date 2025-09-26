@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, Edit, Trash2, Plus, AlertTriangle, HandCoins, ArrowDownUp, DollarSign, Clock, PiggyBank } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import EmptyState from './EmptyState';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
 
 const ActualsView = ({ type }) => {
-  const { state, dispatch } = useBudget();
-  const { projects, activeProjectId, allActuals, settings, actualsSearchTerm, actualsViewFilter } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { projects, allActuals, settings } = dataState;
+  const { activeProjectId, actualsSearchTerm, actualsViewFilter } = uiState;
 
   const { activeProject, actualTransactions } = useMemo(() => {
     const project = projects.find(p => p.id === activeProjectId);
@@ -26,16 +29,16 @@ const ActualsView = ({ type }) => {
   useEffect(() => {
     if (actualsSearchTerm) {
       setSearchTerm(actualsSearchTerm);
-      dispatch({ type: 'SET_ACTUALS_SEARCH_TERM', payload: '' });
+      uiDispatch({ type: 'SET_ACTUALS_SEARCH_TERM', payload: '' });
     }
-  }, [actualsSearchTerm, dispatch]);
+  }, [actualsSearchTerm, uiDispatch]);
 
   useEffect(() => {
     if (actualsViewFilter?.status === 'overdue') {
       setFilterStatus('overdue');
-      dispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: null });
+      uiDispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: null });
     }
-  }, [actualsViewFilter, dispatch]);
+  }, [actualsViewFilter, uiDispatch]);
 
   const config = {
     payable: { title: 'Gestion des Sorties', noun: 'sortie', icon: <ArrowDownUp className="w-8 h-8 text-red-600" />, statuses: { pending: 'À payer', partially_paid: 'Partiellement Payé', paid: 'Payée' }, color: 'red', addBtnText: 'Sortie Hors Budget', actionBtnText: 'Payer' },
@@ -44,17 +47,17 @@ const ActualsView = ({ type }) => {
   const currentConfig = config[type];
   const unpaidLabel = type === 'payable' ? 'À Payer / Partiels' : 'À Recevoir / Partiels';
 
-  const handleAddNew = () => dispatch({ type: 'OPEN_ACTUAL_TRANSACTION_MODAL', payload: { type, isOffBudget: true } });
-  const handleEdit = (actual) => dispatch({ type: 'OPEN_ACTUAL_TRANSACTION_MODAL', payload: actual });
-  const handleOpenPaymentModal = (actual) => dispatch({ type: 'OPEN_PAYMENT_MODAL', payload: actual });
+  const handleAddNew = () => uiDispatch({ type: 'OPEN_ACTUAL_TRANSACTION_MODAL', payload: { type, isOffBudget: true } });
+  const handleEdit = (actual) => uiDispatch({ type: 'OPEN_ACTUAL_TRANSACTION_MODAL', payload: actual });
+  const handleOpenPaymentModal = (actual) => uiDispatch({ type: 'OPEN_PAYMENT_MODAL', payload: actual });
   
   const handleDelete = (id) => {
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer cette ${currentConfig.noun} ?`,
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_ACTUAL', payload: id }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_ACTUAL', payload: id }),
       }
     });
   };

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Layers } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 
 const ConsolidatedViewModal = ({ isOpen, onClose, onSave, editingView }) => {
-  const { state } = useBudget();
-  const { projects } = state;
+  const { dataState } = useData();
+  const { projects } = dataState;
   const activeProjects = projects.filter(p => !p.isArchived);
 
   const [name, setName] = useState('');

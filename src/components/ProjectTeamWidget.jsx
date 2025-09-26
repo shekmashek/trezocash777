@@ -1,11 +1,14 @@
 import React, { useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import Avatar from './Avatar';
 import { Users, Settings } from 'lucide-react';
 
 const ProjectTeamWidget = () => {
-    const { state, dispatch } = useBudget();
-    const { activeProjectId, projects, collaborators, allProfiles } = state;
+    const { dataState } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { activeProjectId } = uiState;
+    const { projects, collaborators, allProfiles } = dataState;
     
     const isConsolidated = activeProjectId === 'consolidated';
     const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
@@ -37,7 +40,7 @@ const ProjectTeamWidget = () => {
     }, [activeProjectId, projects, collaborators, allProfiles, isConsolidated, isCustomConsolidated]);
 
     const handleManageTeam = () => {
-        dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'userManagement' });
+        uiDispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'userManagement' });
     };
 
     return (

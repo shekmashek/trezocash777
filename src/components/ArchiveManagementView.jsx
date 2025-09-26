@@ -1,21 +1,21 @@
 import React from 'react';
 import { Archive, ArchiveRestore, Folder, Layers } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import EmptyState from './EmptyState';
 
 const ArchiveManagementView = () => {
-  const { state, dispatch } = useBudget();
-  const { projects, scenarios } = state;
+  const { dataState, dataDispatch } = useData();
+  const { projects, scenarios } = dataState;
 
   const archivedProjects = projects.filter(p => p.isArchived);
   const archivedScenarios = scenarios.filter(s => s.isArchived);
 
   const handleRestoreProject = (projectId) => {
-    dispatch({ type: 'RESTORE_PROJECT', payload: projectId });
+    dataDispatch({ type: 'RESTORE_PROJECT', payload: projectId });
   };
 
   const handleRestoreScenario = (scenarioId) => {
-    dispatch({ type: 'RESTORE_SCENARIO', payload: scenarioId });
+    dataDispatch({ type: 'RESTORE_SCENARIO', payload: scenarioId });
   };
 
   return (

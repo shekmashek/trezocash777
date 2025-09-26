@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 const tourSteps = [
@@ -55,7 +55,7 @@ const tourSteps = [
 ];
 
 const GuidedTour = () => {
-  const { dispatch } = useBudget();
+  const { uiDispatch } = useUI();
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState(null);
 
@@ -67,18 +67,18 @@ const GuidedTour = () => {
       const rect = targetElement.getBoundingClientRect();
       setTargetRect(rect);
       targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-      dispatch({ type: 'SET_TOUR_HIGHLIGHT', payload: step.target });
+      uiDispatch({ type: 'SET_TOUR_HIGHLIGHT', payload: step.target });
     } else {
       handleNext();
     }
-  }, [currentStep, step.target, dispatch]);
+  }, [currentStep, step.target, uiDispatch]);
 
   useEffect(() => {
     // Cleanup function to remove highlight when the tour component unmounts
     return () => {
-      dispatch({ type: 'SET_TOUR_HIGHLIGHT', payload: null });
+      uiDispatch({ type: 'SET_TOUR_HIGHLIGHT', payload: null });
     };
-  }, [dispatch]);
+  }, [uiDispatch]);
 
   const handleNext = () => {
     if (currentStep < tourSteps.length - 1) {
@@ -95,7 +95,7 @@ const GuidedTour = () => {
   };
 
   const endTour = () => {
-    dispatch({ type: 'END_TOUR' });
+    uiDispatch({ type: 'END_TOUR' });
   };
 
   const tooltipPosition = useMemo(() => {

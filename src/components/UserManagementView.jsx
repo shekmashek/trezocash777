@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Users, UserPlus, Mail, Trash2, Send, Edit, Eye, Shield, Folder, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { inviteCollaborator, revokeCollaborator } from '../context/actions';
 import EmptyState from './EmptyState';
 
 const UserManagementView = () => {
-    const { state, dispatch } = useBudget();
-    const { session, profile, projects, collaborators } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiDispatch } = useUI();
+    const { session, profile, projects, collaborators } = dataState;
 
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('viewer');
@@ -46,10 +48,10 @@ const UserManagementView = () => {
     const handleInvite = (e) => {
         e.preventDefault();
         if (!inviteEmail.trim() || selectedProjects.size === 0) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez saisir un e-mail et sélectionner au moins un projet.", type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: "Veuillez saisir un e-mail et sélectionner au moins un projet.", type: 'error' } });
             return;
         }
-        inviteCollaborator(dispatch, {
+        inviteCollaborator({dataDispatch, uiDispatch}, {
             email: inviteEmail,
             role: inviteRole,
             permissionScope: inviteScope,
@@ -63,12 +65,12 @@ const UserManagementView = () => {
     };
 
     const handleRevoke = (collaboratorId) => {
-        dispatch({
+        uiDispatch({
             type: 'OPEN_CONFIRMATION_MODAL',
             payload: {
                 title: 'Révoquer l\'accès ?',
                 message: 'Le collaborateur perdra l\'accès à tous les projets partagés. Cette action est irréversible.',
-                onConfirm: () => revokeCollaborator(dispatch, collaboratorId),
+                onConfirm: () => revokeCollaborator({dataDispatch, uiDispatch}, collaboratorId),
             }
         });
     };

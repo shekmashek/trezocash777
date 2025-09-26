@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PieChart, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowLeft, Folder, User, ChevronDown } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import ReactECharts from 'echarts-for-react';
 import EmptyState from './EmptyState';
@@ -8,8 +9,10 @@ import { getTodayInTimezone, getEntryAmountForPeriod, expandVatEntries } from '.
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ExpenseAnalysisView = ({ isFocusMode = false, rangeStart: rangeStartProp, rangeEnd: rangeEndProp, analysisType: analysisTypeProp, analysisMode: analysisModeProp, setAnalysisMode: setAnalysisModeProp }) => {
-  const { state, dispatch } = useBudget();
-  const { activeProjectId, projects, categories, allActuals, settings, allEntries, consolidatedViews } = state;
+  const { dataState } = useData();
+  const { uiState } = useUI();
+  const { projects, categories, allActuals, settings, allEntries, consolidatedViews } = dataState;
+  const { activeProjectId } = uiState;
   const [localTimeUnit, setLocalTimeUnit] = useState('month');
   const [localHorizonLength, setLocalHorizonLength] = useState(1);
   const [localPeriodOffset, setLocalPeriodOffset] = useState(0);

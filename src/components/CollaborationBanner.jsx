@@ -1,11 +1,14 @@
 import React, { useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { Info, Check, X, CheckCircle, XCircle } from 'lucide-react';
 import { acceptInvite, declineInvite, dismissNotification } from '../context/actions';
 
 const CollaborationBanner = () => {
-    const { state, dispatch } = useBudget();
-    const { session, activeProjectId, projects, collaborators, allProfiles, profile } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { session, projects, collaborators, allProfiles, profile } = dataState;
+    const { activeProjectId } = uiState;
 
     // 1. Check for pending invitations for the current user
     const pendingInvite = useMemo(() => {
@@ -40,15 +43,15 @@ const CollaborationBanner = () => {
     }, [pendingInvite, ownerNotification, activeProjectId, projects, session, allProfiles, collaborators]);
 
     const handleAccept = () => {
-        acceptInvite(dispatch, pendingInvite, session.user);
+        acceptInvite({dataDispatch, uiDispatch}, pendingInvite, session.user);
     };
 
     const handleDecline = () => {
-        declineInvite(dispatch, pendingInvite, session.user);
+        declineInvite({dataDispatch, uiDispatch}, pendingInvite, session.user);
     };
     
     const handleDismissNotification = () => {
-        dismissNotification(dispatch, ownerNotification.id, session.user);
+        dismissNotification({dataDispatch, uiDispatch}, ownerNotification.id, session.user);
     };
 
     if (pendingInvite) {

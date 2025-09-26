@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { X, Plus, Edit, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import { formatCurrency } from '../utils/formatting';
 
 const ScenarioEntriesDrawer = ({ isOpen, onClose, scenario, onAddEntry, onEditEntry, onDeleteEntry }) => {
-  const { state } = useBudget();
-  const { scenarioEntries, allEntries, activeProjectId } = state;
+  const { dataState } = useData();
+  const { scenarioEntries, allEntries, activeProjectId, settings } = dataState;
 
   const entriesForScenario = useMemo(() => {
     if (!scenario) return [];
@@ -55,7 +55,7 @@ const ScenarioEntriesDrawer = ({ isOpen, onClose, scenario, onAddEntry, onEditEn
                         </div>
                         <div className="flex items-center gap-2">
                             <div className={`font-semibold text-sm ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatCurrency(entry.amount, state.settings)}
+                                {formatCurrency(entry.amount, settings)}
                                 <span className="text-xs font-normal text-gray-500 ml-1">/{entry.frequency}</span>
                             </div>
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">

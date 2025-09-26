@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { Eye, Save } from 'lucide-react';
 import { updateSettings } from '../context/actions';
 
 const DisplaySettingsPage = () => {
-    const { state, dispatch } = useBudget();
-    const { settings, session } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiDispatch } = useUI();
+    const { settings, session } = dataState;
 
     const [currency, setCurrency] = useState(settings.currency);
     const [customCurrency, setCustomCurrency] = useState('');
@@ -31,7 +33,7 @@ const DisplaySettingsPage = () => {
     const handleSave = () => {
         const finalCurrency = currency === 'custom' ? customCurrency.trim() : currency;
         if (!finalCurrency) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'La devise ne peut pas être vide.', type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'La devise ne peut pas être vide.', type: 'error' } });
             return;
         }
         const newSettings = {
@@ -39,7 +41,7 @@ const DisplaySettingsPage = () => {
             displayUnit,
             decimalPlaces,
         };
-        updateSettings(dispatch, session.user, newSettings);
+        updateSettings({dataDispatch, uiDispatch}, session.user, newSettings);
     };
 
     return (

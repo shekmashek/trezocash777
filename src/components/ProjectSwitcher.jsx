@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'lucide-react';
 import ProjectModal from './ProjectModal';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { supabase } from '../utils/supabase';
 import { deleteConsolidatedView, deleteProject } from '../context/actions';
 import Avatar from './Avatar';
 
 const ProjectSwitcher = () => {
-  const { state, dispatch } = useBudget();
-  const { projects, activeProjectId, consolidatedViews, collaborators, allProfiles } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiState, uiDispatch } = useUI();
+  const { projects, consolidatedViews, collaborators, allProfiles } = dataState;
+  const { activeProjectId } = uiState;
   const activeProjects = projects.filter(p => !p.isArchived);
   
   const isConsolidated = activeProjectId === 'consolidated';
@@ -85,12 +88,12 @@ const ProjectSwitcher = () => {
   };
 
   const handleSelectProject = (projectId) => {
-    dispatch({ type: 'SET_ACTIVE_PROJECT', payload: projectId });
+    uiDispatch({ type: 'SET_ACTIVE_PROJECT', payload: projectId });
     setIsListOpen(false);
   };
 
   const handleStartOnboarding = () => {
-    dispatch({ type: 'START_ONBOARDING' });
+    uiDispatch({ type: 'START_ONBOARDING' });
     setIsListOpen(false);
   };
 
@@ -110,16 +113,16 @@ const ProjectSwitcher = () => {
         .single();
 
       if (error) {
-        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors du renommage: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors du renommage: ${error.message}`, type: 'error' } });
       } else {
-        dispatch({
+        dataDispatch({
           type: 'UPDATE_PROJECT_SETTINGS_SUCCESS',
           payload: {
             projectId: editingProject.id,
             newSettings: { name: data.name }
           }
         });
-        dispatch({ type: 'ADD_TOAST', payload: { message: 'Projet renommé avec succès.', type: 'success' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Projet renommé avec succès.', type: 'success' } });
       }
     }
   };
@@ -128,12 +131,12 @@ const ProjectSwitcher = () => {
     const projectToDelete = projects.find(p => p.id === projectId);
     if (!projectToDelete) return;
 
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer le projet "${projectToDelete.name}" ?`,
         message: "Cette action est irréversible. Toutes les données associées à ce projet (budgets, transactions, scénarios) seront définitivement perdues. Pour conserver les données, vous pouvez plutôt l'archiver.",
-        onConfirm: () => deleteProject(dispatch, projectId),
+        onConfirm: () => deleteProject({dataDispatch, uiDispatch}, projectId),
       }
     });
   };
@@ -142,12 +145,12 @@ const ProjectSwitcher = () => {
     const projectToArchive = projects.find(p => p.id === projectId);
     if (!projectToArchive) return;
 
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Archiver le projet "${projectToArchive.name}" ?`,
         message: "L'archivage d'un projet le masquera de la liste principale, mais toutes ses données seront conservées. Vous pourrez le restaurer à tout moment depuis les paramètres avancés.",
-        onConfirm: () => dispatch({ type: 'ARCHIVE_PROJECT', payload: projectId }),
+        onConfirm: () => dataDispatch({ type: 'ARCHIVE_PROJECT', payload: projectId }),
         confirmText: 'Archiver',
         cancelText: 'Annuler',
         confirmColor: 'primary'
@@ -156,17 +159,17 @@ const ProjectSwitcher = () => {
   };
 
   const handleOpenConsolidatedViewModal = (view = null) => {
-    dispatch({ type: 'OPEN_CONSOLIDATED_VIEW_MODAL', payload: view });
+    uiDispatch({ type: 'OPEN_CONSOLIDATED_VIEW_MODAL', payload: view });
     setIsListOpen(false);
   };
 
   const handleDeleteConsolidatedView = (viewId) => {
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer cette vue consolidée ?`,
         message: "Cette action est irréversible et supprimera uniquement la vue, pas les projets qu'elle contient.",
-        onConfirm: () => deleteConsolidatedView(dispatch, viewId),
+        onConfirm: () => deleteConsolidatedView({dataDispatch, uiDispatch}, viewId),
       }
     });
   };

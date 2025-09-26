@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Save, X } from 'lucide-react';
-import { useBudget, mainCashAccountCategories } from '../context/BudgetContext';
+import { useData, mainCashAccountCategories } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 
 const AddAccountForm = ({ onSave, onCancel }) => {
-  const { state } = useBudget();
-  const { settings, projects, activeProjectId } = state;
+  const { dataState } = useData();
+  const { uiState } = useUI();
+  const { settings, projects } = dataState;
+  const { activeProjectId } = uiState;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
 
   const [formData, setFormData] = useState({

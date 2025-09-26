@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import { X, Wallet, Lock, CheckCircle, Landmark, PiggyBank, Smartphone, Edit, Archive, ArrowUp, ArrowDown } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData, mainCashAccountCategories } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
-import { mainCashAccountCategories } from '../context/BudgetContext';
 
 const ActionableBalanceDrawer = ({ isOpen, onClose, balances, selectedAccountId, currency }) => {
-  const { state, dispatch } = useBudget();
-  const { settings, allActuals, projects } = state;
+  const { dataState } = useData();
+  const { uiDispatch: dispatch } = useUI();
+  const { settings, allActuals, projects } = dataState;
 
   const displayedAccount = useMemo(() => {
     if (!selectedAccountId) return null;

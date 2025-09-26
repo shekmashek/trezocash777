@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Trash2, User } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { saveActual, deleteActual } from '../context/actions';
 
 const ActualTransactionModal = ({ isOpen, onClose, editingData, type }) => {
-  const { state, dispatch } = useBudget();
-  const { categories, tiers, settings, session } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiDispatch } = useUI();
+  const { categories, tiers, settings, session } = dataState;
 
   const getInitialFormData = (transactionType) => ({
     category: '',
@@ -43,10 +45,10 @@ const ActualTransactionModal = ({ isOpen, onClose, editingData, type }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.category || !formData.thirdParty || !formData.amount || !formData.date) {
-      alert('Veuillez remplir tous les champs obligatoires.');
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez remplir tous les champs obligatoires.', type: 'error' } });
       return;
     }
-    saveActual(dispatch, {
+    saveActual({ dataDispatch, uiDispatch }, {
       actualData: { ...formData, amount: parseFloat(formData.amount) },
       editingActual: editingData,
       user: session.user,
@@ -56,13 +58,13 @@ const ActualTransactionModal = ({ isOpen, onClose, editingData, type }) => {
 
   const handleDeleteClick = () => {
     if (editingData) {
-      dispatch({
+      uiDispatch({
         type: 'OPEN_CONFIRMATION_MODAL',
         payload: {
           title: `Supprimer cette transaction ?`,
           message: 'Cette action est irréversible.',
           onConfirm: () => {
-            deleteActual(dispatch, editingData.id);
+            deleteActual({dataDispatch, uiDispatch}, editingData.id);
             onClose();
           },
         }

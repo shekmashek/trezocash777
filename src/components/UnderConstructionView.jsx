@@ -1,12 +1,12 @@
 import React from 'react';
 import { Wrench } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useUI } from '../context/UIContext';
 
 const UnderConstructionView = ({ title }) => {
-  const { dispatch } = useBudget();
+  const { uiDispatch } = useUI();
 
   const handleGoBack = () => {
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: 'budget' });
+    uiDispatch({ type: 'SET_CURRENT_VIEW', payload: 'budget' });
   };
 
   return (

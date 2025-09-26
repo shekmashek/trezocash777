@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, User, Banknote, HandCoins, Calendar, Wallet, Check, AlertTriangle } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
 
 const DirectPaymentModal = ({ isOpen, onClose, onSave, type }) => {
-    const { state, dispatch } = useBudget();
-    const { tiers, allActuals, allCashAccounts, settings, activeProjectId, projects } = state;
+    const { dataState } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { tiers, allActuals, allCashAccounts, settings, projects } = dataState;
+    const { activeProjectId } = uiState;
 
     const [selectedTiersId, setSelectedTiersId] = useState('');
     const [selectedActualIds, setSelectedActualIds] = useState(new Set());
@@ -99,7 +102,7 @@ const DirectPaymentModal = ({ isOpen, onClose, onSave, type }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (selectedActualIds.size === 0 || !paymentAmount || !paymentDate || !cashAccountId) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner au moins une facture et remplir tous les champs.', type: 'error' } });
+            uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Veuillez sélectionner au moins une facture et remplir tous les champs.', type: 'error' } });
             return;
         }
         onSave({

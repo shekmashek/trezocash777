@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Users, UserPlus, Edit, Trash2, Save, X, Plus, Search, Banknote, CreditCard } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import EmptyState from './EmptyState';
 
 const TiersManagementView = ({ onOpenPaymentTerms }) => {
-  const { state, dispatch } = useBudget();
-  const { tiers, allEntries, allActuals, settings, loans } = state;
+  const { dataState, dataDispatch } = useData();
+  const { uiDispatch } = useUI();
+  const { tiers, allEntries, allActuals, settings, loans } = dataState;
 
   const [newTierName, setNewTierName] = useState('');
   const [newTierType, setNewTierType] = useState('fournisseur');
@@ -15,15 +17,15 @@ const TiersManagementView = ({ onOpenPaymentTerms }) => {
 
   const handleTierClick = (tier) => {
     const targetView = tier.type === 'fournisseur' ? 'payables' : 'receivables';
-    dispatch({ type: 'SET_ACTUALS_SEARCH_TERM', payload: tier.name });
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: targetView });
-    dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: null });
+    uiDispatch({ type: 'SET_ACTUALS_SEARCH_TERM', payload: tier.name });
+    uiDispatch({ type: 'SET_CURRENT_VIEW', payload: targetView });
+    uiDispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: null });
   };
 
   const handleAddTier = (e) => {
     e.preventDefault();
     if (newTierName.trim()) {
-      dispatch({ type: 'ADD_TIER', payload: { name: newTierName.trim(), type: newTierType } });
+      dataDispatch({ type: 'ADD_TIER', payload: { name: newTierName.trim(), type: newTierType } });
       setNewTierName('');
     }
   };
@@ -31,7 +33,7 @@ const TiersManagementView = ({ onOpenPaymentTerms }) => {
   const handleCancelEdit = () => setEditingTier(null);
   const handleSaveEdit = () => {
     if (editingTier.name.trim()) {
-      dispatch({ type: 'UPDATE_TIER', payload: { tierId: editingTier.id, newName: editingTier.name.trim() } });
+      dataDispatch({ type: 'UPDATE_TIER', payload: { tierId: editingTier.id, newName: editingTier.name.trim() } });
       handleCancelEdit();
     }
   };
@@ -47,16 +49,16 @@ const TiersManagementView = ({ onOpenPaymentTerms }) => {
     if (!tierToDelete) return;
 
     if (isTierUsed(tierToDelete.name)) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: le tiers "${tierToDelete.name}" est utilisé.`, type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: le tiers "${tierToDelete.name}" est utilisé.`, type: 'error' } });
       return;
     }
 
-    dispatch({
+    uiDispatch({
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer "${tierToDelete.name}" ?`,
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_TIER', payload: tierId }),
+        onConfirm: () => dataDispatch({ type: 'DELETE_TIER', payload: tierId }),
       }
     });
   };

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { Plus, Banknote, Coins, Edit, Trash2, List } from 'lucide-react';
 import LoanModal from './LoanModal';
 import EmptyState from './EmptyState';
@@ -7,8 +8,10 @@ import { formatCurrency } from '../utils/formatting';
 import LoanDetailDrawer from './LoanDetailDrawer';
 
 const LoansView = ({ type }) => {
-    const { state, dispatch } = useBudget();
-    const { loans, activeProjectId, projects, settings, allActuals, allEntries } = state;
+    const { dataState, dataDispatch } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { loans, projects, settings, allActuals, allEntries } = dataState;
+    const { activeProjectId } = uiState;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLoan, setEditingLoan] = useState(null);
     const [detailLoan, setDetailLoan] = useState(null);
@@ -82,19 +85,19 @@ const LoansView = ({ type }) => {
     };
 
     const handleDelete = (loanId) => {
-        dispatch({
+        uiDispatch({
             type: 'OPEN_CONFIRMATION_MODAL',
             payload: {
                 title: `Supprimer cet ${config.noun} ?`,
                 message: 'Cette action est irréversible et supprimera toutes les transactions associées.',
-                onConfirm: () => dispatch({ type: 'DELETE_LOAN', payload: loanId }),
+                onConfirm: () => dataDispatch({ type: 'DELETE_LOAN', payload: loanId }),
             }
         });
     };
 
     const handleSave = (loanData) => {
         const actionType = editingLoan ? 'UPDATE_LOAN' : 'ADD_LOAN';
-        dispatch({
+        dataDispatch({
             type: actionType,
             payload: {
                 ...loanData,

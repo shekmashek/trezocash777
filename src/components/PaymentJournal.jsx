@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Folder, User, Wallet, Receipt, ArrowRightLeft } from 'lucide-react';
 import { formatCurrency } from '../utils/formatting';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import EmptyState from './EmptyState';
 
 const PaymentJournal = () => {
-  const { state } = useBudget();
-  const { allActuals, projects, allCashAccounts, settings } = state;
+  const { dataState } = useData();
+  const { allActuals, projects, allCashAccounts, settings } = dataState;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProject, setFilterProject] = useState('all');

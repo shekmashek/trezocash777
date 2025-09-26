@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import { Star, ShieldCheck, Clock } from 'lucide-react';
 
 const SubscriptionBadge = () => {
-    const { state } = useBudget();
-    const { profile, session } = state;
+    const { dataState } = useData();
+    const { profile, session } = dataState;
 
     const subscriptionInfo = useMemo(() => {
         if (!profile) return null;

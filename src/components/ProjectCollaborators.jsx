@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
 import Avatar from './Avatar';
 import { motion } from 'framer-motion';
 
 const ProjectCollaborators = () => {
-    const { state } = useBudget();
-    const { activeProjectId, projects, collaborators, allProfiles, consolidatedViews } = state;
+    const { dataState } = useData();
+    const { activeProjectId, projects, collaborators, allProfiles, consolidatedViews } = dataState;
 
     const projectUsers = useMemo(() => {
         if (!activeProjectId || !allProfiles.length) return [];

@@ -1,11 +1,14 @@
 import React, { useMemo } from 'react';
 import { X, User, TrendingUp, TrendingDown } from 'lucide-react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { formatCurrency, formatPaymentTerms } from '../utils/formatting';
 
 const TierDetailDrawer = ({ isOpen, onClose, context }) => {
-    const { state } = useBudget();
-    const { tiers, allEntries, allActuals, settings, activeProjectId, consolidatedViews } = state;
+    const { dataState } = useData();
+    const { uiState } = useUI();
+    const { tiers, allEntries, allActuals, settings, consolidatedViews } = dataState;
+    const { activeProjectId } = uiState;
 
     const { tier, associatedEntries, kpis } = useMemo(() => {
         if (!context) return { tier: null, associatedEntries: [], kpis: {} };

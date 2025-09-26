@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { Plus, Table, AreaChart, Calendar, Layers, PieChart, Minimize, ChevronLeft, ChevronRight, Eye, TrendingDown, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -11,8 +12,11 @@ import BudgetTracker from './BudgetTracker';
 import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
 
 const FocusView = () => {
-    const { state, dispatch } = useBudget();
-    const { focusView, activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, settings } = state;
+    const { dataState } = useData();
+    const { uiState, uiDispatch } = useUI();
+    const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, focusView } = uiState;
+    const { settings } = dataState;
+    
     const isConsolidated = activeProjectId === 'consolidated';
     const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
@@ -51,12 +55,12 @@ const FocusView = () => {
     }, []);
 
     const focusNewMenuItems = [
-        { label: 'Budget prévisionnel', icon: Plus, action: () => { if (!isConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } }, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter une nouvelle entrée ou sortie prévisionnelle" },
-        { label: 'Entrée reçue', icon: TrendingUp, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'receivable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Encaisser directement des entrées" },
-        { label: 'Sortie payée', icon: TrendingDown, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" }
+        { label: 'Budget prévisionnel', icon: Plus, action: () => { if (!isConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } }, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter une nouvelle entrée ou sortie prévisionnelle" },
+        { label: 'Entrée reçue', icon: TrendingUp, action: () => uiDispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'receivable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Encaisser directement des entrées" },
+        { label: 'Sortie payée', icon: TrendingDown, action: () => uiDispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" }
     ];
 
-    const handlePeriodChange = (direction) => dispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
+    const handlePeriodChange = (direction) => uiDispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
 
     const handleQuickPeriodSelect = (quickSelectType) => {
         const today = getTodayInTimezone(settings.timezoneOffset);
@@ -72,7 +76,7 @@ const FocusView = () => {
             case 'long_term': { payload = { timeUnit: 'annually', horizonLength: 10, periodOffset: 0, activeQuickSelect: 'long_term' }; break; }
             default: return;
         }
-        dispatch({ type: 'SET_QUICK_PERIOD', payload });
+        uiDispatch({ type: 'SET_QUICK_PERIOD', payload });
     };
 
     const timeUnitLabels = { day: 'Jour', week: 'Semaine', fortnightly: 'Quinzaine', month: 'Mois', bimonthly: 'Bimestre', quarterly: 'Trimestre', semiannually: 'Semestre', annually: 'Année' };
@@ -172,8 +176,8 @@ const FocusView = () => {
                     <div className="relative" ref={newMenuRef}><button onClick={() => setIsNewMenuOpen(p => !p)} disabled={isConsolidated} className="flex items-center justify-center h-9 w-9 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed" title="Créer"><Plus className="w-5 h-5" /></button>
                         <AnimatePresence>{isNewMenuOpen && (<motion.div initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -10 }} className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"><ul className="p-2">{focusNewMenuItems.map(item => (<li key={item.label}><button onClick={() => { if (!item.disabled) { item.action(); setIsNewMenuOpen(false); } }} disabled={item.disabled} title={item.tooltip} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"><item.icon className="w-4 h-4 text-gray-500" /><span>{item.label}</span></button></li>))}</ul></motion.div>)}</AnimatePresence>
                     </div>
-                    <div className="flex items-center bg-secondary-200 rounded-lg p-1"><button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'table' })} className={`p-2 rounded-md transition-colors ${focusView === 'table' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Tableau"><Table size={20} /></button><button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'chart' })} className={`p-2 rounded-md transition-colors ${focusView === 'chart' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Graphique"><AreaChart size={20} /></button><button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'schedule' })} className={`p-2 rounded-md transition-colors ${focusView === 'schedule' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Échéancier"><Calendar size={20} /></button><button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'scenarios' })} className={`p-2 rounded-md transition-colors ${focusView === 'scenarios' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Scénarios"><Layers size={20} /></button><button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'expenseAnalysis' })} className={`p-2 rounded-md transition-colors ${focusView === 'expenseAnalysis' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Analyse"><PieChart size={20} /></button></div>
-                    <button onClick={() => dispatch({ type: 'SET_FOCUS_VIEW', payload: 'none' })} className="p-2 text-secondary-500 hover:text-primary-600" title="Quitter le focus"><Minimize size={20} /></button>
+                    <div className="flex items-center bg-secondary-200 rounded-lg p-1"><button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'table' })} className={`p-2 rounded-md transition-colors ${focusView === 'table' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Tableau"><Table size={20} /></button><button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'chart' })} className={`p-2 rounded-md transition-colors ${focusView === 'chart' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Graphique"><AreaChart size={20} /></button><button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'schedule' })} className={`p-2 rounded-md transition-colors ${focusView === 'schedule' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Échéancier"><Calendar size={20} /></button><button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'scenarios' })} className={`p-2 rounded-md transition-colors ${focusView === 'scenarios' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Scénarios"><Layers size={20} /></button><button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'expenseAnalysis' })} className={`p-2 rounded-md transition-colors ${focusView === 'expenseAnalysis' ? 'bg-surface text-primary-600 shadow-sm' : 'bg-transparent text-text-secondary'}`} title="Vue Analyse"><PieChart size={20} /></button></div>
+                    <button onClick={() => uiDispatch({ type: 'SET_FOCUS_VIEW', payload: 'none' })} className="p-2 text-secondary-500 hover:text-primary-600" title="Quitter le focus"><Minimize size={20} /></button>
                 </div>
             </div>
             <div className="flex-grow min-h-0">

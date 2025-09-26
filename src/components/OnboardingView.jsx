@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useBudget } from '../context/BudgetContext';
+import { useData } from '../context/DataContext';
+import { useUI } from '../context/UIContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Sparkles, Loader, Search, Star, Users, LayoutTemplate, FilePlus } from 'lucide-react';
 import TrezocashLogo from './TrezocashLogo';
@@ -16,8 +17,9 @@ const OnboardingProgress = ({ current, total }) => (
 );
 
 const OnboardingView = () => {
-  const { state: budgetState, dispatch } = useBudget();
-  const { projects, session, tiers, templates: userAndCommunityTemplates } = budgetState;
+  const { dataState, dataDispatch } = useData();
+  const { uiDispatch } = useUI();
+  const { projects, session, tiers, templates: userAndCommunityTemplates } = dataState;
   const hasExistingProjects = useMemo(() => projects.filter(p => !p.isArchived).length > 0, [projects]);
 
   const [step, setStep] = useState(0);
@@ -45,7 +47,7 @@ const OnboardingView = () => {
 
   const handleNext = () => {
     if (step === 0 && !data.projectName.trim()) {
-      dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du projet est obligatoire.", type: 'error' } });
+      uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du projet est obligatoire.", type: 'error' } });
       return;
     }
     
@@ -74,12 +76,12 @@ const OnboardingView = () => {
     }
   };
   
-  const handleCancel = () => dispatch({ type: 'CANCEL_ONBOARDING' });
+  const handleCancel = () => uiDispatch({ type: 'CANCEL_ONBOARDING' });
 
   const handleFinish = async () => {
     setIsLoading(true);
     try {
-      await initializeProject(dispatch, data, session.user, tiers, userAndCommunityTemplates);
+      await initializeProject({ dataDispatch, uiDispatch }, data, session.user, tiers, userAndCommunityTemplates);
     } catch (error) {
       setIsLoading(false);
     }
