@@ -15,7 +15,6 @@ import ScenarioModal from '../components/ScenarioModal';
 import ActualTransactionModal from '../components/ActualTransactionModal';
 import PaymentModal from '../components/PaymentModal';
 import DirectPaymentModal from '../components/DirectPaymentModal';
-import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import ConsolidatedViewModal from '../components/ConsolidatedViewModal';
 import CommentDrawer from '../components/CommentDrawer';
@@ -25,24 +24,18 @@ import CollaborationBanner from '../components/CollaborationBanner';
 import PaymentTermsModal from '../components/PaymentTermsModal';
 import { saveEntry, deleteEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, updateTierPaymentTerms } from '../context/actions';
 
-import { AnimatePresence } from 'framer-motion';
-import { Loader, LayoutDashboard, ListChecks, Table, AreaChart, Calendar, Layers, PieChart, Hash } from 'lucide-react';
+import { Loader, Hash } from 'lucide-react';
 import { getTodayInTimezone, getStartOfWeek, getEntryAmountForPeriod, getActualAmountForPeriod } from '../utils/budgetCalculations';
 
 const NavItem = ({ item, isCollapsed }) => {
     const location = useLocation();
     const isActive = location.pathname === item.path;
-    const { uiState } = useUI();
-    const { isTourActive, tourHighlightId } = uiState;
-    const isHighlighted = isTourActive && tourHighlightId === `#tour-step-${item.id}`;
-
+    
     return (
         <NavLink
             to={item.path}
-            id={`tour-step-${item.id}`}
             className={`flex items-center gap-3 h-10 px-4 rounded-lg text-sm font-medium transition-all duration-200
                 ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
-                ${isHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}
                 ${isCollapsed ? 'justify-center' : ''}`}
             title={isCollapsed ? item.label : ''}
         >
@@ -66,7 +59,7 @@ const AppLayout = () => {
         isCloseAccountModalOpen, accountToClose, isScenarioModalOpen, editingScenario, 
         isActualTransactionModalOpen, editingActual, isPaymentModalOpen, payingActual, 
         isDirectPaymentModalOpen, directPaymentType, timeUnit, horizonLength, periodOffset, 
-        activeQuickSelect, isTourActive, transactionMenu, isConsolidatedViewModalOpen, 
+        activeQuickSelect, transactionMenu, isConsolidatedViewModalOpen, 
         editingConsolidatedView, isCommentDrawerOpen, commentDrawerContext, isTierDetailDrawerOpen, 
         tierDetailContext, isSaveTemplateModalOpen, editingTemplate
     } = uiState;
@@ -119,11 +112,12 @@ const AppLayout = () => {
             uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Vous devez être connecté.', type: 'error' } });
             return;
         }
-        const cashAccounts = allCashAccounts[activeProjectId] || [];
+        const targetProjectId = entryData.projectId || activeProjectId;
+        const cashAccounts = allCashAccounts[targetProjectId] || [];
         saveEntry({dataDispatch, uiDispatch}, { 
             entryData: { ...entryData, user_id: user.id }, 
             editingEntry, 
-            activeProjectId, 
+            activeProjectId: targetProjectId, 
             tiers,
             user,
             cashAccounts
@@ -207,24 +201,12 @@ const AppLayout = () => {
         setIsPaymentTermsModalOpen(false);
     };
     
-    const navItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/app/dashboard' },
-        { id: 'budget', label: 'Budget', icon: ListChecks, path: '/app/budget' },
-        { id: 'trezo', label: 'Trezo', icon: Table, path: '/app/trezo' },
-        { id: 'flux', label: 'Flux', icon: AreaChart, path: '/app/flux' },
-        { id: 'echeancier', label: 'Echeancier', icon: Calendar, path: '/app/echeancier' },
-        { id: 'scenarios', label: 'Scénarios', icon: Layers, path: '/app/scenarios' },
-        { id: 'analyse', label: 'Analyse', icon: PieChart, path: '/app/analyse' },
-    ];
-    
     const fiscalNavItems = [
         { id: 'tva', label: 'Gestion TVA', icon: Hash, path: '/app/tva' },
     ];
 
     return (
         <div className="flex min-h-screen bg-background">
-            <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
-            
             <div className={`flex flex-col bg-white shadow-lg transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
                 <Header 
                     isCollapsed={isSidebarCollapsed} 
@@ -233,12 +215,7 @@ const AppLayout = () => {
                     periods={periods}
                 />
                 <div className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
-                    <nav>
-                        {navItems.map(item => (
-                            <NavItem key={item.id} item={item} isCollapsed={isSidebarCollapsed} />
-                        ))}
-                    </nav>
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="border-t border-gray-200 pt-4">
                         <h3 className={`px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider ${isSidebarCollapsed ? 'text-center' : ''}`}>
                             {isSidebarCollapsed ? 'FIS' : 'Fiscalité'}
                         </h3>

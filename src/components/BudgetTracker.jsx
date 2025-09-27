@@ -3,7 +3,7 @@ import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown,
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions } from '../utils/selectors.jsx';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals, calculateOffBudgetTotalsForPeriod } from '../utils/selectors.jsx';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
@@ -390,8 +390,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   const expandedAndVatEntries = useProcessedEntries(filteredBudgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
   const hasOffBudgetRevenues = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
   const hasOffBudgetExpenses = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
-  const groupedData = useGroupedData(expandedAndVatEntries, categories, isRowVisibleInPeriods);
-  const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings);
+  const groupedData = useGroupedData(expandedAndVatEntries, categories);
+  const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries);
 
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
@@ -506,36 +506,6 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     groupedData.sortie.forEach(mainCat => newCollapsedState[mainCat.id] = true);
     setCollapsedItems(newCollapsedState);
   };
-
-  const calculateMainCategoryTotals = (entries, period) => {
-    const budget = entries.reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
-    const actual = entries.reduce((sum, entry) => sum + getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate), 0);
-    return { budget, actual, reste: budget - actual };
-  };
-  const calculateOffBudgetTotalsForPeriod = (type, period) => {
-      const offBudgetEntries = expandedAndVatEntries.filter(e => e.isOffBudget && e.type === type);
-      const budget = offBudgetEntries.reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, period.startDate, period.endDate), 0);
-      const actual = offBudgetEntries.reduce((sum, entry) => sum + getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate), 0);
-      return { budget, actual, reste: budget - actual };
-  };
-  const calculateGeneralTotals = (mainCategories, period, type) => {
-    const totals = mainCategories.reduce((acc, mainCategory) => {
-      const categoryTotals = calculateMainCategoryTotals(mainCategory.entries, period);
-      acc.budget += categoryTotals.budget;
-      acc.actual += categoryTotals.actual;
-      return acc;
-    }, { budget: 0, actual: 0 });
-    if (type === 'entree' && hasOffBudgetRevenues) {
-        const offBudgetTotals = calculateOffBudgetTotalsForPeriod('revenu', period);
-        totals.budget += offBudgetTotals.budget;
-        totals.actual += offBudgetTotals.actual;
-    } else if (type === 'sortie' && hasOffBudgetExpenses) {
-        const offBudgetTotals = calculateOffBudgetTotalsForPeriod('depense', period);
-        totals.budget += offBudgetTotals.budget;
-        totals.actual += offBudgetTotals.actual;
-    }
-    return totals;
-  };
   
   const numVisibleCols = Object.values(visibleColumns).filter(v => v).length;
   const periodColumnWidth = numVisibleCols > 0 ? numVisibleCols * 90 : 50;
@@ -567,7 +537,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     const Icon = type === 'entree' ? TrendingUp : TrendingDown;
     const colorClass = type === 'entree' ? 'text-success-600' : 'text-danger-600';
 
-    if (mainCategories.length === 0 && (type === 'entree' ? !hasOffBudgetRevenues : !hasOffBudgetExpenses)) {
+    const hasData = mainCategories.length > 0 || (type === 'entree' ? hasOffBudgetRevenues : hasOffBudgetExpenses);
+    if (!hasData) {
       return null;
     }
 
@@ -584,7 +555,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
           </td>
           <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
           {periods.map((period, periodIndex) => {
-            const totals = calculateGeneralTotals(mainCategories, period, type);
+            const totals = calculateGeneralTotals(mainCategories, period, type, expandedAndVatEntries, actualTransactions, hasOffBudgetRevenues, hasOffBudgetExpenses);
             const reste = totals.budget - totals.actual;
             const columnIdBase = period.startDate.toISOString();
             const rowId = `total_${type}`;
@@ -618,6 +589,12 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
         {/* Rows for each Main Category and Entry */}
         {!isCollapsed && mainCategories.map(mainCategory => {
+          const hasDataInView = periods.some(period => {
+            const totals = calculateMainCategoryTotals(mainCategory.entries, period, actualTransactions);
+            return totals.budget !== 0 || totals.actual !== 0;
+          });
+          if (!hasDataInView) return null;
+
           const isMainCollapsed = collapsedItems[mainCategory.id];
           return (
             <React.Fragment key={mainCategory.id}>
@@ -630,7 +607,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                 </td>
                 <td className="bg-surface"></td>
                 {periods.map((period, periodIndex) => {
-                  const totals = calculateMainCategoryTotals(mainCategory.entries, period);
+                  const totals = calculateMainCategoryTotals(mainCategory.entries, period, actualTransactions);
                   const reste = totals.budget - totals.actual;
                   const columnIdBase = period.startDate.toISOString();
                   const rowId = `main_cat_${mainCategory.id}`;
@@ -661,7 +638,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                   );
                 })}
               </tr>
-              {!isMainCollapsed && mainCategory.entries.map((entry) => {
+              {!isMainCollapsed && mainCategory.entries.filter(isRowVisibleInPeriods).map((entry) => {
                 const project = (isConsolidated || isCustomConsolidated) ? projects.find(p => p.id === entry.projectId) : null;
                 return (
                   <tr key={entry.id} className={`border-b border-gray-100 hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : (entry.is_vat_payment ? 'bg-blue-50/50' : '')}`}>
@@ -857,8 +834,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                         <th className="bg-surface border-b-2" style={{ width: `${separatorWidth}px` }}></th>
                         {periods.map((period, periodIndex) => {
                         const isPast = period.endDate <= today;
-                        const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
-                        const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie');
+                        const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree', expandedAndVatEntries, actualTransactions, hasOffBudgetRevenues, hasOffBudgetExpenses);
+                        const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie', expandedAndVatEntries, actualTransactions, hasOffBudgetRevenues, hasOffBudgetExpenses);
                         const netBudget = revenueTotals.budget - expenseTotals.budget;
                         const isNegativeFlow = netBudget < 0;
                         return (
@@ -890,8 +867,8 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                         <td colSpan={(isConsolidated || isCustomConsolidated) ? 3 : 2} className="px-4 py-2 text-text-primary bg-gray-200 sticky left-0 z-10"><div className="flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" />Flux de trésorerie</div></td>
                         <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
                         {periods.map((period, periodIndex) => {
-                            const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree');
-                            const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie');
+                            const revenueTotals = calculateGeneralTotals(groupedData.entree || [], period, 'entree', expandedAndVatEntries, actualTransactions, hasOffBudgetRevenues, hasOffBudgetExpenses);
+                            const expenseTotals = calculateGeneralTotals(groupedData.sortie || [], period, 'sortie', expandedAndVatEntries, actualTransactions, hasOffBudgetRevenues, hasOffBudgetExpenses);
                             const netBudget = revenueTotals.budget - expenseTotals.budget;
                             const netActual = revenueTotals.actual - expenseTotals.actual;
                             const netReste = netBudget - netActual;

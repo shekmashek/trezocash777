@@ -13,10 +13,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 const CashflowView = ({ isFocusMode = false }) => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { scenarios, scenarioEntries, settings } = dataState;
+  const { settings, categories, vatRegimes } = dataState;
   const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
 
-  const { budgetEntries, actualTransactions, cashAccounts, isConsolidated } = useActiveProjectData(dataState, uiState);
+  const { budgetEntries, actualTransactions, cashAccounts, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
   
   const [isScenarioBudgetModalOpen, setIsScenarioBudgetModalOpen] = useState(false);
   const [editingScenarioEntry, setEditingScenarioEntry] = useState(null);
@@ -207,7 +207,7 @@ const CashflowView = ({ isFocusMode = false }) => {
     });
   }, [timeUnit, horizonLength, periodOffset, activeQuickSelect, settings.timezoneOffset]);
 
-  const chartData = useCashflowChartData(periods, budgetEntries, actualTransactions, cashAccounts, settings);
+  const chartData = useCashflowChartData(periods, budgetEntries, actualTransactions, cashAccounts, settings, categories, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated);
   
   const getChartOptions = () => {
     if (!chartData.labels || chartData.labels.length === 0) {

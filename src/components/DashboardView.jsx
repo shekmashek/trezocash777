@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
-import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Compass, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
+import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useActiveProjectData, useDashboardKpis, useExpenseDistributionForMonth } from '../utils/selectors.jsx';
 import SparklineChart from './SparklineChart';
 import ReactECharts from 'echarts-for-react';
@@ -74,10 +74,6 @@ const DashboardView = () => {
     return `Bonsoir ${name}`;
   }
 
-  const startTour = () => {
-    uiDispatch({ type: 'START_TOUR' });
-  };
-
   const tabContentVariants = {
     hidden: { opacity: 0, y: 10 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
@@ -110,10 +106,6 @@ const DashboardView = () => {
           <h1 className="text-3xl font-bold text-gray-900">{greetingMessage()} !</h1>
           <p className="text-gray-600">Bienvenue sur votre tableau de bord. Voici un aperçu de votre situation.</p>
         </div>
-        <button onClick={startTour} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors">
-            <Compass className="w-4 h-4" />
-            Faire une visite guidée
-        </button>
       </div>
 
       {/* KPI Cards */}

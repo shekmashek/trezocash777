@@ -27,13 +27,31 @@ const SettingsLink = ({ item, onClick }) => {
   );
 };
 
+const NavItem = ({ item }) => {
+    const location = useLocation();
+    const isActive = location.pathname === item.path;
+    const navigate = useNavigate();
+
+    return (
+        <button
+            onClick={() => navigate(item.path)}
+            className={`px-4 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
+                isActive
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
+            }`}
+            title={item.label}
+        >
+            <span>{item.label}</span>
+        </button>
+    );
+};
+
 const SubHeader = () => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
   const { profile, session } = dataState;
-  const { isTourActive, tourHighlightId } = uiState;
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef(null);
@@ -108,8 +126,6 @@ const SubHeader = () => {
     { id: 'analyse', label: 'Analyse', path: '/app/analyse' },
   ];
   
-  const isProjectSwitcherHighlighted = isTourActive && tourHighlightId === '#project-switcher';
-
   const subscriptionDetails = useMemo(() => {
     if (!profile) return null;
     const status = profile.subscriptionStatus;
@@ -135,7 +151,7 @@ const SubHeader = () => {
           <div className="py-2 flex w-full items-center justify-between">
             {/* Left Group */}
             <div className="flex items-center gap-4">
-              <div id="project-switcher" className={`w-auto min-w-[10rem] max-w-xs rounded-lg transition-all ${isProjectSwitcherHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}>
+              <div className="w-auto min-w-[10rem] max-w-xs rounded-lg transition-all">
                 <ProjectSwitcher />
               </div>
               <ProjectCollaborators />
@@ -143,25 +159,9 @@ const SubHeader = () => {
 
             {/* Center Group */}
             <nav className="flex items-center gap-1">
-              {navItems.map(item => {
-                const isActive = location.pathname === item.path;
-                const isHighlighted = isTourActive && tourHighlightId === `#tour-step-${item.id}`;
-                return (
-                  <button
-                    key={item.id}
-                    id={`tour-step-${item.id}`}
-                    onClick={() => handleNavigate(item.path)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-                      isActive
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
-                    } ${isHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}
-                    title={item.label}
-                  >
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+              {navItems.map(item => (
+                  <NavItem key={item.id} item={item} />
+              ))}
             </nav>
 
             {/* Right Group */}

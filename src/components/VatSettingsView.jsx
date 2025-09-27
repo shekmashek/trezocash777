@@ -48,7 +48,7 @@ const VatSettingsView = () => {
                         { project_id: activeProjectId, name: 'Taux super-réduit', rate: 2.1, is_default: false },
                         { project_id: activeProjectId, name: 'Taux zéro', rate: 0, is_default: false },
                     ];
-                    const { data: newRates, error: insertError } = await supabase.from('vat_rates').insert(defaultRatesPayload).select();
+                    const { data: newRates, error: insertError } = await supabase.from('vat_rates').upsert(defaultRatesPayload, { onConflict: 'project_id, name' }).select();
                     
                     if (insertError) {
                         uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux par défaut: ${insertError.message}`, type: 'error' } });
@@ -61,20 +61,27 @@ const VatSettingsView = () => {
             }
             
             if (!currentRegime) {
-                const { data: existingRegime, error: regimeError } = await supabase.from('vat_regimes').select('*, collection_periodicity, payment_delay_months, regime_type').eq('project_id', activeProjectId).single();
-                if (regimeError && regimeError.code !== 'PGRST116') {
+                const { data: existingRegime, error: regimeError } = await supabase.from('vat_regimes').select('*').eq('project_id', activeProjectId).single();
+                if (regimeError && regimeError.code !== 'PGRST116') { // PGRST116 = no rows found
                     uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur chargement régime TVA: ${regimeError.message}`, type: 'error' } });
                 } else if (existingRegime) {
                     currentRegime = existingRegime;
                 } else {
-                    const { data: newRegime, error: insertError } = await supabase.from('vat_regimes').upsert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' }, { onConflict: 'project_id' }).select().single();
-                    if (insertError) {
-                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
+                    // Create a default regime if none exists
+                    const { data: newRegime, error: newRegimeError } = await supabase
+                        .from('vat_regimes')
+                        .insert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' })
+                        .select()
+                        .single();
+                    if (newRegimeError) {
+                        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${newRegimeError.message}`, type: 'error' } });
                     } else {
                         currentRegime = newRegime;
                     }
                 }
-                dataDispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: currentRegime } });
+                if (currentRegime) {
+                    dataDispatch({ type: 'SET_PROJECT_VAT_REGIME', payload: { projectId: activeProjectId, regime: currentRegime } });
+                }
             }
 
             setRates(currentRates || []);
@@ -123,7 +130,12 @@ const VatSettingsView = () => {
         setLoading(true);
         const { data: savedRegime, error: regimeError } = await supabase
             .from('vat_regimes')
-            .upsert({ ...regime, project_id: activeProjectId, regime_type: regime.regime_type || 'reel_normal' }, { onConflict: 'project_id' })
+            .upsert({ 
+                project_id: activeProjectId, 
+                collection_periodicity: regime.collection_periodicity, 
+                payment_delay_months: regime.payment_delay_months, 
+                regime_type: regime.regime_type || 'reel_normal' 
+            }, { onConflict: 'project_id' })
             .select()
             .single();
 
@@ -142,7 +154,7 @@ const VatSettingsView = () => {
             is_default: rate.is_default
         }));
 
-        const { data: upsertedRates, error: ratesError } = await supabase.from('vat_rates').upsert(ratesToUpsert, { onConflict: 'id' }).select();
+        const { data: upsertedRates, error: ratesError } = await supabase.from('vat_rates').upsert(ratesToUpsert).select();
 
         if (ratesError) {
             uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur taux: ${ratesError.message}`, type: 'error' } });
