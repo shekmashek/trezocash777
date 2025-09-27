@@ -8,7 +8,13 @@ import AddCategoryFlowModal from './AddCategoryFlowModal';
 import { deleteEntry } from '../context/actions';
 import { expandVatEntries } from '../utils/budgetCalculations';
 
-const LectureView = ({ entries, settings, tiers, setMode }) => {
+const criticalityConfig = {
+    critical: { label: 'Critique', color: 'bg-red-500' },
+    essential: { label: 'Essentiel', color: 'bg-yellow-500' },
+    discretionary: { label: 'Discrétionnaire', color: 'bg-blue-500' },
+};
+
+const LectureView = ({ entries, settings, tiers, setMode, categories }) => {
     const sortedEntries = useMemo(() => {
         return [...entries].sort((a, b) => {
             const dateA = a.startDate || a.date;
@@ -46,10 +52,18 @@ const LectureView = ({ entries, settings, tiers, setMode }) => {
                             {sectionEntries.length > 0 ? (
                                 sectionEntries.map(entry => {
                                     const tier = tiers.find(t => t.name === entry.supplier && t.type === (entry.type === 'revenu' ? 'client' : 'fournisseur'));
+                                    const subCat = (entry.type === 'depense') 
+                                        ? categories.expense.flatMap(mc => mc.subCategories).find(sc => sc.name === entry.category) 
+                                        : null;
+                                    const criticality = subCat?.criticality;
+                                    const critConfig = criticalityConfig[criticality];
                                     return (
                                         <tr key={entry.id} className="border-b hover:bg-gray-50">
-                                            <td className={`py-3 px-4 font-medium ${entry.type === 'revenu' ? 'text-green-700' : 'text-red-700'}`}>
-                                                {entry.category}
+                                            <td className="py-3 px-4 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {critConfig && <span className={`w-2 h-2 rounded-full ${critConfig.color}`} title={`Criticité: ${critConfig.label}`}></span>}
+                                                    <span className={`${entry.type === 'revenu' ? 'text-green-700' : 'text-red-700'}`}>{entry.category}</span>
+                                                </div>
                                             </td>
                                             <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
                                             <td className="py-3 px-4 text-gray-500 text-xs">{formatPaymentTerms(tier?.payment_terms)}</td>
@@ -216,7 +230,7 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                     <tbody>
                         {mainCategories.map(mainCat => {
                             const entriesForMainCat = sectionEntries.filter(entry => 
-                                mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible') && mainCat.name === 'Impôts et Taxes')
+                                mainCat.subCategories.some(sc => sc.name === entry.category) || (entry.is_vat_child && (entry.category === 'TVA collectée' || entry.category === 'TVA déductible') && mainCat.name === 'IMPÔTS & CONTRIBUTIONS')
                             );
                             if (entriesForMainCat.length === 0) return null;
 
@@ -251,37 +265,47 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
                                             )}
                                         </td>
                                     </tr>
-                                    {entriesForMainCat.map(entry => (
-                                        <tr key={entry.id} className={`border-b hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : ''}`}>
-                                            <td className={`py-3 px-4 font-medium ${entry.is_vat_child ? 'pl-8 text-slate-600' : 'text-blue-600'}`}>{entry.category}</td>
-                                            <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
-                                            <td className="py-3 px-4 text-gray-600">
-                                                {entry.isProvision && (
-                                                    <div className="flex items-center gap-2 text-xs text-indigo-700">
-                                                        <Lock className="w-4 h-4" />
-                                                        <span>
-                                                            Provision en {entry.payments?.length || 0} fois de {formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}
-                                                        </span>
+                                    {entriesForMainCat.map(entry => {
+                                        const subCat = mainCat.subCategories.find(sc => sc.name === entry.category);
+                                        const criticality = subCat?.criticality;
+                                        const critConfig = criticalityConfig[criticality];
+                                        return (
+                                            <tr key={entry.id} className={`border-b hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : ''}`}>
+                                                <td className="py-3 px-4 font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        {critConfig && entry.type === 'depense' && <span className={`w-2 h-2 rounded-full ${critConfig.color}`} title={`Criticité: ${critConfig.label}`}></span>}
+                                                        <span className={`${entry.is_vat_child ? 'pl-8 text-slate-600' : 'text-gray-800'}`}>{entry.category}</span>
                                                     </div>
-                                                )}
-                                            </td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.frequency}</td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.startDate ? new Date(entry.startDate).toLocaleDateString('fr-FR') : (entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-')}</td>
-                                            <td className="py-3 px-4 text-gray-600">{entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : 'Indéterminée'}</td>
-                                            <td className="py-3 px-4 text-right font-medium text-gray-700">{formatCurrency(entry.amount, settings)}</td>
-                                            <td className="py-3 px-4 text-right">
-                                                <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEditEntry(entry)} className="p-1 text-blue-500 hover:text-blue-700" title="Modifier">
-                                                        <Edit size={14} />
-                                                    </button>
-                                                    <button onClick={() => handleDeleteEntry(entry)} className="p-1 text-red-500 hover:text-red-700" title="Supprimer">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-500 text-xs italic">{entry.description || '-'}</td>
+                                                <td className="py-3 px-4 text-gray-600">{entry.supplier}</td>
+                                                <td className="py-3 px-4 text-gray-600">
+                                                    {entry.isProvision && (
+                                                        <div className="flex items-center gap-2 text-xs text-indigo-700">
+                                                            <Lock className="w-4 h-4" />
+                                                            <span>
+                                                                Provision en {entry.payments?.length || 0} fois de {formatCurrency((entry.payments && entry.payments.length > 0) ? entry.payments[0].amount : 0, settings)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-600">{entry.frequency}</td>
+                                                <td className="py-3 px-4 text-gray-600">{entry.startDate ? new Date(entry.startDate).toLocaleDateString('fr-FR') : (entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-')}</td>
+                                                <td className="py-3 px-4 text-gray-600">{entry.endDate ? new Date(entry.endDate).toLocaleDateString('fr-FR') : 'Indéterminée'}</td>
+                                                <td className="py-3 px-4 text-right font-medium text-gray-700">{formatCurrency(entry.amount, settings)}</td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => handleEditEntry(entry)} className="p-1 text-blue-500 hover:text-blue-700" title="Modifier">
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteEntry(entry)} className="p-1 text-red-500 hover:text-red-700" title="Supprimer">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </React.Fragment>
                             );
                         })}
@@ -303,7 +327,7 @@ const BudgetStateView = ({ mode = 'lecture', setMode }) => {
     }
     
     if (mode === 'lecture') {
-        return <LectureView entries={filteredBudgetEntries} settings={settings} tiers={tiers} setMode={setMode} />;
+        return <LectureView entries={filteredBudgetEntries} settings={settings} tiers={tiers} setMode={setMode} categories={categories} />;
     }
 
     return (

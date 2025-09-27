@@ -3,7 +3,7 @@ import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown,
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals } from '../utils/selectors.jsx';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals, calculatePeriodPositions } from '../utils/selectors.jsx';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
@@ -15,7 +15,7 @@ const criticalityConfig = {
     discretionary: { label: 'Discrétionnaire', color: 'bg-blue-500' },
 };
 
-const LectureView = ({ entries, periods, settings, actuals, isConsolidated, projects, visibleColumns, CommentButton }) => {
+const LectureView = ({ entries, periods, settings, actuals, isConsolidated, projects, visibleColumns, CommentButton, categories }) => {
     const sortedEntries = useMemo(() => {
         return [...entries].sort((a, b) => {
             if (a.type !== b.type) return a.type === 'revenu' ? -1 : 1;
@@ -41,11 +41,15 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
         });
     }, [sortedEntries, periods, actuals]);
 
+    let isFirstRevenue = true;
+    let isFirstExpense = true;
+
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm border">
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b text-left text-xs text-gray-500 uppercase">
+                        <th className="py-3 px-4 w-28">Groupe</th>
                         <th className="py-3 px-4">Écriture</th>
                         {isConsolidated && <th className="py-3 px-4">Projet</th>}
                         <th className="py-3 px-4">Tiers</th>
@@ -62,38 +66,61 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
                     </tr>
                 </thead>
                 <tbody>
-                    {sortedEntries.map(entry => (
-                        <tr key={entry.id} className="border-b hover:bg-gray-50">
-                            <td className={`py-2 px-4 font-medium ${entry.type === 'revenu' ? 'text-green-700' : 'text-red-700'}`}>{entry.category}</td>
-                            {isConsolidated && <td className="py-2 px-4">{projects.find(p => p.id === entry.projectId)?.name || 'N/A'}</td>}
-                            <td className="py-2 px-4 flex items-center gap-2">
-                                {entry.supplier}
-                                {entry.isProvision && <Lock className="w-3 h-3 text-indigo-500" title="Provision" />}
-                            </td>
-                            {periods.map(period => {
-                                const budget = getEntryAmountForPeriod(entry, period.startDate, period.endDate);
-                                const actual = getActualAmountForPeriod(entry, actuals, period.startDate, period.endDate);
-                                const reste = budget - actual;
-                                const isRevenue = entry.type === 'revenu';
-                                const resteColor = reste === 0 ? 'text-gray-500' : isRevenue ? (reste <= 0 ? 'text-green-600' : 'text-red-600') : (reste >= 0 ? 'text-green-600' : 'text-red-600');
-                                const columnIdBase = period.startDate.toISOString();
-                                const currencySettings = { currency: entry.currency, displayUnit: entry.display_unit, decimalPlaces: entry.decimal_places };
-                                return (
-                                    <td key={period.label} className="py-2 px-4 text-center">
-                                        <div className="flex justify-around">
-                                            {visibleColumns.budget && <div className="w-1/3 text-gray-500 relative group/subcell">{formatCurrency(budget, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_budget`} rowName={entry.supplier} columnName={`${period.label} (Prév.)`} /></div>}
-                                            {visibleColumns.actual && <div className="w-1/3 font-semibold relative group/subcell">{formatCurrency(actual, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} /></div>}
-                                            {visibleColumns.reste && <div className={`w-1/3 ${resteColor} relative group/subcell`}>{formatCurrency(reste, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} /></div>}
-                                        </div>
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    ))}
+                    {sortedEntries.map(entry => {
+                        let groupLabel = '';
+                        if (entry.type === 'revenu' && isFirstRevenue) {
+                            groupLabel = 'Encaissement';
+                            isFirstRevenue = false;
+                        } else if (entry.type === 'depense' && isFirstExpense) {
+                            groupLabel = 'Décaissement';
+                            isFirstExpense = false;
+                        }
+
+                        const subCat = (entry.type === 'depense') 
+                            ? categories.expense.flatMap(mc => mc.subCategories).find(sc => sc.name === entry.category) 
+                            : null;
+                        const criticality = subCat?.criticality;
+                        const critConfig = criticalityConfig[criticality];
+                        const currencySettings = { currency: entry.currency, displayUnit: entry.display_unit, decimalPlaces: entry.decimal_places };
+
+                        return (
+                            <tr key={entry.id} className="border-b hover:bg-gray-50">
+                                <td className="py-2 px-4 font-bold text-gray-500 align-top">{groupLabel}</td>
+                                <td className={`py-2 px-4 font-medium text-gray-600`}>
+                                    <div className="flex items-center gap-2">
+                                        {critConfig && <span className={`w-2 h-2 rounded-full ${critConfig.color}`} title={`Criticité: ${critConfig.label}`}></span>}
+                                        <span>{entry.category}</span>
+                                    </div>
+                                </td>
+                                {isConsolidated && <td className="py-2 px-4">{projects.find(p => p.id === entry.projectId)?.name || 'N/A'}</td>}
+                                <td className="py-2 px-4 flex items-center gap-2">
+                                    {entry.supplier}
+                                    {entry.isProvision && <Lock className="w-3 h-3 text-indigo-500" title="Provision" />}
+                                </td>
+                                {periods.map(period => {
+                                    const budget = getEntryAmountForPeriod(entry, period.startDate, period.endDate);
+                                    const actual = getActualAmountForPeriod(entry, actuals, period.startDate, period.endDate);
+                                    const reste = budget - actual;
+                                    const isRevenue = entry.type === 'revenu';
+                                    const resteColor = reste === 0 ? 'text-gray-500' : isRevenue ? (reste <= 0 ? 'text-green-600' : 'text-red-600') : (reste >= 0 ? 'text-green-600' : 'text-red-600');
+                                    const columnIdBase = period.startDate.toISOString();
+                                    return (
+                                        <td key={period.label} className="py-2 px-4 text-center">
+                                            <div className="flex justify-around">
+                                                {visibleColumns.budget && <div className="w-1/3 text-gray-500 relative group/subcell">{formatCurrency(budget, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_budget`} rowName={entry.supplier} columnName={`${period.label} (Prév.)`} /></div>}
+                                                {visibleColumns.actual && <div className="w-1/3 font-semibold relative group/subcell">{formatCurrency(actual, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} /></div>}
+                                                {visibleColumns.reste && <div className={`w-1/3 ${resteColor} relative group/subcell`}>{formatCurrency(reste, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} /></div>}
+                                            </div>
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        );
+                    })}
                 </tbody>
                 <tfoot>
                     <tr className="bg-gray-100 font-bold">
-                        <td colSpan={isConsolidated ? 3 : 2} className="py-3 px-4">Flux de trésorerie net</td>
+                        <td colSpan={isConsolidated ? 4 : 3} className="py-3 px-4">Flux de trésorerie net</td>
                         {totalsByPeriod.map((total, index) => {
                             const period = periods[index];
                             const columnIdBase = period.startDate.toISOString();
@@ -592,7 +619,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
                     </div>
                   )}
                 </td>
-                <td className="bg-surface" style={{ width: `${separatorWidth}px` }}></td>
+                <td className="bg-surface"></td>
               </React.Fragment>
             );
           })}
@@ -798,6 +825,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
             projects={projects}
             visibleColumns={visibleColumns}
             CommentButton={CommentButton}
+            categories={categories}
         />
       ) : (
         <div className="bg-surface rounded-lg shadow-lg overflow-hidden">
