@@ -178,25 +178,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     )
                 })}
                 </div>
-                <div className={`mt-3 space-y-2 ${isCollapsed ? 'px-0' : 'px-2'}`}>
-                <button 
-                    onClick={() => navigate('/app/comptes')}
-                    className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 disabled:text-gray-400 disabled:cursor-not-allowed ${isCollapsed ? 'justify-center' : ''}`}
-                    disabled={isConsolidated || isCustomConsolidated}
-                    title={isCollapsed ? 'Ajouter un compte' : ''}
-                >
-                    <PlusCircle className="w-4 h-4 shrink-0" />
-                    {!isCollapsed && 'Ajouter un compte'}
-                </button>
-                <button 
-                    onClick={() => uiDispatch({ type: 'OPEN_TRANSFER_MODAL' })}
-                    className={`w-full flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-800 p-2 rounded-lg hover:bg-purple-50 ${isCollapsed ? 'justify-center' : ''}`}
-                    title={isCollapsed ? 'Transfert entre comptes' : ''}
-                >
-                    <ArrowRightLeft className="w-4 h-4 shrink-0" />
-                    {!isCollapsed && 'Transfert interne'}
-                </button>
-                </div>
             </div>
 
             {/* Équipe section */}
@@ -225,17 +206,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     </div>
                 ))}
                 </div>
-                {!isCollapsed && (
-                <div className="mt-3 px-2">
-                    <button 
-                    onClick={() => navigate('/app/collaborateurs')}
-                    className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50`}
-                    >
-                    <Settings className="w-4 h-4 shrink-0" />
-                    Gérer l'équipe
-                    </button>
-                </div>
-                )}
             </div>
             
             {/* Tendance section */}

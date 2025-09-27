@@ -6,19 +6,17 @@ import { useUI } from '../context/UIContext';
 import AddAccountForm from './AddAccountForm';
 import EmptyState from './EmptyState';
 import { updateUserCashAccount, addUserCashAccount } from '../context/actions';
+import { useAccountBalances } from '../utils/selectors.jsx';
 
 const CashAccountsView = () => {
   const { dataState, dataDispatch } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { allCashAccounts, settings, allActuals, projects, session } = dataState;
+  const { allCashAccounts, settings, allActuals, projects, session, consolidatedViews } = dataState;
   const { activeProjectId } = uiState;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
   const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
 
-  const userCashAccounts = useMemo(() => {
-    if (isConsolidated) return [];
-    return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated]);
+  const accountBalances = useAccountBalances(allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews);
 
   const accountTypeMap = useMemo(() => 
     new Map(mainCashAccountCategories.map(cat => [cat.id, cat.name])), 
@@ -123,9 +121,9 @@ const CashAccountsView = () => {
               Transfert entre comptes
             </button>
           </div>
-          {userCashAccounts.length > 0 ? (
+          {accountBalances.length > 0 ? (
             <ul className="divide-y divide-gray-200">
-              {userCashAccounts.map(account => (
+              {accountBalances.map(account => (
                 <li key={account.id} className={`py-4 ${account.isClosed ? 'opacity-60' : ''}`}>
                   {editingAccount?.id === account.id ? (
                     <div className="space-y-3">
@@ -152,7 +150,7 @@ const CashAccountsView = () => {
                     </div>
                   ) : (
                     <div className="group flex items-center justify-between">
-                      <div>
+                      <div className="flex-grow">
                         <div className="flex items-center gap-3">
                           <Wallet className="w-5 h-5 text-teal-600" />
                           <div>
@@ -165,16 +163,22 @@ const CashAccountsView = () => {
                           Solde initial: <span className="font-semibold">{formatCurrency(account.initialBalance || 0, settings)}</span> le {new Date(account.initialBalanceDate).toLocaleDateString('fr-FR')}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {account.isClosed ? (
-                          <button onClick={() => handleReopen(account.id)} className="p-1 text-green-600 hover:text-green-800" title="Ré-ouvrir le compte"><ArchiveRestore className="w-4 h-4" /></button>
-                        ) : (
-                          <>
-                            <button onClick={() => handleStartEdit(account)} className="p-1 text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
-                            <button onClick={() => handleStartClose(account)} className="p-1 text-yellow-600 hover:text-yellow-800" title="Clôturer le compte"><Archive className="w-4 h-4" /></button>
-                            <button onClick={() => handleDeleteAccount(account.id)} className="p-1 text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed" title={isAccountUsed(account.id) ? "Suppression impossible: compte utilisé" : "Supprimer"}><Trash2 className="w-4 h-4" /></button>
-                          </>
-                        )}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-gray-800">{formatCurrency(account.balance, settings)}</p>
+                          <p className="text-xs text-gray-500">Solde au {new Date().toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {account.isClosed ? (
+                            <button onClick={() => handleReopen(account.id)} className="p-1 text-green-600 hover:text-green-800" title="Ré-ouvrir le compte"><ArchiveRestore className="w-4 h-4" /></button>
+                          ) : (
+                            <>
+                              <button onClick={() => handleStartEdit(account)} className="p-1 text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
+                              <button onClick={() => handleStartClose(account)} className="p-1 text-yellow-600 hover:text-yellow-800" title="Clôturer le compte"><Archive className="w-4 h-4" /></button>
+                              <button onClick={() => handleDeleteAccount(account.id)} className="p-1 text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed" title={isAccountUsed(account.id) ? "Suppression impossible: compte utilisé" : "Supprimer"}><Trash2 className="w-4 h-4" /></button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -190,7 +194,7 @@ const CashAccountsView = () => {
 
         {isAddingAccount ? (
           <AddAccountForm onSave={handleAddAccount} onCancel={() => setIsAddingAccount(false)} />
-        ) : userCashAccounts.length > 0 ? (
+        ) : accountBalances.length > 0 ? (
           <div className="text-center">
             <button onClick={() => setIsAddingAccount(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center gap-2">
               <Plus className="w-5 h-5" /> Ajouter un autre compte
