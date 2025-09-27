@@ -7,7 +7,7 @@ import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, useCashflowChartData } from '../utils/selectors.jsx';
+import { useActiveProjectData, useCashflowChartData, calculatePeriodPositions } from '../utils/selectors.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CashflowView = ({ isFocusMode = false }) => {

@@ -3,7 +3,7 @@ import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown,
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, useProcessedEntries, useGroupedData, calculatePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals, calculateOffBudgetTotalsForPeriod } from '../utils/selectors.jsx';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals } from '../utils/selectors.jsx';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
@@ -71,12 +71,13 @@ const LectureView = ({ entries, periods, settings, actuals, isConsolidated, proj
                                 const isRevenue = entry.type === 'revenu';
                                 const resteColor = reste === 0 ? 'text-gray-500' : isRevenue ? (reste <= 0 ? 'text-green-600' : 'text-red-600') : (reste >= 0 ? 'text-green-600' : 'text-red-600');
                                 const columnIdBase = period.startDate.toISOString();
+                                const currencySettings = { currency: entry.currency, displayUnit: entry.display_unit, decimalPlaces: entry.decimal_places };
                                 return (
                                     <td key={period.label} className="py-2 px-4 text-center">
                                         <div className="flex justify-around">
-                                            {visibleColumns.budget && <div className="w-1/3 text-gray-500 relative group/subcell">{formatCurrency(budget, settings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_budget`} rowName={entry.supplier} columnName={`${period.label} (Prév.)`} /></div>}
-                                            {visibleColumns.actual && <div className="w-1/3 font-semibold relative group/subcell">{formatCurrency(actual, settings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} /></div>}
-                                            {visibleColumns.reste && <div className={`w-1/3 ${resteColor} relative group/subcell`}>{formatCurrency(reste, settings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} /></div>}
+                                            {visibleColumns.budget && <div className="w-1/3 text-gray-500 relative group/subcell">{formatCurrency(budget, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_budget`} rowName={entry.supplier} columnName={`${period.label} (Prév.)`} /></div>}
+                                            {visibleColumns.actual && <div className="w-1/3 font-semibold relative group/subcell">{formatCurrency(actual, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_actual`} rowName={entry.supplier} columnName={`${period.label} (Réel)`} /></div>}
+                                            {visibleColumns.reste && <div className={`w-1/3 ${resteColor} relative group/subcell`}>{formatCurrency(reste, currencySettings)}<CommentButton rowId={entry.id} columnId={`${columnIdBase}_reste`} rowName={entry.supplier} columnName={`${period.label} (Reste)`} /></div>}
                                         </div>
                                     </td>
                                 );
@@ -193,8 +194,11 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   useEffect(() => { const topEl = topScrollRef.current; const mainEl = mainScrollRef.current; if (!topEl || !mainEl) return; let isSyncing = false; const syncTopToMain = () => { if (!isSyncing) { isSyncing = true; mainEl.scrollLeft = topEl.scrollLeft; requestAnimationFrame(() => { isSyncing = false; }); } }; const syncMainToTop = () => { if (!isSyncing) { isSyncing = true; topEl.scrollLeft = mainEl.scrollLeft; requestAnimationFrame(() => { isSyncing = false; }); } }; topEl.addEventListener('scroll', syncTopToMain); mainEl.addEventListener('scroll', syncMainToTop); return () => { topEl.removeEventListener('scroll', syncTopToMain); mainEl.removeEventListener('scroll', syncMainToTop); }; }, []);
   const handleResize = (columnId, newWidth) => setColumnWidths(prev => ({ ...prev, [columnId]: Math.max(newWidth, 80) }));
   
-  const projectCurrency = activeProject?.currency || settings.currency;
-  const currencySettings = { ...settings, currency: projectCurrency };
+  const currencySettings = {
+    currency: activeProject?.currency,
+    displayUnit: activeProject?.display_unit,
+    decimalPlaces: activeProject?.decimal_places,
+  };
 
   const handlePeriodChange = (direction) => {
     uiDispatch({ type: 'SET_PERIOD_OFFSET', payload: periodOffset + direction });
@@ -380,21 +384,18 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     return entries;
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
   
-  const isRowVisibleInPeriods = (entry) => {
+  const isRowVisibleInPeriods = useCallback((entry) => {
     for (const period of periods) { 
       if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; 
     } 
     return false;
-  };
+  }, [periods, actualTransactions]);
 
   const expandedAndVatEntries = useProcessedEntries(filteredBudgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
   const hasOffBudgetRevenues = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
   const hasOffBudgetExpenses = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
   const groupedData = useGroupedData(expandedAndVatEntries, categories, isRowVisibleInPeriods);
-  const periodPositions = useMemo(() => 
-    calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries),
-    [periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries]
-  );
+  const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries);
   
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
@@ -910,7 +911,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
             </div>
         </div>
       )}
-      <TransactionDetailDrawer isOpen={drawerData.isOpen} onClose={handleCloseDrawer} transactions={drawerData.transactions} title={drawerData.title} currency={projectCurrency} />
+      <TransactionDetailDrawer isOpen={drawerData.isOpen} onClose={handleCloseDrawer} transactions={drawerData.transactions} title={drawerData.title} currency={activeProject?.currency} />
     </>
   );
 };

@@ -95,11 +95,10 @@ const SubHeader = () => {
   ];
 
   const settingsItems = [
-    { id: 'projectSettings', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
+    { id: '/app/parametres-projet', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
     { id: '/app/collaborateurs', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
     { id: '/app/templates', label: 'Mes Modèles', icon: LayoutTemplate, color: 'text-indigo-500' },
     { id: '/app/provisions', label: 'Suivi des Provisions', icon: Lock, color: 'text-orange-500' },
-    { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
     { id: '/app/categories', label: 'Catégories', icon: FolderKanban, color: 'text-orange-500' },
     { id: '/app/tiers', label: 'Tiers', icon: Users, color: 'text-pink-500' },
     { id: '/app/comptes', label: 'Comptes', icon: Wallet, color: 'text-teal-500' },

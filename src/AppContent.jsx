@@ -25,7 +25,7 @@ import ProfilePage from './pages/ProfilePage';
 import SecurityPage from './pages/SecurityPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
-import DisplaySettingsPage from './pages/DisplaySettingsPage';
+import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminUsersPage from './pages/AdminUsersPage';
@@ -155,7 +155,7 @@ function AppContent() {
           const { data: profilesData, error: profilesError } = await supabase.from('profiles').select('id, full_name, email').in('id', Array.from(userIds));
           if (profilesError) throw profilesError;
 
-          const projects = (projectsRes.data || []).map(p => ({ id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id, annualGoals: p.annual_goals, expenseTargets: p.expense_targets }));
+          const projects = (projectsRes.data || []).map(p => ({ id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, endDate: p.end_date, isArchived: p.is_archived, user_id: p.user_id, annualGoals: p.annual_goals, expenseTargets: p.expense_targets, display_unit: p.display_unit, decimal_places: p.decimal_places }));
           const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type, payment_terms: t.payment_terms }));
           const loans = (loansRes.data || []).map(l => ({ id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term, monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date }));
           const scenarios = (scenariosRes.data || []).map(s => ({ id: s.id, projectId: s.project_id, name: s.name, description: s.description, color: s.color, isVisible: s.is_visible, isArchived: s.is_archived }));
@@ -341,7 +341,7 @@ function AppContent() {
                 <Route path="templates" element={<MyTemplatesPage />} />
                 <Route path="provisions" element={<ProvisionsPage />} />
                 <Route path="tva" element={<VatManagementPage />} />
-                <Route path="display-settings" element={<DisplaySettingsPage />} />
+                <Route path="parametres-projet" element={<ProjectSettingsPage />} />
                 <Route path="delete-account" element={<DeleteAccountPage />} />
                 <Route path="factures" element={<UnderConstructionView title="Factures" />} />
                 <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />

@@ -1,14 +1,12 @@
 import React from 'react';
-import { X, FolderCog, Globe } from 'lucide-react';
+import { X, Globe } from 'lucide-react';
 import TimezoneSettingsView from './TimezoneSettingsView';
-import ProjectSettingsView from './ProjectSettingsView';
 
 const SettingsDrawerWrapper = ({ activeDrawer, onClose }) => {
 
   if (!activeDrawer) return null;
 
   const drawerConfig = {
-    projectSettings: { title: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500', component: <ProjectSettingsView /> },
     timezoneSettings: { title: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500', component: <TimezoneSettingsView /> },
   };
 

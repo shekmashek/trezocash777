@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { expandVatEntries, generateVatPaymentEntries, getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone } from './budgetCalculations';
 
 export const useActiveProjectData = (dataState, uiState) => {
@@ -18,7 +18,13 @@ export const useActiveProjectData = (dataState, uiState) => {
             budgetEntries = Object.values(allEntries).flat();
             actualTransactions = Object.values(allActuals).flat();
             cashAccounts = Object.values(allCashAccounts).flat();
-            activeProject = { id: 'consolidated', name: 'Projet consolidé', currency: settings.currency };
+            activeProject = { 
+                id: 'consolidated', 
+                name: 'Projet consolidé', 
+                currency: settings.currency,
+                display_unit: settings.displayUnit,
+                decimal_places: settings.decimalPlaces
+            };
         } else if (isCustomConsolidated) {
             const viewId = activeProjectId.replace('consolidated_view_', '');
             const view = consolidatedViews.find(v => v.id === viewId);
@@ -27,7 +33,13 @@ export const useActiveProjectData = (dataState, uiState) => {
                 actualTransactions = view.project_ids.flatMap(id => allActuals[id] || []);
                 cashAccounts = view.project_ids.flatMap(id => allCashAccounts[id] || []);
             }
-            activeProject = { id: activeProjectId, name: view?.name || 'Vue Inconnue', currency: settings.currency };
+            activeProject = { 
+                id: activeProjectId, 
+                name: view?.name || 'Vue Inconnue', 
+                currency: settings.currency,
+                display_unit: settings.displayUnit,
+                decimal_places: settings.decimalPlaces
+            };
         } else {
             activeProject = projects.find(p => p.id === activeProjectId);
             if (activeProject) {
@@ -38,7 +50,7 @@ export const useActiveProjectData = (dataState, uiState) => {
         }
 
         return { budgetEntries, actualTransactions, cashAccounts, activeProject, isConsolidated, isCustomConsolidated };
-    }, [activeProjectId, allEntries, allActuals, allCashAccounts, projects, consolidatedViews, settings.currency]);
+    }, [activeProjectId, allEntries, allActuals, allCashAccounts, projects, consolidatedViews, settings]);
 };
 
 export const useProcessedEntries = (budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated) => {
@@ -56,13 +68,13 @@ export const useProcessedEntries = (budgetEntries, categories, vatRegimes, activ
     }, [budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated]);
 };
 
-export const useGroupedData = (processedEntries, categories) => {
+export const useGroupedData = (processedEntries, categories, isRowVisibleInPeriods) => {
     return useMemo(() => {
         const groupByType = (type) => {
             const catType = type === 'entree' ? 'revenue' : 'expense';
             if (!categories || !categories[catType]) return [];
             
-            const entriesForType = processedEntries.filter(entry => entry.type === (type === 'entree' ? 'revenu' : 'depense'));
+            const entriesForType = processedEntries.filter(e => e.type === (type === 'entree' ? 'revenu' : 'depense'));
 
             return categories[catType].map(mainCat => {
                 const entriesForMainCat = entriesForType.filter(entry => {
@@ -78,7 +90,7 @@ export const useGroupedData = (processedEntries, categories) => {
             }).filter(Boolean);
         };
         return { entree: groupByType('entree'), sortie: groupByType('sortie') };
-    }, [processedEntries, categories]);
+    }, [processedEntries, categories, isRowVisibleInPeriods]);
 };
 
 export function calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries) {
@@ -186,6 +198,21 @@ export const calculateGeneralTotals = (mainCategories, period, type, allEntriesF
 };
 
 export const useCashflowChartData = (periods, budgetEntries, actualTransactions, cashAccounts, settings, categories, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated) => {
+    const processedEntries = useProcessedEntries(budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
+    
+    const isRowVisibleInPeriods = useCallback((entry) => {
+        if (!periods || periods.length === 0) return false;
+        for (const period of periods) { 
+          if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; 
+        } 
+        return false;
+    }, [periods, actualTransactions]);
+
+    const groupedData = useGroupedData(processedEntries, categories, isRowVisibleInPeriods);
+    
+    const hasOffBudgetRevenues = useMemo(() => processedEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e)), [processedEntries, isRowVisibleInPeriods]);
+    const hasOffBudgetExpenses = useMemo(() => processedEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [processedEntries, isRowVisibleInPeriods]);
+
     return useMemo(() => {
         if (!periods || periods.length === 0) {
             return { labels: [], inflows: [], outflows: [], actualBalance: [], projectedBalance: [] };
@@ -197,11 +224,6 @@ export const useCashflowChartData = (periods, budgetEntries, actualTransactions,
             if (periods.length > 0 && today < periods[0].startDate) todayIndex = -1;
             else if (periods.length > 0 && today >= periods[periods.length - 1].endDate) todayIndex = periods.length - 1;
         }
-
-        const processedEntries = useProcessedEntries(budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
-        const hasOffBudgetRevenues = processedEntries.some(e => e.isOffBudget && e.type === 'revenu');
-        const hasOffBudgetExpenses = processedEntries.some(e => e.isOffBudget && e.type === 'depense');
-        const groupedData = useGroupedData(processedEntries, categories);
 
         const periodPositions = calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, processedEntries);
 
@@ -234,7 +256,7 @@ export const useCashflowChartData = (periods, budgetEntries, actualTransactions,
             actualBalance,
             projectedBalance,
         };
-    }, [periods, budgetEntries, actualTransactions, cashAccounts, settings, categories, vatRegimes, activeProjectId, isConsolidated, isCustomConsolidated]);
+    }, [periods, cashAccounts, actualTransactions, settings, processedEntries, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses]);
 };
 
 export const useDashboardKpis = (cashAccounts, actualTransactions, settings) => {

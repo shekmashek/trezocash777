@@ -13,17 +13,6 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
     const visibleTransactions = transactions.slice(0, maxVisibleItems);
     const hiddenCount = transactions.length - maxVisibleItems;
 
-    const formatForSchedule = (amount) => {
-        if (amount === null || amount === undefined || isNaN(amount)) return '-';
-        const formatter = new Intl.NumberFormat('fr-FR', {
-            style: 'currency',
-            currency: currencySettings.currency || 'EUR',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-        return formatter.format(amount);
-    };
-
     const totalPayable = useMemo(() => transactions.filter(tx => tx.type === 'payable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
     const totalReceivable = useMemo(() => transactions.filter(tx => tx.type === 'receivable').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0), [transactions]);
 
@@ -45,18 +34,20 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
     
     const cellHeightClass = viewMode === 'week' ? 'h-[calc(100vh-22rem)]' : 'h-48';
 
+    const settingsForSchedule = { ...currencySettings, displayUnit: 'standard' };
+
     return (
         <div className={`border-t border-r border-gray-200 p-1 flex flex-col ${cellHeightClass} ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}`}>
             <div className="flex justify-between items-start">
                 <div className="text-left flex-grow space-y-0.5 pr-1">
                     {totalReceivable > 0 && (
-                        <div className="text-xs font-semibold text-green-600" title={`Entrées: ${formatForSchedule(totalReceivable)}`}>
-                            +{formatForSchedule(totalReceivable)}
+                        <div className="text-xs font-semibold text-green-600" title={`Entrées: ${formatCurrency(totalReceivable, settingsForSchedule)}`}>
+                            +{formatCurrency(totalReceivable, settingsForSchedule)}
                         </div>
                     )}
                     {totalPayable > 0 && (
-                        <div className="text-xs font-semibold text-red-600" title={`Sorties: ${formatForSchedule(totalPayable)}`}>
-                            -{formatForSchedule(totalPayable)}
+                        <div className="text-xs font-semibold text-red-600" title={`Sorties: ${formatCurrency(totalPayable, settingsForSchedule)}`}>
+                            -{formatCurrency(totalPayable, settingsForSchedule)}
                         </div>
                     )}
                 </div>
@@ -75,7 +66,7 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
                     >
                         <div className="flex justify-between items-center">
                             <span className="font-semibold truncate flex-1" title={tx.thirdParty}>{tx.thirdParty}</span>
-                            <span className="font-mono ml-2 whitespace-nowrap">{formatForSchedule(tx.amount)}</span>
+                            <span className="font-mono ml-2 whitespace-nowrap">{formatCurrency(tx.amount, settingsForSchedule)}</span>
                         </div>
                     </button>
                 ))}
@@ -117,8 +108,15 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
     
     const today = getTodayInTimezone(settings.timezoneOffset);
 
-    const { actualTransactions, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+    const { actualTransactions, activeProject, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
     const { transactionsByDate, overdueTransactions } = useScheduleData(actualTransactions, settings);
+
+    const currencySettingsForView = useMemo(() => {
+        const projectCurrency = activeProject?.currency || settings.currency;
+        const projectDisplayUnit = activeProject?.display_unit || settings.displayUnit;
+        const projectDecimalPlaces = activeProject?.decimal_places ?? settings.decimalPlaces;
+        return { ...settings, currency: projectCurrency, displayUnit: projectDisplayUnit, decimalPlaces: projectDecimalPlaces };
+    }, [activeProject, settings]);
 
     const calendarGrid = useMemo(() => {
         const grid = [];
@@ -293,7 +291,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                                         transactions={transactionsByDate.get(dateKey) || []}
                                         isToday={isTodayCell}
                                         isCurrentMonth={isCurrentMonth}
-                                        currencySettings={settings}
+                                        currencySettings={currencySettingsForView}
                                         todayDate={today}
                                         viewMode={viewMode}
                                         onTransactionClick={handleTransactionClick}
@@ -337,7 +335,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <p className="text-base font-normal whitespace-nowrap pl-2 text-gray-600">{formatCurrency(tx.amount, settings)}</p>
+                                                    <p className="text-base font-normal whitespace-nowrap pl-2 text-gray-600">{formatCurrency(tx.amount, currencySettingsForView)}</p>
                                                 </div>
                                             </button>
                                         </li>

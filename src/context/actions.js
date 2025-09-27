@@ -159,6 +159,9 @@ export const updateProjectSettings = async ({ dataDispatch, uiDispatch }, { proj
             name: newSettings.name,
             start_date: newSettings.startDate,
             end_date: newSettings.endDate,
+            currency: newSettings.currency,
+            display_unit: newSettings.display_unit,
+            decimal_places: newSettings.decimal_places,
         };
 
         const { data, error } = await supabase
@@ -178,6 +181,9 @@ export const updateProjectSettings = async ({ dataDispatch, uiDispatch }, { proj
                     name: data.name,
                     startDate: data.start_date,
                     endDate: data.end_date,
+                    currency: data.currency,
+                    display_unit: data.display_unit,
+                    decimal_places: data.decimal_places,
                 }
             }
         });
@@ -206,7 +212,7 @@ export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editi
         }
 
         const finalEntryDataForDB = {
-            project_id: activeProjectId,
+            project_id: entryData.projectId || activeProjectId,
             user_id: user.id,
             type: entryData.type,
             category: entryData.category,
@@ -231,7 +237,10 @@ export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editi
                 .eq('id', editingEntry.id)
                 .select()
                 .single();
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase update error:", error);
+                throw error;
+            }
             savedEntryFromDB = data;
         } else {
             const { data, error } = await supabase
@@ -239,7 +248,10 @@ export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editi
                 .insert(finalEntryDataForDB)
                 .select()
                 .single();
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase insert error:", error);
+                throw error;
+            }
             savedEntryFromDB = data;
         }
         
@@ -272,7 +284,7 @@ export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editi
         const tier = existingTier || newTierData;
         const paymentTerms = tier?.payment_terms;
 
-        const newActuals = deriveActualsFromEntry(savedEntryForClient, activeProjectId, cashAccounts, paymentTerms);
+        const newActuals = deriveActualsFromEntry(savedEntryForClient, savedEntryFromDB.project_id, cashAccounts, paymentTerms);
         
         if (newActuals.length > 0) {
             const { error: insertError } = await supabase
@@ -303,7 +315,7 @@ export const saveEntry = async ({ dataDispatch, uiDispatch }, { entryData, editi
             payload: {
                 savedEntry: savedEntryForClient,
                 newActuals: newActuals,
-                targetProjectId: activeProjectId,
+                targetProjectId: savedEntryFromDB.project_id,
                 newTier: newTierData ? { id: newTierData.id, name: newTierData.name, type: newTierData.type } : null,
             }
         });
