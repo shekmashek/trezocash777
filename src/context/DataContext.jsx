@@ -364,6 +364,15 @@ const dataReducer = (state, action) => {
             }
             return { ...state, categories: newCategories };
         }
+        case 'ADD_USER_CASH_ACCOUNT_SUCCESS': {
+            const { projectId, newAccount } = action.payload;
+            const newAllCashAccounts = { ...state.allCashAccounts };
+            if (!newAllCashAccounts[projectId]) {
+                newAllCashAccounts[projectId] = [];
+            }
+            newAllCashAccounts[projectId] = [...newAllCashAccounts[projectId], newAccount];
+            return { ...state, allCashAccounts: newAllCashAccounts };
+        }
         // Add other data-related cases here
         default:
             return state;

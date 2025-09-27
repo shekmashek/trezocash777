@@ -398,6 +398,50 @@ export const updateSettings = async ({ dataDispatch, uiDispatch }, user, newSett
     }
 };
 
+export const addUserCashAccount = async ({ dataDispatch, uiDispatch }, { projectId, mainCategoryId, name, initialBalance, initialBalanceDate, user }) => {
+    try {
+        const { data: newAccount, error } = await supabase
+            .from('cash_accounts')
+            .insert({
+                project_id: projectId,
+                user_id: user.id,
+                main_category_id: mainCategoryId,
+                name: name,
+                initial_balance: initialBalance,
+                initial_balance_date: initialBalanceDate,
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const newAccountForState = {
+            id: newAccount.id,
+            projectId: newAccount.project_id,
+            mainCategoryId: newAccount.main_category_id,
+            name: newAccount.name,
+            initialBalance: newAccount.initial_balance,
+            initialBalanceDate: newAccount.initial_balance_date,
+            isClosed: newAccount.is_closed,
+            closureDate: newAccount.closure_date,
+        };
+
+        dataDispatch({
+            type: 'ADD_USER_CASH_ACCOUNT_SUCCESS',
+            payload: {
+                projectId,
+                newAccount: newAccountForState,
+            }
+        });
+
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Compte de trésorerie ajouté.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error adding cash account:", error);
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
 export const updateUserCashAccount = async ({ dataDispatch, uiDispatch }, { projectId, accountId, accountData }) => {
     try {
         const updates = {

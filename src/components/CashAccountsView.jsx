@@ -5,11 +5,12 @@ import { useData, mainCashAccountCategories } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import AddAccountForm from './AddAccountForm';
 import EmptyState from './EmptyState';
+import { updateUserCashAccount, addUserCashAccount } from '../context/actions';
 
 const CashAccountsView = () => {
   const { dataState, dataDispatch } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { allCashAccounts, settings, allActuals, projects } = dataState;
+  const { allCashAccounts, settings, allActuals, projects, session } = dataState;
   const { activeProjectId } = uiState;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
   const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
@@ -49,31 +50,26 @@ const CashAccountsView = () => {
       uiDispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du compte ne peut pas être vide.", type: 'error' } });
       return;
     }
-    dataDispatch({
-      type: 'UPDATE_USER_CASH_ACCOUNT',
-      payload: {
-        projectId: activeProjectId,
-        accountId: editingAccount.id,
-        accountData: {
-          name: editingAccount.name.trim(),
-          initialBalance: parseFloat(editingAccount.initialBalance) || 0,
-          initialBalanceDate: editingAccount.initialBalanceDate
-        }
+    updateUserCashAccount({ dataDispatch, uiDispatch }, {
+      projectId: activeProjectId,
+      accountId: editingAccount.id,
+      accountData: {
+        name: editingAccount.name.trim(),
+        initialBalance: parseFloat(editingAccount.initialBalance) || 0,
+        initialBalanceDate: editingAccount.initialBalanceDate
       }
     });
     handleCancelEdit();
   };
 
   const handleAddAccount = (formData) => {
-    dataDispatch({
-      type: 'ADD_USER_CASH_ACCOUNT',
-      payload: {
-        projectId: activeProjectId,
-        mainCategoryId: formData.mainCategoryId,
-        name: formData.name.trim(),
-        initialBalance: parseFloat(formData.initialBalance) || 0,
-        initialBalanceDate: formData.initialBalanceDate || new Date().toISOString().split('T')[0]
-      }
+    addUserCashAccount({ dataDispatch, uiDispatch }, {
+      projectId: activeProjectId,
+      mainCategoryId: formData.mainCategoryId,
+      name: formData.name.trim(),
+      initialBalance: parseFloat(formData.initialBalance) || 0,
+      initialBalanceDate: formData.initialBalanceDate || new Date().toISOString().split('T')[0],
+      user: session.user
     });
     setIsAddingAccount(false);
   };
