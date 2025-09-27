@@ -226,6 +226,17 @@ const dataReducer = (state, action) => {
                 categories: newCategories || state.categories,
             };
         }
+        case 'UPDATE_PROJECT_SETTINGS_SUCCESS': {
+            const { projectId, newSettings } = action.payload;
+            return {
+                ...state,
+                projects: state.projects.map(project =>
+                    project.id === projectId
+                        ? { ...project, ...newSettings }
+                        : project
+                ),
+            };
+        }
         case 'SAVE_ENTRY_SUCCESS': {
             const { savedEntry, newActuals, targetProjectId, newTier } = action.payload;
             let newState = { ...state };

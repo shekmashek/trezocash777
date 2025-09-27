@@ -58,18 +58,23 @@ export const useProcessedEntries = (budgetEntries, categories, vatRegimes, activ
 
 export const useGroupedData = (processedEntries, categories) => {
     return useMemo(() => {
-        const entriesToGroup = processedEntries.filter(e => !e.isOffBudget);
         const groupByType = (type) => {
             const catType = type === 'entree' ? 'revenue' : 'expense';
             if (!categories || !categories[catType]) return [];
             
+            const entriesForType = processedEntries.filter(entry => entry.type === (type === 'entree' ? 'revenu' : 'depense'));
+
             return categories[catType].map(mainCat => {
-                const entriesForMainCat = entriesToGroup.filter(entry => {
-                    const isInCategory = mainCat.subCategories.some(sc => sc.name === entry.category);
+                const entriesForMainCat = entriesForType.filter(entry => {
+                    const isInCategory = mainCat.subCategories && mainCat.subCategories.some(sc => sc && sc.name === entry.category);
                     const isVatEntry = (entry.is_vat_child || entry.is_vat_payment) && mainCat.name === 'IMPÔTS & CONTRIBUTIONS';
                     return isInCategory || isVatEntry;
                 });
-                return entriesForMainCat.length > 0 ? { ...mainCat, entries: entriesForMainCat } : null;
+
+                if (entriesForMainCat.length === 0) return null;
+                
+                return { ...mainCat, entries: entriesForMainCat };
+
             }).filter(Boolean);
         };
         return { entree: groupByType('entree'), sortie: groupByType('sortie') };
@@ -193,30 +198,10 @@ export const useCashflowChartData = (periods, budgetEntries, actualTransactions,
             else if (periods.length > 0 && today >= periods[periods.length - 1].endDate) todayIndex = periods.length - 1;
         }
 
-        const expandedEntries = expandVatEntries(budgetEntries, categories);
-        const vatRegime = vatRegimes[activeProjectId];
-        const processedEntries = (isConsolidated || isCustomConsolidated || !vatRegime)
-            ? expandedEntries
-            : [...expandedEntries, ...periods.flatMap(period => generateVatPaymentEntries(expandedEntries, period, vatRegime))];
-
+        const processedEntries = useProcessedEntries(budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
         const hasOffBudgetRevenues = processedEntries.some(e => e.isOffBudget && e.type === 'revenu');
         const hasOffBudgetExpenses = processedEntries.some(e => e.isOffBudget && e.type === 'depense');
-        const groupedData = (() => {
-            const entriesToGroup = processedEntries.filter(e => !e.isOffBudget);
-            const groupByType = (type) => {
-                const catType = type === 'entree' ? 'revenue' : 'expense';
-                if (!categories || !categories[catType]) return [];
-                return categories[catType].map(mainCat => {
-                    const entriesForMainCat = entriesToGroup.filter(entry => {
-                        const isInCategory = mainCat.subCategories.some(sc => sc.name === entry.category);
-                        const isVatEntry = (entry.is_vat_child || entry.is_vat_payment) && mainCat.name === 'IMPÔTS & CONTRIBUTIONS';
-                        return isInCategory || isVatEntry;
-                    });
-                    return entriesForMainCat.length > 0 ? { ...mainCat, entries: entriesForMainCat } : null;
-                }).filter(Boolean);
-            };
-            return { entree: groupByType('entree'), sortie: groupByType('sortie') };
-        })();
+        const groupedData = useGroupedData(processedEntries, categories);
 
         const periodPositions = calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, processedEntries);
 
@@ -327,4 +312,42 @@ export const useExpenseDistributionForMonth = (actualTransactions, categories, s
           .filter(item => item.value > 0)
           .sort((a, b) => b.value - a.value);
     }, [actualTransactions, categories.expense]);
+};
+
+export const useScheduleData = (actualTransactions, settings) => {
+    return useMemo(() => {
+        const byDate = new Map();
+        const overdue = [];
+        const today = getTodayInTimezone(settings.timezoneOffset);
+
+        (actualTransactions || []).forEach(actual => {
+            const dueDate = new Date(actual.date);
+            dueDate.setHours(0, 0, 0, 0);
+
+            const isUnsettled = !['paid', 'received', 'written_off'].includes(actual.status);
+
+            if (isUnsettled) {
+                const totalPaid = (actual.payments || []).reduce((sum, p) => sum + p.paidAmount, 0);
+                const remainingAmount = actual.amount - totalPaid;
+
+                if (remainingAmount > 0.001) {
+                    const transactionForDisplay = { ...actual, amount: remainingAmount };
+
+                    const dateKey = dueDate.toISOString().split('T')[0];
+                    if (!byDate.has(dateKey)) {
+                        byDate.set(dateKey, []);
+                    }
+                    byDate.get(dateKey).push(transactionForDisplay);
+                    
+                    if (dueDate < today) {
+                        overdue.push(transactionForDisplay);
+                    }
+                }
+            }
+        });
+        
+        overdue.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        return { transactionsByDate: byDate, overdueTransactions: overdue };
+    }, [actualTransactions, settings.timezoneOffset]);
 };

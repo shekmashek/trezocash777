@@ -3,7 +3,9 @@ import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
+import { useActiveProjectData, useScheduleData } from '../utils/selectors.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatCurrency } from '../utils/formatting';
 
 const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings, todayDate, viewMode, onTransactionClick }) => {
     const dayNumber = day.getDate();
@@ -30,11 +32,6 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
         dueDate.setHours(0, 0, 0, 0);
         
         const isPayable = tx.type === 'payable';
-        const isSettled = ['paid', 'received'].includes(tx.status);
-
-        if (isSettled) {
-            return 'bg-gray-100 text-gray-500 line-through opacity-70 cursor-pointer hover:bg-gray-200';
-        }
         
         if (dueDate < todayDate) { // Overdue
             return isPayable ? 'bg-red-100 text-red-800 cursor-pointer hover:bg-red-200' : 'bg-green-100 text-green-800 cursor-pointer hover:bg-green-200';
@@ -94,8 +91,8 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
 
 const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewMode: propViewMode }) => {
     const { dataState } = useData();
-    const { uiDispatch } = useUI();
-    const { allActuals, settings, projects, activeProjectId, consolidatedViews } = dataState;
+    const { uiState, uiDispatch } = useUI();
+    const { settings, projects } = dataState;
 
     const [localCurrentDate, setLocalCurrentDate] = useState(new Date());
     const [localViewMode, setLocalViewMode] = useState('month');
@@ -118,59 +115,10 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
     const currentDate = isFocusMode ? propCurrentDate : localCurrentDate;
     const viewMode = isFocusMode ? propViewMode : localViewMode;
     
-    const isConsolidated = activeProjectId === 'consolidated';
-    const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
-
     const today = getTodayInTimezone(settings.timezoneOffset);
 
-    const allRelevantActuals = useMemo(() => {
-        if (isConsolidated) {
-            return Object.values(allActuals).flat().map(actual => {
-                const project = projects.find(p => p.id === actual.projectId);
-                return { ...actual, projectName: project?.name || 'N/A' };
-            });
-        }
-        if (isCustomConsolidated) {
-            const viewId = activeProjectId.replace('consolidated_view_', '');
-            const view = consolidatedViews.find(v => v.id === viewId);
-            if (!view || !view.project_ids) return [];
-            return view.project_ids.flatMap(projectId => 
-                (allActuals[projectId] || []).map(actual => {
-                    const project = projects.find(p => p.id === projectId);
-                    return { ...actual, projectName: project?.name || 'N/A' };
-                })
-            );
-        }
-        // Single project view
-        const project = projects.find(p => p.id === activeProjectId);
-        return (allActuals[activeProjectId] || []).map(actual => ({ ...actual, projectName: project?.name || 'N/A' }));
-    }, [activeProjectId, allActuals, projects, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-    const { transactionsByDate, overdueTransactions } = useMemo(() => {
-        const byDate = new Map();
-        const overdue = [];
-
-        allRelevantActuals.forEach(actual => {
-            const dueDate = new Date(actual.date);
-            dueDate.setHours(0, 0, 0, 0);
-
-            const isUnsettled = !['paid', 'received'].includes(actual.status);
-
-            if (isUnsettled && dueDate < today) {
-                overdue.push(actual);
-            }
-
-            const dateKey = dueDate.toISOString().split('T')[0];
-            if (!byDate.has(dateKey)) {
-                byDate.set(dateKey, []);
-            }
-            byDate.get(dateKey).push(actual);
-        });
-        
-        overdue.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        return { transactionsByDate: byDate, overdueTransactions: overdue };
-    }, [allRelevantActuals, today]);
+    const { actualTransactions, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+    const { transactionsByDate, overdueTransactions } = useScheduleData(actualTransactions, settings);
 
     const calendarGrid = useMemo(() => {
         const grid = [];
@@ -336,14 +284,14 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
                         <div className="grid grid-cols-7 flex-grow">
                             {calendarGrid.map((day, index) => {
                                 const dateKey = day.toISOString().split('T')[0];
-                                const isToday = dateKey === today.toISOString().split('T')[0];
+                                const isTodayCell = dateKey === today.toISOString().split('T')[0];
                                 const isCurrentMonth = day.getMonth() === currentDate.getMonth();
                                 return (
                                     <DayCell
                                         key={index}
                                         day={day}
                                         transactions={transactionsByDate.get(dateKey) || []}
-                                        isToday={isToday}
+                                        isToday={isTodayCell}
                                         isCurrentMonth={isCurrentMonth}
                                         currencySettings={settings}
                                         todayDate={today}

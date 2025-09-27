@@ -3,7 +3,7 @@ import { Plus, Edit, Eye, Search, ChevronDown, Folder, TrendingUp, TrendingDown,
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
 import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals, calculateOffBudgetTotalsForPeriod } from '../utils/selectors.jsx';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, calculatePeriodPositions, calculateGeneralTotals, calculateMainCategoryTotals, calculateOffBudgetTotalsForPeriod } from '../utils/selectors.jsx';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
@@ -379,20 +379,23 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     }
     return entries;
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
-
-  const isRowVisibleInPeriods = useCallback((entry) => {
+  
+  const isRowVisibleInPeriods = (entry) => {
     for (const period of periods) { 
       if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; 
     } 
     return false;
-  }, [periods, actualTransactions]);
+  };
 
   const expandedAndVatEntries = useProcessedEntries(filteredBudgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
   const hasOffBudgetRevenues = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
   const hasOffBudgetExpenses = useMemo(() => expandedAndVatEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [expandedAndVatEntries, isRowVisibleInPeriods]);
-  const groupedData = useGroupedData(expandedAndVatEntries, categories);
-  const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries);
-
+  const groupedData = useGroupedData(expandedAndVatEntries, categories, isRowVisibleInPeriods);
+  const periodPositions = useMemo(() => 
+    calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries),
+    [periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, expandedAndVatEntries]
+  );
+  
   const handleNewBudget = () => { if (!isConsolidated && !isCustomConsolidated) { uiDispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { 
     if (entry.is_vat_payment) return; // Cannot edit automatic VAT payments
