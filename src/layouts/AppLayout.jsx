@@ -23,9 +23,9 @@ import SaveTemplateModal from '../components/SaveTemplateModal';
 import CollaborationBanner from '../components/CollaborationBanner';
 import PaymentTermsModal from '../components/PaymentTermsModal';
 import { saveEntry, deleteEntry, saveActual, deleteActual, recordPayment, writeOffActual, saveConsolidatedView, saveScenario, updateTierPaymentTerms } from '../context/actions';
-
 import { Loader, Hash } from 'lucide-react';
-import { getTodayInTimezone, getStartOfWeek, getEntryAmountForPeriod, getActualAmountForPeriod } from '../utils/budgetCalculations';
+import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
+import { useActiveProjectData, useProcessedEntries, useGroupedData, usePeriodPositions } from '../utils/selectors.jsx';
 
 const NavItem = ({ item, isCollapsed }) => {
     const location = useLocation();
@@ -50,7 +50,7 @@ const AppLayout = () => {
     const { uiState, uiDispatch } = useUI();
     
     const { 
-        projects, allEntries, allActuals, allCashAccounts, session, tiers, categories, scenarios, settings 
+        projects, allEntries, allActuals, allCashAccounts, session, tiers, categories, scenarios, settings, vatRegimes 
     } = dataState;
     
     const { 
@@ -68,32 +68,92 @@ const AppLayout = () => {
     const [isPaymentTermsModalOpen, setIsPaymentTermsModalOpen] = useState(false);
     const [editingTierForTerms, setEditingTierForTerms] = useState(null);
 
-    const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
-
-    const { activeEntries, activeActuals } = useMemo(() => {
-        if (isConsolidated) {
-            return {
-                activeEntries: Object.entries(allEntries).flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId }))),
-                activeActuals: Object.entries(allActuals).flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId }))),
-            };
-        } else {
-            const project = projects.find(p => p.id === activeProjectId);
-            return {
-                activeEntries: project ? (allEntries[project.id] || []) : [],
-                activeActuals: project ? (allActuals[project.id] || []) : [],
-            };
-        }
-    }, [activeProjectId, projects, allEntries, allActuals, isConsolidated]);
-
+    const { budgetEntries, actualTransactions, cashAccounts, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+    
     const periods = useMemo(() => {
-        // ... (same logic as before)
-        return [];
-    }, [timeUnit, horizonLength, periodOffset, settings.timezoneOffset, activeQuickSelect]);
+        const today = getTodayInTimezone(settings.timezoneOffset);
+        let baseDate;
+        switch (timeUnit) {
+            case 'day': baseDate = new Date(today); baseDate.setHours(0,0,0,0); break;
+            case 'week': baseDate = getStartOfWeek(today); break;
+            case 'fortnightly': const day = today.getDate(); baseDate = new Date(today.getFullYear(), today.getMonth(), day <= 15 ? 1 : 16); break;
+            case 'month': baseDate = new Date(today.getFullYear(), today.getMonth(), 1); break;
+            case 'bimonthly': const bimonthStartMonth = Math.floor(today.getMonth() / 2) * 2; baseDate = new Date(today.getFullYear(), bimonthStartMonth, 1); break;
+            case 'quarterly': const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3; baseDate = new Date(today.getFullYear(), quarterStartMonth, 1); break;
+            case 'semiannually': const semiAnnualStartMonth = Math.floor(today.getMonth() / 6) * 6; baseDate = new Date(today.getFullYear(), semiAnnualStartMonth, 1); break;
+            case 'annually': baseDate = new Date(today.getFullYear(), 0, 1); break;
+            default: baseDate = getStartOfWeek(today);
+        }
 
-    const periodPositions = useMemo(() => {
-        // ... (same logic as before)
-        return [];
-    }, [periods, allCashAccounts, activeProjectId, isConsolidated, activeEntries, activeActuals, categories, settings.timezoneOffset]);
+        const periodList = [];
+        for (let i = 0; i < horizonLength; i++) {
+            const periodIndex = i + periodOffset;
+            const periodStart = new Date(baseDate);
+            switch (timeUnit) {
+                case 'day': periodStart.setDate(periodStart.getDate() + periodIndex); break;
+                case 'week': periodStart.setDate(periodStart.getDate() + periodIndex * 7); break;
+                case 'fortnightly': {
+                    const d = new Date(baseDate);
+                    let numFortnights = periodIndex;
+                    let currentMonth = d.getMonth();
+                    let isFirstHalf = d.getDate() === 1;
+                    const monthsToAdd = Math.floor(((isFirstHalf ? 0 : 1) + numFortnights) / 2);
+                    d.setMonth(currentMonth + monthsToAdd);
+                    const newIsFirstHalf = (((isFirstHalf ? 0 : 1) + numFortnights) % 2 + 2) % 2 === 0;
+                    d.setDate(newIsFirstHalf ? 1 : 16);
+                    periodStart.setTime(d.getTime());
+                    break;
+                }
+                case 'month': periodStart.setMonth(periodStart.getMonth() + periodIndex); break;
+                case 'bimonthly': periodStart.setMonth(periodStart.getMonth() + periodIndex * 2); break;
+                case 'quarterly': periodStart.setMonth(periodStart.getMonth() + periodIndex * 3); break;
+                case 'semiannually': periodStart.setMonth(periodStart.getMonth() + periodIndex * 6); break;
+                case 'annually': periodStart.setFullYear(periodStart.getFullYear() + periodIndex); break;
+            }
+            periodList.push(periodStart);
+        }
+
+        return periodList.map((periodStart) => {
+            const periodEnd = new Date(periodStart);
+            switch (timeUnit) {
+                case 'day': periodEnd.setDate(periodEnd.getDate() + 1); break;
+                case 'week': periodEnd.setDate(periodEnd.getDate() + 7); break;
+                case 'fortnightly': if (periodStart.getDate() === 1) { periodEnd.setDate(16); } else { periodEnd.setMonth(periodEnd.getMonth() + 1); periodEnd.setDate(1); } break;
+                case 'month': periodEnd.setMonth(periodEnd.getMonth() + 1); break;
+                case 'bimonthly': periodEnd.setMonth(periodEnd.getMonth() + 2); break;
+                case 'quarterly': periodEnd.setMonth(periodEnd.getMonth() + 3); break;
+                case 'semiannually': periodEnd.setMonth(periodEnd.getMonth() + 6); break;
+                case 'annually': periodEnd.setFullYear(periodEnd.getFullYear() + 1); break;
+            }
+            const year = periodStart.toLocaleDateString('fr-FR', { year: '2-digit' });
+            const monthsShort = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+            let label = '';
+            switch (timeUnit) {
+                case 'day':
+                    if (activeQuickSelect === 'week') {
+                        const dayLabel = periodStart.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' });
+                        label = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
+                    } else {
+                        label = periodStart.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                    }
+                    break;
+                case 'week': label = `S ${periodStart.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`; break;
+                case 'fortnightly': const fortnightNum = periodStart.getDate() === 1 ? '1' : '2'; label = `${fortnightNum}Q-${monthsShort[periodStart.getMonth()]}'${year}`; break;
+                case 'month': label = `${periodStart.toLocaleString('fr-FR', { month: 'short' })} '${year}`; break;
+                case 'bimonthly': const startMonthB = monthsShort[periodStart.getMonth()]; const endMonthB = monthsShort[(periodStart.getMonth() + 1) % 12]; label = `${startMonthB}-${endMonthB}`; break;
+                case 'quarterly': const quarter = Math.floor(periodStart.getMonth() / 3) + 1; label = `T${quarter} '${year}`; break;
+                case 'semiannually': const semester = Math.floor(periodStart.getMonth() / 6) + 1; label = `S${semester} '${year}`; break;
+                case 'annually': label = String(periodStart.getFullYear()); break;
+            }
+            return { label, startDate: periodStart, endDate: periodEnd };
+        });
+    }, [timeUnit, horizonLength, periodOffset, activeQuickSelect, settings.timezoneOffset]);
+
+    const processedEntries = useProcessedEntries(budgetEntries, categories, vatRegimes, activeProjectId, periods, isConsolidated, isCustomConsolidated);
+    const groupedData = useGroupedData(processedEntries, categories);
+    const hasOffBudgetRevenues = useMemo(() => processedEntries.some(e => e.isOffBudget && e.type === 'revenu'), [processedEntries]);
+    const hasOffBudgetExpenses = useMemo(() => processedEntries.some(e => e.isOffBudget && e.type === 'depense'), [processedEntries]);
+    const periodPositions = usePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, processedEntries);
 
     if (isLoading) {
         return (
@@ -113,19 +173,19 @@ const AppLayout = () => {
             return;
         }
         const targetProjectId = entryData.projectId || activeProjectId;
-        const cashAccounts = allCashAccounts[targetProjectId] || [];
+        const cashAccountsForEntry = allCashAccounts[targetProjectId] || [];
         saveEntry({dataDispatch, uiDispatch}, { 
             entryData: { ...entryData, user_id: user.id }, 
             editingEntry, 
             activeProjectId: targetProjectId, 
             tiers,
             user,
-            cashAccounts
+            cashAccounts: cashAccountsForEntry
         });
     };
     
     const handleDeleteEntryWrapper = (entryId) => {
-        const entryToDelete = editingEntry || activeEntries.find(e => e.id === entryId);
+        const entryToDelete = budgetEntries.find(e => e.id === entryId);
         deleteEntry({dataDispatch, uiDispatch}, { entryId, entryProjectId: entryToDelete?.projectId });
     };
 
