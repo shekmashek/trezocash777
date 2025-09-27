@@ -3,11 +3,12 @@ import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
-import { useActiveProjectData, useDashboardKpis, useExpenseDistributionForMonth } from '../utils/selectors.jsx';
+import { useActiveProjectData, useDashboardKpis, useExpenseDistributionForMonth, useTrezoScore } from '../utils/selectors.jsx';
 import SparklineChart from './SparklineChart';
 import ReactECharts from 'echarts-for-react';
 import MonthlyBudgetSummary from './MonthlyBudgetSummary';
 import { motion, AnimatePresence } from 'framer-motion';
+import TrezoScoreWidget from './TrezoScoreWidget';
 
 const DashboardView = () => {
   const { dataState } = useData();
@@ -19,6 +20,7 @@ const DashboardView = () => {
   const { actualTransactions, cashAccounts, activeProject, isConsolidated } = useActiveProjectData(dataState, uiState);
   const { totalActionableBalance, totalOverduePayables, totalOverdueReceivables, overdueItems } = useDashboardKpis(cashAccounts, actualTransactions, settings);
   const expenseDistributionData = useExpenseDistributionForMonth(actualTransactions, dataState.categories, settings);
+  const trezoScoreData = useTrezoScore(dataState, uiState);
 
   const activeProjectName = activeProject?.name || '';
 
@@ -133,11 +135,55 @@ const DashboardView = () => {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+            <TrezoScoreWidget scoreData={trezoScoreData} />
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                Actions Prioritaires
+            </h2>
+            {overdueItems.length > 0 ? (
+                <div className="space-y-3 overflow-y-auto custom-scrollbar">
+                    {overdueItems.map(item => {
+                    const project = isConsolidated ? projects.find(p => p.id === item.projectId) : null;
+                    return (
+                        <button key={item.id} onClick={(e) => handleActionClick(e, item)} className="w-full text-left p-2 rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full ${item.type === 'payable' ? 'bg-red-100' : 'bg-green-100'}`}>
+                                    {item.type === 'payable' ? <ArrowDown className="w-4 h-4 text-red-600" /> : <ArrowUp className="w-4 h-4 text-green-600" />}
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="font-semibold truncate text-gray-800" title={item.thirdParty}>
+                                        {item.thirdParty}
+                                        {isConsolidated && project && <span className="text-xs font-normal text-gray-500 ml-1">({project.name})</span>}
+                                    </p>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                                        <span>{new Date(item.date).toLocaleDateString('fr-FR')}</span>
+                                        <span className="text-gray-500">({Math.floor((new Date() - new Date(item.date)) / (1000 * 60 * 60 * 24))}j en retard)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-base font-normal whitespace-nowrap pl-2 text-gray-600">{formatCurrency(item.remainingAmount, settings)}</p>
+                        </div>
+                        </button>
+                    )
+                    })}
+                </div>
+            ) : (
+                <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-gray-500 py-10">
+                        <p>Aucune action prioritaire. Tout est à jour !</p>
+                    </div>
+                </div>
+            )}
+        </div>
+      </div>
+
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button onClick={() => setActiveTab('overview')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'overview' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-            Vue d'ensemble
-          </button>
           <button onClick={() => setActiveTab('budget')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'budget' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
             Budget Annuel
           </button>
@@ -156,50 +202,6 @@ const DashboardView = () => {
             animate="visible"
             exit="exit"
           >
-            {activeTab === 'overview' && (
-              <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col lg:col-span-3">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 flex-shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                    Actions Prioritaires <span className="text-gray-500 font-medium">- {activeProjectName}</span>
-                  </h2>
-                  {overdueItems.length > 0 ? (
-                    <div className="space-y-3 overflow-y-auto custom-scrollbar" style={{ height: '28rem' }}>
-                      {overdueItems.map(item => {
-                        const project = isConsolidated ? projects.find(p => p.id === item.projectId) : null;
-                        return (
-                          <button key={item.id} onClick={(e) => handleActionClick(e, item)} className="w-full text-left p-2 rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full ${item.type === 'payable' ? 'bg-red-100' : 'bg-green-100'}`}>
-                                        {item.type === 'payable' ? <ArrowDown className="w-4 h-4 text-red-600" /> : <ArrowUp className="w-4 h-4 text-green-600" />}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="font-semibold truncate text-gray-800" title={item.thirdParty}>
-                                          {item.thirdParty}
-                                          {isConsolidated && project && <span className="text-xs font-normal text-gray-500 ml-1">({project.name})</span>}
-                                        </p>
-                                        <div className="text-xs text-gray-500 flex items-center gap-1.5">
-                                            <span>{new Date(item.date).toLocaleDateString('fr-FR')}</span>
-                                            <span className="text-gray-500">({Math.floor((new Date() - new Date(item.date)) / (1000 * 60 * 60 * 24))}j en retard)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p className="text-base font-normal whitespace-nowrap pl-2 text-gray-600">{formatCurrency(item.remainingAmount, settings)}</p>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="h-[28rem] flex items-center justify-center">
-                        <div className="text-center text-gray-500 py-10">
-                            <p>Aucune action prioritaire. Tout est à jour !</p>
-                        </div>
-                    </div>
-                  )}
-                </div>
-            )}
-
             {activeTab === 'budget' && (
               <MonthlyBudgetSummary />
             )}

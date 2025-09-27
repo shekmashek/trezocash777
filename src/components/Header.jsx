@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown, Users, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../context/DataContext';
@@ -10,11 +10,12 @@ import ActionableBalanceDrawer from './ActionableBalanceDrawer';
 import SparklineChart from './SparklineChart';
 import Avatar from './Avatar';
 import { useNavigate } from 'react-router-dom';
+import { useActiveProjectData, useAccountBalances, useHeaderMetrics } from '../utils/selectors.jsx';
 
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { settings, allCashAccounts, allActuals, allEntries, loans, consolidatedViews, projects, collaborators, allProfiles, categories } = dataState;
+  const { settings, allCashAccounts, allActuals, loans, consolidatedViews, projects, collaborators, allProfiles, allEntries } = dataState;
   const { activeProjectId } = uiState;
   const navigate = useNavigate();
 
@@ -30,8 +31,9 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const isConsolidated = activeProjectId === 'consolidated';
-  const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
+  const { isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+  const accountBalances = useAccountBalances(allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews);
+  const headerMetrics = useHeaderMetrics(dataState, uiState, accountBalances);
 
   const handleNavigate = (path) => {
     navigate(path);
@@ -42,208 +44,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     uiDispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
     navigate(`/app/${view}`);
   };
-
-  const userCashAccounts = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allCashAccounts).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(id => allCashAccounts[id] || []);
-    }
-    return allCashAccounts[activeProjectId] || [];
-  }, [allCashAccounts, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const relevantActuals = useMemo(() => {
-    if (isConsolidated) {
-      return Object.values(allActuals).flat();
-    }
-    if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        if (!view || !view.project_ids) return [];
-        return view.project_ids.flatMap(id => allActuals[id] || []);
-    }
-    return allActuals[activeProjectId] || [];
-  }, [activeProjectId, allActuals, isConsolidated, isCustomConsolidated, consolidatedViews]);
-
-  const accountBalances = useMemo(() => {
-    return userCashAccounts.map(account => {
-      let currentBalance = parseFloat(account.initialBalance) || 0;
-      const accountPayments = relevantActuals
-        .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
-      
-      for (const payment of accountPayments) {
-        if (payment.type === 'receivable') {
-          currentBalance += payment.paidAmount;
-        } else if (payment.type === 'payable') {
-          currentBalance -= payment.paidAmount;
-        }
-      }
-
-      const blockedForProvision = relevantActuals
-        .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
-        .reduce((sum, actual) => {
-          const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-          return sum + (actual.amount - paidAmount);
-        }, 0);
-
-      return { 
-        id: account.id,
-        projectId: account.projectId,
-        name: account.name,
-        mainCategoryId: account.mainCategoryId,
-        balance: currentBalance, 
-        blockedForProvision, 
-        actionableBalance: currentBalance - blockedForProvision,
-        isClosed: account.isClosed
-      };
-    });
-  }, [userCashAccounts, relevantActuals]);
-
-  const headerMetrics = useMemo(() => {
-    let relevantAccounts;
-    let relevantActuals;
-    let relevantLoans;
-    let relevantEntries;
-
-    if (isConsolidated) {
-        relevantAccounts = Object.values(allCashAccounts).flat();
-        relevantActuals = Object.values(allActuals).flat();
-        relevantLoans = loans || [];
-        relevantEntries = Object.values(allEntries).flat();
-    } else if (isCustomConsolidated) {
-        const viewId = activeProjectId.replace('consolidated_view_', '');
-        const view = consolidatedViews.find(v => v.id === viewId);
-        const projectIds = view ? view.project_ids : [];
-        
-        relevantAccounts = projectIds.flatMap(id => allCashAccounts[id] || []);
-        relevantActuals = projectIds.flatMap(id => allActuals[id] || []);
-        relevantLoans = (loans || []).filter(l => projectIds.includes(l.projectId));
-        relevantEntries = projectIds.flatMap(id => allEntries[id] || []);
-    } else {
-        relevantAccounts = allCashAccounts[activeProjectId] || [];
-        relevantActuals = allActuals[activeProjectId] || [];
-        relevantLoans = (loans || []).filter(l => l.projectId === activeProjectId);
-        relevantEntries = allEntries[activeProjectId] || [];
-    }
-
-    const provisionDeposits = relevantActuals
-        .filter(actual => actual.isProvision)
-        .flatMap(actual => actual.payments || [])
-        .reduce((sum, payment) => sum + payment.paidAmount, 0);
-
-    const provisionPayouts = relevantActuals
-        .filter(actual => actual.isFinalProvisionPayment)
-        .flatMap(actual => actual.payments || [])
-        .reduce((sum, payment) => sum + payment.paidAmount, 0);
-    
-    const totalProvisionsNet = provisionDeposits - provisionPayouts;
-
-    let totalActionableCash = 0;
-
-    relevantAccounts.forEach(account => {
-        let currentBalance = parseFloat(account.initialBalance) || 0;
-        
-        const accountPayments = relevantActuals
-            .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
-
-        for (const payment of accountPayments) {
-            if (payment.type === 'receivable') {
-                currentBalance += payment.paidAmount;
-            } else if (payment.type === 'payable') {
-                currentBalance -= payment.paidAmount;
-            }
-        }
-        
-        const blockedForProvision = relevantActuals
-            .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
-            .reduce((sum, actual) => {
-                const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-                return sum + (actual.amount - paidAmount);
-            }, 0);
-
-        const actionableBalance = currentBalance - blockedForProvision;
-        totalActionableCash += actionableBalance;
-    });
-
-    const totalSavings = accountBalances
-        .filter(acc => acc.mainCategoryId === 'savings')
-        .reduce((sum, acc) => sum + acc.balance, 0);
-
-    const today = getTodayInTimezone(settings.timezoneOffset);
-    const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
-
-    let totalBorrowingPrincipalRemaining = 0;
-    let totalLoanPrincipalRemaining = 0;
-
-    relevantLoans.forEach(loan => {
-        const projectEntries = allEntries[loan.projectId] || [];
-        const projectActuals = allActuals[loan.projectId] || [];
-
-        const repaymentEntry = projectEntries.find(e => e.loanId === loan.id && e.type !== (loan.type === 'borrowing' ? 'revenu' : 'depense'));
-        
-        let remainingPrincipal = loan.principal;
-
-        if (repaymentEntry) {
-            const repaymentActuals = projectActuals.filter(a => a.budgetId === repaymentEntry.id);
-            const totalRepaid = repaymentActuals.reduce((sum, actual) => {
-                return sum + (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-            }, 0);
-
-            const totalToBePaid = loan.monthlyPayment * loan.term;
-            if (totalToBePaid > 0 && totalToBePaid >= loan.principal) {
-                const principalRatio = loan.principal / totalToBePaid;
-                const principalRepaid = totalRepaid * principalRatio;
-                remainingPrincipal = Math.max(0, loan.principal - principalRepaid);
-            } else {
-                 remainingPrincipal = Math.max(0, loan.principal - totalRepaid);
-            }
-        }
-
-        if (loan.type === 'borrowing') {
-            totalBorrowingPrincipalRemaining += remainingPrincipal;
-        } else if (loan.type === 'loan') {
-            totalLoanPrincipalRemaining += remainingPrincipal;
-        }
-    });
-
-    let totalOverduePayables = 0;
-    let totalOverdueReceivables = 0;
-
-    relevantActuals.forEach(actual => {
-        const isLoanRelated = (loans || []).some(loan => {
-             const projectEntries = allEntries[loan.projectId] || [];
-             const entry = projectEntries.find(e => e.id === actual.budgetId);
-             return entry && entry.loanId === loan.id;
-        });
-
-        if (!isLoanRelated && unpaidStatuses.includes(actual.status)) {
-            const totalPaid = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-            const remainingAmount = actual.amount - totalPaid;
-
-            if (remainingAmount > 0 && new Date(actual.date) <= today) {
-                if (actual.type === 'payable') {
-                    totalOverduePayables += remainingAmount;
-                } else if (actual.type === 'receivable') {
-                    totalOverdueReceivables += remainingAmount;
-                }
-            }
-        }
-    });
-
-    return {
-        actionableCash: formatCurrency(totalActionableCash, settings),
-        savings: formatCurrency(totalSavings, settings),
-        provisions: formatCurrency(totalProvisionsNet, settings),
-        overduePayables: formatCurrency(totalOverduePayables, settings),
-        overdueReceivables: formatCurrency(totalOverdueReceivables, settings),
-        totalDebts: formatCurrency(totalBorrowingPrincipalRemaining, settings),
-        totalCredits: formatCurrency(totalLoanPrincipalRemaining, settings),
-    };
-  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, isCustomConsolidated, consolidatedViews, categories, accountBalances]);
 
   const projectedCashflowData = useMemo(() => {
     if (!periods || periods.length === 0 || !periodPositions || periodPositions.length === 0) {

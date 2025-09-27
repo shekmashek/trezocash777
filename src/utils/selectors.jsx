@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { expandVatEntries, generateVatPaymentEntries, getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone } from './budgetCalculations';
+import { formatCurrency } from './formatting';
 
 export const useActiveProjectData = (dataState, uiState) => {
     const { allEntries, allActuals, allCashAccounts, projects, consolidatedViews, settings } = dataState;
@@ -372,4 +373,255 @@ export const useScheduleData = (actualTransactions, settings) => {
 
         return { transactionsByDate: byDate, overdueTransactions: overdue };
     }, [actualTransactions, settings.timezoneOffset]);
+};
+
+export const useAccountBalances = (allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews) => {
+    return useMemo(() => {
+        let accountsToProcess = [];
+        if (isConsolidated) {
+            accountsToProcess = Object.values(allCashAccounts).flat();
+        } else if (isCustomConsolidated) {
+            const viewId = activeProjectId.replace('consolidated_view_', '');
+            const view = consolidatedViews.find(v => v.id === viewId);
+            if (view && view.project_ids) {
+                accountsToProcess = view.project_ids.flatMap(id => allCashAccounts[id] || []);
+            }
+        } else {
+            accountsToProcess = allCashAccounts[activeProjectId] || [];
+        }
+
+        const allActualsFlat = Object.values(allActuals).flat();
+
+        return accountsToProcess.map(account => {
+            let currentBalance = parseFloat(account.initialBalance) || 0;
+            const accountPayments = allActualsFlat
+                .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
+            
+            for (const payment of accountPayments) {
+                if (payment.type === 'receivable') {
+                    currentBalance += payment.paidAmount;
+                } else if (payment.type === 'payable') {
+                    currentBalance -= payment.paidAmount;
+                }
+            }
+
+            const blockedForProvision = allActualsFlat
+                .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
+                .reduce((sum, actual) => {
+                    const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
+                    return sum + (actual.amount - paidAmount);
+                }, 0);
+
+            return {
+                ...account,
+                balance: currentBalance,
+                blockedForProvision: blockedForProvision,
+                actionableBalance: currentBalance - blockedForProvision,
+            };
+        });
+    }, [allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
+};
+
+export const useHeaderMetrics = (dataState, uiState, accountBalances) => {
+    const { allActuals, loans, settings, projects, consolidatedViews } = dataState;
+    const { activeProjectId } = uiState;
+    const { isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+
+    return useMemo(() => {
+        const today = getTodayInTimezone(settings.timezoneOffset);
+        const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
+
+        let actualsToConsider = [];
+        if (isConsolidated) {
+            actualsToConsider = Object.values(allActuals).flat();
+        } else if (isCustomConsolidated) {
+            const viewId = activeProjectId.replace('consolidated_view_', '');
+            const view = consolidatedViews.find(v => v.id === viewId);
+            if (view && view.project_ids) {
+                actualsToConsider = view.project_ids.flatMap(id => allActuals[id] || []);
+            }
+        } else {
+            actualsToConsider = allActuals[activeProjectId] || [];
+        }
+
+        const overduePayables = actualsToConsider
+            .filter(a => a.type === 'payable' && unpaidStatuses.includes(a.status) && new Date(a.date) < today)
+            .reduce((sum, a) => sum + (a.amount - (a.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0)), 0);
+
+        const overdueReceivables = actualsToConsider
+            .filter(a => a.type === 'receivable' && unpaidStatuses.includes(a.status) && new Date(a.date) < today)
+            .reduce((sum, a) => sum + (a.amount - (a.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0)), 0);
+        
+        const savings = accountBalances.filter(acc => acc.mainCategoryId === 'savings').reduce((sum, acc) => sum + acc.actionableBalance, 0);
+        const provisions = accountBalances.filter(acc => acc.mainCategoryId === 'provisions').reduce((sum, acc) => sum + acc.actionableBalance, 0);
+        
+        const actionableCash = accountBalances.filter(acc => ['bank', 'cash', 'mobileMoney'].includes(acc.mainCategoryId)).reduce((sum, acc) => sum + acc.actionableBalance, 0);
+
+        const totalDebts = loans.filter(l => l.type === 'borrowing').reduce((sum, l) => sum + l.principal, 0);
+        const totalCredits = loans.filter(l => l.type === 'loan').reduce((sum, l) => sum + l.principal, 0);
+
+        return {
+            actionableCash: formatCurrency(actionableCash, settings),
+            savings: formatCurrency(savings, settings),
+            provisions: formatCurrency(provisions, settings),
+            overduePayables: formatCurrency(overduePayables, settings),
+            overdueReceivables: formatCurrency(overdueReceivables, settings),
+            totalDebts: formatCurrency(totalDebts, settings),
+            totalCredits: formatCurrency(totalCredits, settings),
+        };
+    }, [accountBalances, allActuals, loans, settings, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
+};
+
+export const useTrezoScore = (dataState, uiState) => {
+    const { loans, categories } = dataState;
+    const { budgetEntries, actualTransactions, cashAccounts } = useActiveProjectData(dataState, uiState);
+    const accountBalances = useAccountBalances(dataState.allCashAccounts, dataState.allActuals, uiState.activeProjectId, uiState.activeProjectId === 'consolidated', uiState.activeProjectId?.startsWith('consolidated_view_'), dataState.consolidatedViews);
+
+    return useMemo(() => {
+        const today = new Date();
+        const sixMonthsAgo = new Date(new Date().setMonth(today.getMonth() - 6));
+
+        const recentActuals = actualTransactions.filter(a => (a.payments || []).some(p => new Date(p.paymentDate) >= sixMonthsAgo));
+
+        const monthlyMetrics = Array.from({ length: 6 }).map((_, i) => {
+            const monthDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const monthStart = new Date(monthDate);
+            const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
+            const monthlyIncome = recentActuals
+                .filter(a => a.type === 'receivable')
+                .flatMap(a => a.payments || [])
+                .filter(p => {
+                    const pDate = new Date(p.paymentDate);
+                    return pDate >= monthStart && pDate <= monthEnd;
+                })
+                .reduce((sum, p) => sum + p.paidAmount, 0);
+
+            const monthlyCriticalExpenses = recentActuals
+                .filter(a => {
+                    const mainCat = categories.expense.find(mc => mc.subCategories.some(sc => sc.name === a.category));
+                    const subCat = mainCat?.subCategories.find(sc => sc.name === a.category);
+                    return a.type === 'payable' && subCat?.criticality === 'critical';
+                })
+                .flatMap(a => a.payments || [])
+                .filter(p => {
+                    const pDate = new Date(p.paymentDate);
+                    return pDate >= monthStart && pDate <= monthEnd;
+                })
+                .reduce((sum, p) => sum + p.paidAmount, 0);
+
+            const monthlyTotalExpenses = recentActuals
+                .filter(a => a.type === 'payable')
+                .flatMap(a => a.payments || [])
+                .filter(p => {
+                    const pDate = new Date(p.paymentDate);
+                    return pDate >= monthStart && pDate <= monthEnd;
+                })
+                .reduce((sum, p) => sum + p.paidAmount, 0);
+
+            return { monthlyIncome, monthlyCriticalExpenses, monthlyTotalExpenses };
+        });
+
+        const avgMonthlyIncome = monthlyMetrics.reduce((sum, m) => sum + m.monthlyIncome, 0) / 6;
+        const avgMonthlyCriticalExpenses = monthlyMetrics.reduce((sum, m) => sum + m.monthlyCriticalExpenses, 0) / 6;
+        const avgMonthlyTotalExpenses = monthlyMetrics.reduce((sum, m) => sum + m.monthlyTotalExpenses, 0) / 6;
+
+        // Pillar 1: Critical Expenses Coverage
+        let coverageScore = 0;
+        let coverageText = '';
+        if (avgMonthlyCriticalExpenses > 0) {
+            const margin = (avgMonthlyIncome - avgMonthlyCriticalExpenses) / avgMonthlyCriticalExpenses;
+            coverageText = `Marge de ${ (margin * 100).toFixed(0) }%`;
+            if (margin > 0.5) coverageScore = 30;
+            else if (margin > 0.25) coverageScore = 24;
+            else if (margin > 0) coverageScore = 18;
+            else if (margin > -0.1) coverageScore = 12;
+            else coverageScore = 6;
+        } else if (avgMonthlyIncome > 0) {
+            coverageScore = 30; // No critical expenses, excellent coverage
+            coverageText = 'Aucune dépense critique';
+        }
+
+        // Pillar 2: Resource Stability (simplified)
+        const incomeSources = new Set(recentActuals.filter(a => a.type === 'receivable').map(a => a.thirdParty));
+        const recurringIncomeEntries = budgetEntries.filter(e => e.type === 'revenu' && e.frequency !== 'ponctuel' && e.frequency !== 'irregulier');
+        let stabilityScore = 5;
+        if (recurringIncomeEntries.length > 0) stabilityScore = 20;
+        if (incomeSources.size > 2) stabilityScore = Math.min(25, stabilityScore + 5);
+        if (incomeSources.size <= 1 && recurringIncomeEntries.length === 0) stabilityScore = 10;
+
+        // Pillar 3: Expense Management
+        let expenseMgmtScore = 4;
+        let savingsRateText = '';
+        if (avgMonthlyIncome > 0) {
+            const savingsRate = (avgMonthlyIncome - avgMonthlyTotalExpenses) / avgMonthlyIncome;
+            savingsRateText = `Taux d'épargne de ${(savingsRate * 100).toFixed(0)}%`;
+            if (savingsRate > 0.2) expenseMgmtScore = 20;
+            else if (savingsRate > 0.1) expenseMgmtScore = 16;
+            else if (savingsRate > 0.05) expenseMgmtScore = 12;
+            else if (savingsRate > 0) expenseMgmtScore = 8;
+        }
+
+        // Pillar 4: Emergency Savings
+        const availableSavings = accountBalances.filter(acc => acc.mainCategoryId === 'savings').reduce((sum, acc) => sum + acc.actionableBalance, 0);
+        let autonomyScore = 3;
+        let autonomyText = '';
+        if (avgMonthlyCriticalExpenses > 0) {
+            const autonomyMonths = availableSavings / avgMonthlyCriticalExpenses;
+            autonomyText = `Autonomie de ${autonomyMonths.toFixed(1)} mois`;
+            if (autonomyMonths > 6) autonomyScore = 15;
+            else if (autonomyMonths > 3) autonomyScore = 12;
+            else if (autonomyMonths > 1) autonomyScore = 9;
+            else if (autonomyMonths > 0.5) autonomyScore = 6;
+        } else if (availableSavings > 0) {
+            autonomyScore = 15; // No critical expenses, infinite autonomy
+            autonomyText = 'Autonomie infinie';
+        }
+
+        // Pillar 5: Debt
+        const monthlyLoanRepayments = loans.filter(l => l.type === 'borrowing').reduce((sum, l) => sum + l.monthlyPayment, 0);
+        let debtScore = 10;
+        if (avgMonthlyIncome > 0) {
+            const debtRatio = monthlyLoanRepayments / avgMonthlyIncome;
+            if (debtRatio > 0.6) debtScore = 2;
+            else if (debtRatio > 0.45) debtScore = 4;
+            else if (debtRatio > 0.3) debtScore = 6;
+            else if (debtRatio > 0.15) debtScore = 8;
+        }
+
+        const totalScore = Math.round(coverageScore + stabilityScore + expenseMgmtScore + autonomyScore + debtScore);
+
+        let evaluation, color, recommendations = [], strengths = [], weaknesses = [];
+        if (totalScore >= 90) { 
+            evaluation = 'Excellente'; 
+            color = 'blue';
+            recommendations.push("Votre situation est très saine. Pensez à investir votre épargne excédentaire."); 
+        } else if (totalScore >= 70) { 
+            evaluation = 'Bonne'; 
+            color = 'green';
+            recommendations.push("Votre gestion est solide. Surveillez la stabilité de vos revenus."); 
+        } else if (totalScore >= 50) { 
+            evaluation = 'Correcte'; 
+            color = 'yellow';
+            recommendations.push("Attention aux imprévus. Renforcez votre épargne de précaution."); 
+        } else if (totalScore >= 30) { 
+            evaluation = 'Fragile'; 
+            color = 'orange';
+            recommendations.push("Situation tendue. Concentrez-vous sur la réduction des dépenses non essentielles."); 
+        } else { 
+            evaluation = 'Critique'; 
+            color = 'red';
+            recommendations.push("Danger immédiat. Consultez un conseiller financier rapidement."); 
+        }
+
+        // Populate strengths and weaknesses
+        if (coverageScore >= 24) strengths.push({ pillar: 'Couverture des Dépenses Critiques', text: `Dépenses critiques bien couvertes (${coverageText})` }); else weaknesses.push({ pillar: 'Couverture des Dépenses Critiques', text: `Marge de sécurité faible (${coverageText})` });
+        if (stabilityScore >= 20) strengths.push({ pillar: 'Stabilité des Ressources', text: 'Revenus stables' }); else weaknesses.push({ pillar: 'Stabilité des Ressources', text: 'Revenus variables à surveiller' });
+        if (expenseMgmtScore >= 16) strengths.push({ pillar: 'Maîtrise des Dépenses', text: `Taux d'épargne satisfaisant (${savingsRateText})` }); else weaknesses.push({ pillar: 'Maîtrise des Dépenses', text: `Épargne à améliorer (${savingsRateText})` });
+        if (autonomyScore >= 12) strengths.push({ pillar: 'Épargne de Précaution', text: `Bonne épargne de précaution (${autonomyText})` }); else weaknesses.push({ pillar: 'Épargne de Précaution', text: `Épargne de précaution faible (${autonomyText})` });
+        if (debtScore >= 8) strengths.push({ pillar: 'Endettement & Engagements', text: 'Endettement maîtrisé' }); else weaknesses.push({ pillar: 'Endettement & Engagements', text: 'Endettement à surveiller' });
+
+        return { score: totalScore, evaluation, color, strengths, weaknesses, recommendations };
+
+    }, [budgetEntries, actualTransactions, cashAccounts, categories, loans, accountBalances]);
 };

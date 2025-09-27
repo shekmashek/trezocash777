@@ -3,26 +3,24 @@ import { X, Wallet, Lock, CheckCircle, Landmark, PiggyBank, Smartphone, Edit, Ar
 import { useData, mainCashAccountCategories } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
+import { useActiveProjectData } from '../utils/selectors.jsx';
 
 const ActionableBalanceDrawer = ({ isOpen, onClose, balances, selectedAccountId, currency }) => {
   const { dataState } = useData();
   const { uiDispatch: dispatch } = useUI();
   const { settings, allActuals, projects } = dataState;
 
+  const { activeProject } = useActiveProjectData(dataState, useUI().uiState);
+
   const displayedAccount = useMemo(() => {
     if (!selectedAccountId) return null;
     return balances.find(acc => acc.id === selectedAccountId);
   }, [balances, selectedAccountId]);
 
-  const accountProject = useMemo(() => {
-    if (!displayedAccount) return null;
-    return projects.find(p => p.id === displayedAccount.projectId);
-  }, [displayedAccount, projects]);
-
   const recentTransactions = useMemo(() => {
-    if (!displayedAccount || !accountProject) return [];
+    if (!displayedAccount || !activeProject) return [];
 
-    const projectActuals = allActuals[accountProject.id] || [];
+    const projectActuals = allActuals[activeProject.id] || [];
     
     return projectActuals
       .flatMap(actual => 
@@ -32,7 +30,7 @@ const ActionableBalanceDrawer = ({ isOpen, onClose, balances, selectedAccountId,
       .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
       .slice(0, 10);
 
-  }, [displayedAccount, accountProject, allActuals, selectedAccountId]);
+  }, [displayedAccount, activeProject, allActuals, selectedAccountId]);
 
   const groupIcons = {
       bank: Landmark,
@@ -75,7 +73,7 @@ const ActionableBalanceDrawer = ({ isOpen, onClose, balances, selectedAccountId,
                 <h2 className="text-lg font-semibold text-gray-800">
                   Détail - {displayedAccount.name}
                 </h2>
-                <p className="text-sm text-gray-500">{accountProject?.name}</p>
+                <p className="text-sm text-gray-500">{activeProject?.name}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
