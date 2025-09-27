@@ -13,62 +13,168 @@ export const mainCashAccountCategories = [
 
 const initialCategories = {
   revenue: [
-    { id: 'rev-main-1', name: 'Entrées des Ventes', isFixed: true, subCategories: [{ id: 'rev-sub-1-1', name: 'Ventes de produits' }, { id: 'rev-sub-1-2', name: 'Ventes de services' }] },
-    { id: 'rev-main-2', name: 'Entrées Financières', isFixed: true, subCategories: [
-        { id: 'rev-sub-2-1', name: 'Intérêts perçus' }, { id: 'rev-sub-2-2', name: 'Réception Emprunt' },
-        { id: 'rev-sub-2-3', name: 'Remboursement de prêt reçu' }, { id: 'rev-sub-2-4', name: 'Intérêts de prêt reçus' },
-    ] },
-    { id: 'rev-main-3', name: 'Autres Entrées', isFixed: true, subCategories: [
-        { id: 'rev-sub-3-1', name: 'Subventions' }, { id: 'rev-sub-3-2', name: 'Revenus Exceptionnels'},
-        { id: 'rev-sub-3-3', name: 'Crédit de TVA', isFixed: true }
-    ] },
+    // 1. RÉMUNÉRATION DU TRAVAIL
+    { id: 'rev-main-1', name: 'RÉMUNÉRATION DU TRAVAIL', isFixed: true, subCategories: [
+        { id: 'rev-sub-1-1', name: 'Salaires & traitements nets' },
+        { id: 'rev-sub-1-2', name: 'Rémunération des dirigeants' },
+        { id: 'rev-sub-1-3', name: 'Honoraires & chiffre d\'affaires (BIC/BNC)' },
+        { id: 'rev-sub-1-4', name: 'Primes, bonus & commissions' },
+        { id: 'rev-sub-1-5', name: 'Indemnités' },
+        { id: 'rev-sub-1-6', name: 'Remboursements de frais professionnels' },
+    ]},
+    // 2. VENTES DE BIENS & PRODUITS
+    { id: 'rev-main-2', name: 'VENTES DE BIENS & PRODUITS', isFixed: true, subCategories: [
+        { id: 'rev-sub-2-1', name: 'Vente de marchandises' },
+        { id: 'rev-sub-2-2', name: 'Vente de produits fabriqués' },
+        { id: 'rev-sub-2-3', name: 'Vente d\'actifs immobilisés' },
+        { id: 'rev-sub-2-4', name: 'Revente de biens personnels' },
+    ]},
+    // 3. PRESTATIONS DE SERVICES & ACTIVITÉS
+    { id: 'rev-main-3', name: 'PRESTATIONS DE SERVICES & ACTIVITÉS', isFixed: true, subCategories: [
+        { id: 'rev-sub-3-1', name: 'Conseil & expertise' },
+        { id: 'rev-sub-3-2', name: 'Prestations artistiques ou culturelles' },
+        { id: 'rev-sub-3-3', name: 'Prestations sportives' },
+        { id: 'rev-sub-3-4', name: 'Recettes d\'événements' },
+        { id: 'rev-sub-3-5', name: 'Locations diverses' },
+    ]},
+    // 4. REVENUS FINANCIERS & DE PLACEMENTS
+    { id: 'rev-main-4', name: 'REVENUS FINANCIERS & DE PLACEMENTS', isFixed: true, subCategories: [
+        { id: 'rev-sub-4-1', name: 'Dividendes' },
+        { id: 'rev-sub-4-2', name: 'Intérêts perçus' },
+        { id: 'rev-sub-4-3', name: 'Plus-values de cession' },
+        { id: 'rev-sub-4-4', name: 'Revenus locatifs nets' },
+    ]},
+    // 5. AIDES, SUBVENTIONS & DOTATIONS
+    { id: 'rev-main-5', name: 'AIDES, SUBVENTIONS & DOTATIONS', isFixed: true, subCategories: [
+        { id: 'rev-sub-5-1', name: 'Aides publiques aux entreprises' },
+        { id: 'rev-sub-5-2', name: 'Subventions associatives' },
+        { id: 'rev-sub-5-3', name: 'Allocations & prestations sociales' },
+        { id: 'rev-sub-5-4', name: 'Indemnités journalières' },
+        { id: 'rev-sub-5-5', name: 'Pensions de retraite' },
+        { id: 'rev-sub-5-6', name: 'Bourses & bourses d\'études' },
+        { id: 'rev-sub-5-7', name: 'Crédit de TVA', isFixed: true },
+    ]},
+    // 6. APPORTS & FINANCEMENTS
+    { id: 'rev-main-6', name: 'APPORTS & FINANCEMENTS', isFixed: true, subCategories: [
+        { id: 'rev-sub-6-1', name: 'Apports en capital' },
+        { id: 'rev-sub-6-2', name: 'Emprunts & prêts reçus' },
+        { id: 'rev-sub-6-3', name: 'Collecte de fonds (crowdfunding)' },
+        { id: 'rev-sub-6-4', name: 'Apports personnels pour projet' },
+    ]},
+    // 7. REVENUS DIVERS & OCCASIONNELS
+    { id: 'rev-main-7', name: 'REVENUS DIVERS & OCCASIONNELS', isFixed: true, subCategories: [
+        { id: 'rev-sub-7-1', name: 'Dons & cadeaux en argent' },
+        { id: 'rev-sub-7-2', name: 'Gains divers' },
+        { id: 'rev-sub-7-3', name: 'Remboursements personnels' },
+        { id: 'rev-sub-7-4', name: 'Compensations' },
+    ]},
   ],
   expense: [
-    { id: 'exp-main-1', name: 'Exploitation', isFixed: true, subCategories: [
-        { id: 'exp-sub-1-1', name: 'Loyer et charges' }, { id: 'exp-sub-1-2', name: 'Fournitures de bureau' }, { id: 'exp-sub-1-3', name: 'Marketing et publicité' }, 
-        { id: 'exp-sub-1-4', name: 'Frais de déplacement' },{ id: 'exp-sub-1-5', name: 'Frais administratives et de gestion' }, { id: 'exp-sub-1-6', name: 'Frais de transport' },
-        { id: 'exp-sub-1-7', name: 'Entretien, réparation et maintenance' }, { id: 'exp-sub-1-8', name: 'Recherche et développement' }, { id: 'exp-sub-1-9', name: 'Petit équipement' }
-    ] },
-    { id: 'exp-main-2', name: 'Masse Salariale', isFixed: true, subCategories: [{ id: 'exp-sub-2-1', name: 'Salaires et traitements' }, { id: 'exp-sub-2-2', name: 'Charges sociales' }] },
-    { id: 'exp-main-3', name: 'Investissement', isFixed: true, subCategories: [
-        { id: 'exp-sub-3-1', name: 'Investissements financiers' }, { id: 'exp-sub-3-2', name: 'Investissements immobiliers' },
-        { id: 'exp-sub-3-3', name: 'Investissement dans sa propre entreprise' }, { id: 'exp-sub-3-4', name: 'Autres investissements' }
-    ] },
-    { id: 'exp-main-4', name: 'Financement', isFixed: true, subCategories: [
-        { id: 'exp-sub-4-1', name: 'Octroi de Prêt' }, { id: 'exp-sub-4-2', name: "Remboursement d'emprunt" }, { id: 'exp-sub-4-3', name: "Intérêts d'emprunt" },
-    ] },
-    { id: 'exp-main-5', name: 'Épargne', isFixed: true, subCategories: [
-        { id: 'exp-sub-5-1', name: 'Provision pour risques' }, { id: 'exp-sub-5-2', name: "Fond d'urgence" },
-        { id: 'exp-sub-5-3', name: 'Epargne Projet à court et moyen termes' }, { id: 'exp-sub-5-4', name: 'Epargne retraite' },
-    ] },
-    { id: 'exp-main-6', name: 'Exceptionnel', isFixed: true, subCategories: [{ id: 'exp-sub-6-1', name: 'Amendes' }] },
-    { id: 'exp-main-7', name: 'Impôts et Taxes', isFixed: true, subCategories: [
-        { id: 'exp-sub-7-1', name: 'Impôt sur les sociétés', isFixed: false }, { id: 'exp-sub-7-2', name: 'TVA collectée', isFixed: true },
-        { id: 'exp-sub-7-3', name: 'TVA déductible', isFixed: true }, { id: 'exp-sub-7-4', name: 'Autres taxes', isFixed: false },
-        { id: 'exp-sub-7-5', name: 'TVA à payer', isFixed: true }
-    ] },
-    { id: 'exp-main-8', name: 'Formation', isFixed: true, subCategories: [
-        { id: 'exp-sub-8-1', name: 'Matériel' }, { id: 'exp-sub-8-2', name: 'Livres' }, { id: 'exp-sub-8-3', name: 'Logiciels' },
-        { id: 'exp-sub-8-4', name: 'Abonnement' }, { id: 'exp-sub-8-5', name: 'Ateliers pratiques' }, { id: 'exp-sub-8-6', name: 'Formations certifiantes' }, { id: 'exp-sub-8-7', name: 'Stage' },
-    ] },
-    { id: 'exp-main-9', name: 'Innovation, Recherche et développement', isFixed: true, subCategories: [] },
-    { id: 'exp-main-10', name: 'Personnel', isFixed: true, subCategories: [
-        { id: 'exp-sub-10-1', name: 'Logement' }, { id: 'exp-sub-10-2', name: 'Eau et Electricité' }, { id: 'exp-sub-10-3', name: 'Frais de réparation et entretien' },
-        { id: 'exp-sub-10-4', name: 'Décoration et ameublement' }, { id: 'exp-sub-10-5', name: 'Frais de nettoyage' }, { id: 'exp-sub-10-6', name: 'Nourriture & alimentation' },
-        { id: 'exp-sub-10-7', name: 'Transports et déplacement' }, { id: 'exp-sub-10-8', name: 'Santé et bien etre' }, { id: 'exp-sub-10-9', name: 'Communication et divertissement' },
-        { id: 'exp-sub-10-10', name: 'Enfant et education' }, { id: 'exp-sub-10-11', name: 'Habillement & Textile' }, { id: 'exp-sub-10-12', name: 'Assurance divers' },
-        { id: 'exp-sub-10-13', name: 'Impots & obligation fiscales' }, { id: 'exp-sub-10-14', name: 'DIvers et imprévus' },
-    ] },
-    { id: 'exp-main-11', name: 'Loisirs et plaisirs', isFixed: true, subCategories: [
-        { id: 'exp-sub-11-1', name: 'Sorties et restaurants' }, { id: 'exp-sub-11-2', name: 'Abonnement digitaux' }, { id: 'exp-sub-11-3', name: 'Hobbies et passion' },
-        { id: 'exp-sub-11-4', name: 'Shopping' }, { id: 'exp-sub-11-5', name: 'Soins personnel' },
+    // 1. RÉMUNÉRATIONS & HONORAIRES
+    { id: 'exp-main-1', name: 'RÉMUNÉRATIONS & HONORAIRES', isFixed: true, subCategories: [
+        { id: 'exp-sub-1-1', name: 'Salaires, traitements et charges' },
+        { id: 'exp-sub-1-2', name: 'Honoraires (freelances, experts-comptables)' },
+        { id: 'exp-sub-1-3', name: 'Primes, bonus et participations' },
+        { id: 'exp-sub-1-4', name: 'Indemnités (déplacement, repas, km)' },
+        { id: 'exp-sub-1-5', name: 'Cotisations sociales personnelles' },
     ]},
-    { id: 'exp-main-12', name: 'Dons et cadeaux', isFixed: true, subCategories: [
-        { id: 'exp-sub-12-1', name: 'Cadeaux pour occasions' }, { id: 'exp-sub-12-2', name: 'Célébration' }, { id: 'exp-sub-12-3', name: 'Charité' },
+    // 2. HEBERGEMENT & LOGEMENT
+    { id: 'exp-main-2', name: 'HEBERGEMENT & LOGEMENT', isFixed: true, subCategories: [
+        { id: 'exp-sub-2-1', name: 'Loyer & Charges locatives' },
+        { id: 'exp-sub-2-2', name: 'Prêt immobilier (remboursement capital)' },
+        { id: 'exp-sub-2-3', name: 'Charges de copropriété' },
+        { id: 'exp-sub-2-4', name: 'Entretien, réparations et amélioration' },
+        { id: 'exp-sub-2-5', name: 'Énergie (Électricité, Gaz, Chauffage)' },
+        { id: 'exp-sub-2-6', name: 'Eau et assainissement' },
+        { id: 'exp-sub-2-7', name: 'Assurance habitation/locaux' },
+        { id: 'exp-sub-2-8', name: 'Taxe foncière' },
     ]},
-    { id: 'exp-main-13', name: 'Achat pour revente', isFixed: true, subCategories: [
-        { id: 'exp-sub-13-1', name: 'Matière premiere' }, { id: 'exp-sub-13-2', name: 'Marchandises' }, { id: 'exp-sub-13-3', name: 'Emballage' },
-        { id: 'exp-sub-13-4', name: 'Etude et prestation de service' }, { id: 'exp-sub-13-5', name: 'Equipement et travaux' },
+    // 3. TRANSPORT & VÉHICULES
+    { id: 'exp-main-3', name: 'TRANSPORT & VÉHICULES', isFixed: true, subCategories: [
+        { id: 'exp-sub-3-1', name: 'Carburant & Recharge' },
+        { id: 'exp-sub-3-2', name: 'Entretien, réparations et pièces' },
+        { id: 'exp-sub-3-3', name: 'Assurance auto/moto' },
+        { id: 'exp-sub-3-4', name: 'Péage, stationnement et amendes' },
+        { id: 'exp-sub-3-5', name: 'Transport en commun (abonnements)' },
+        { id: 'exp-sub-3-6', name: 'Taxi, VTC, location de véhicule' },
+        { id: 'exp-sub-3-7', name: 'Voyages longue distance (billets de train, d\'avion)' },
+    ]},
+    // 4. NOURRITURE & RESTAURATION
+    { id: 'exp-main-4', name: 'NOURRITURE & RESTAURATION', isFixed: true, subCategories: [
+        { id: 'exp-sub-4-1', name: 'Courses alimentaires (supermarché)' },
+        { id: 'exp-sub-4-2', name: 'Restaurant, café, bar' },
+        { id: 'exp-sub-4-3', name: 'Livraison de repas à domicile' },
+        { id: 'exp-sub-4-4', name: 'Repas en déplacement professionnel' },
+    ]},
+    // 5. COMMUNICATION, INTERNET & ABONNEMENTS
+    { id: 'exp-main-5', name: 'COMMUNICATION, INTERNET & ABONNEMENTS', isFixed: true, subCategories: [
+        { id: 'exp-sub-5-1', name: 'Téléphonie mobile et fixe' },
+        { id: 'exp-sub-5-2', name: 'Internet (Box) et Abonnements TV' },
+        { id: 'exp-sub-5-3', name: 'Logiciels et applications (SaaS)' },
+        { id: 'exp-sub-5-4', name: 'Hébergement web, nom de domaine' },
+        { id: 'exp-sub-5-5', name: 'Équipements tech (ordinateur, smartphone)' },
+    ]},
+    // 6. LOISIRS, CULTURE & SPORT
+    { id: 'exp-main-6', name: 'LOISIRS, CULTURE & SPORT', isFixed: true, subCategories: [
+        { id: 'exp-sub-6-1', name: 'Abonnements culturels (Streaming, presse, jeux vidéo)' },
+        { id: 'exp-sub-6-2', name: 'Sports (Club, équipement, licence)' },
+        { id: 'exp-sub-6-3', name: 'Sorties (Cinéma, concert, musée, événement)' },
+        { id: 'exp-sub-6-4', name: 'Hobbies et passions' },
+        { id: 'exp-sub-6-5', name: 'Vacances et week-ends' },
+        { id: 'exp-sub-6-6', name: 'Cotisations associatives' },
+    ]},
+    // 7. SANTÉ & BIEN-ÊTRE
+    { id: 'exp-main-7', name: 'SANTÉ & BIEN-ÊTRE', isFixed: true, subCategories: [
+        { id: 'exp-sub-7-1', name: 'Mutuelle santé' },
+        { id: 'exp-sub-7-2', name: 'Frais médicaux (consultations, pharmacie)' },
+        { id: 'exp-sub-7-3', name: 'Soins (dentiste, opticien, kiné)' },
+        { id: 'exp-sub-7-4', name: 'Bien-être (Coaching, yoga, cosmétiques)' },
+    ]},
+    // 8. PROJET IMMOBILIER & INVESTISSEMENTS
+    { id: 'exp-main-8', name: 'PROJET IMMOBILIER & INVESTISSEMENTS', isFixed: true, subCategories: [
+        { id: 'exp-sub-8-1', name: 'Apport personnel' },
+        { id: 'exp-sub-8-2', name: 'Frais de notaire' },
+        { id: 'exp-sub-8-3', name: 'Travaux d\'aménagement importants' },
+        { id: 'exp-sub-8-4', name: 'Achat de mobilier durable' },
+        { id: 'exp-sub-8-5', name: 'Investissements financiers (PEA, etc.)' },
+    ]},
+    // 9. ACTIVITÉ PROFESSIONNELLE & ENTREPRISE
+    { id: 'exp-main-9', name: 'ACTIVITÉ PROFESSIONNELLE & ENTREPRISE', isFixed: true, subCategories: [
+        { id: 'exp-sub-9-1', name: 'Marketing et publicité' },
+        { id: 'exp-sub-9-2', name: 'Achat de marchandises / matières premières' },
+        { id: 'exp-sub-9-3', name: 'Sous-traitance' },
+        { id: 'exp-sub-9-4', name: 'Frais de déplacement professionnel' },
+        { id: 'exp-sub-9-5', name: 'Cotisations et frais professionnels' },
+        { id: 'exp-sub-9-6', name: 'Assurance responsabilité civile pro (RC Pro)' },
+    ]},
+    // 10. FINANCES & ASSURANCES
+    { id: 'exp-main-10', name: 'FINANCES & ASSURANCES', isFixed: true, subCategories: [
+        { id: 'exp-sub-10-1', name: 'Intérêts d\'emprunts' },
+        { id: 'exp-sub-10-2', name: 'Frais bancaires' },
+        { id: 'exp-sub-10-3', name: 'Assurance emprunteur' },
+        { id: 'exp-sub-10-4', name: 'Autres assurances (RC Familiale, etc.)' },
+    ]},
+    // 11. IMPÔTS & CONTRIBUTIONS
+    { id: 'exp-main-11', name: 'IMPÔTS & CONTRIBUTIONS', isFixed: true, subCategories: [
+        { id: 'exp-sub-11-1', name: 'Impôt sur le revenu / sur les sociétés' },
+        { id: 'exp-sub-11-2', name: 'TVA collectée', isFixed: true },
+        { id: 'exp-sub-11-3', name: 'TVA déductible', isFixed: true },
+        { id: 'exp-sub-11-4', name: 'TVA à payer', isFixed: true },
+        { id: 'exp-sub-11-5', name: 'Taxe d\'habitation' },
+        { id: 'exp-sub-11-6', name: 'Cotisation Foncière des Entreprises (CFE)' },
+        { id: 'exp-sub-11-7', name: 'Dons et mécénat' },
+    ]},
+    // 12. FAMILLE & ENFANTS
+    { id: 'exp-main-12', name: 'FAMILLE & ENFANTS', isFixed: true, subCategories: [
+        { id: 'exp-sub-12-1', name: 'Frais de scolarité et garde' },
+        { id: 'exp-sub-12-2', name: 'Activités extrascolaires' },
+        { id: 'exp-sub-12-3', name: 'Vêtements et fournitures pour enfants' },
+    ]},
+    // 13. ÉPARGNE & DOSSIERS
+    { id: 'exp-main-13', name: 'ÉPARGNE & DOSSIERS', isFixed: true, subCategories: [
+        { id: 'exp-sub-13-1', name: 'Versement épargne (Livret A, etc.)' },
+        { id: 'exp-sub-13-2', name: 'Épargne retraite (PER)' },
+        { id: 'exp-sub-13-3', name: 'Frais divers et imprévus' },
     ]},
   ]
 };

@@ -6,62 +6,22 @@ import BudgetModal from './BudgetModal';
 import { formatCurrency } from '../utils/formatting';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
-import { resolveScenarioEntries } from '../utils/scenarioCalculations';
 import { getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
-import { useActiveProjectData, calculatePeriodPositions } from '../utils/selectors.jsx';
+import { useActiveProjectData, useCashflowChartData } from '../utils/selectors.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
-
-function renderBudgetLine(params, api) {
-  const flowType = api.value(2);
-  const xValue = api.value(0);
-  const yValue = api.value(1);
-
-  if (!yValue) {
-    return;
-  }
-
-  const point = api.coord([xValue, yValue]);
-  if (!point) return;
-
-  const totalBandWidth = api.size([1, 0])[0];
-  
-  const barWidth = (totalBandWidth / 2) * 0.8;
-  const halfBarWidth = barWidth / 2;
-  
-  const bandCenterOffset = totalBandWidth / 4;
-  
-  const horizontalOffset = flowType === 'outflow' ? bandCenterOffset : -bandCenterOffset;
-
-  const center_x = point[0] + horizontalOffset;
-
-  return {
-    type: 'line',
-    shape: {
-      x1: center_x - halfBarWidth,
-      y1: point[1],
-      x2: center_x + halfBarWidth,
-      y2: point[1]
-    },
-    style: api.style({
-      stroke: api.visual('color'),
-      lineWidth: 3
-    })
-  };
-}
 
 const CashflowView = ({ isFocusMode = false }) => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { scenarios, scenarioEntries, settings, categories } = dataState;
+  const { scenarios, scenarioEntries, settings } = dataState;
   const { activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect } = uiState;
 
-  const { budgetEntries, actualTransactions, cashAccounts, isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+  const { budgetEntries, actualTransactions, cashAccounts, isConsolidated } = useActiveProjectData(dataState, uiState);
   
   const [isScenarioBudgetModalOpen, setIsScenarioBudgetModalOpen] = useState(false);
   const [editingScenarioEntry, setEditingScenarioEntry] = useState(null);
   const [activeScenarioIdForModal, setActiveScenarioIdForModal] = useState(null);
   const [drawerData, setDrawerData] = useState({ isOpen: false, transactions: [], title: '' });
-  const [selectedScenarios, setSelectedScenarios] = useState({});
   const [isPeriodMenuOpen, setIsPeriodMenuOpen] = useState(false);
   const periodMenuRef = useRef(null);
 
@@ -168,28 +128,6 @@ const CashflowView = ({ isFocusMode = false }) => {
     return `${periodOffset > 0 ? '+' : ''}${periodOffset} ${label}${plural}`;
   }, [periodOffset, timeUnit, timeUnitLabels]);
 
-  const handleScenarioSelectionChange = (scenarioId) => {
-    setSelectedScenarios(prev => ({ ...prev, [scenarioId]: !prev[scenarioId] }));
-  };
-  
-  const projectScenarios = useMemo(() => {
-    if (isConsolidated) {
-      return scenarios.map(s => {
-        const project = dataState.projects.find(p => p.id === s.projectId);
-        return { ...s, name: `${s.name} (${project?.name || 'N/A'})` };
-      });
-    }
-    return scenarios.filter(s => s.projectId === activeProjectId && !s.isArchived);
-  }, [scenarios, activeProjectId, isConsolidated, dataState.projects]);
-
-  useEffect(() => {
-    const initialSelection = {};
-    projectScenarios.forEach(s => {
-      initialSelection[s.id] = selectedScenarios[s.id] === undefined ? true : selectedScenarios[s.id];
-    });
-    setSelectedScenarios(initialSelection);
-  }, [projectScenarios]);
-
   const periods = useMemo(() => {
     const today = getTodayInTimezone(settings.timezoneOffset);
     let baseDate;
@@ -269,42 +207,17 @@ const CashflowView = ({ isFocusMode = false }) => {
     });
   }, [timeUnit, horizonLength, periodOffset, activeQuickSelect, settings.timezoneOffset]);
 
-  const cashflowData = useMemo(() => {
-    const calculateCashflowData = (budgetEntriesForCalc, actualsForCalc) => {
-        const periodPositions = calculatePeriodPositions(periods, cashAccounts, actualsForCalc, {}, false, false, settings, budgetEntriesForCalc);
-        
-        const periodFlows = periods.map(period => {
-            const realizedInflow = actualsForCalc.filter(a => a.type === 'receivable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
-            const realizedOutflow = actualsForCalc.filter(a => a.type === 'payable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
-            return { inflow: realizedInflow, outflow: realizedOutflow };
-        });
-
-        return {
-            labels: periods.map(p => p.label),
-            periods,
-            inflows: periodFlows.map(f => ({ value: f.inflow, isFuture: false })), // Simplified for chart display
-            outflows: periodFlows.map(f => ({ value: f.outflow, isFuture: false })),
-            actualBalance: periodPositions.map(p => p.final),
-            projectedBalance: periodPositions.map(p => p.final),
-        };
-    };
-
-    const baseFlow = calculateCashflowData(budgetEntries, actualTransactions);
-    
-    return { base: baseFlow };
-  }, [periods, budgetEntries, actualTransactions, cashAccounts, settings]);
+  const chartData = useCashflowChartData(periods, budgetEntries, actualTransactions, cashAccounts, settings);
   
   const getChartOptions = () => {
-    const { base } = cashflowData;
-
-    if (!base || !base.labels || base.labels.length === 0) {
+    if (!chartData.labels || chartData.labels.length === 0) {
         return {
             title: { text: 'Aucune donnée à afficher', left: 'center', top: 'center' },
             series: []
         };
     }
 
-    const { labels, inflows, outflows, actualBalance, projectedBalance } = base;
+    const { labels, inflows, outflows, actualBalance, projectedBalance } = chartData;
 
     const labelFormatter = (params) => {
         if (params.value === null || params.value === undefined) return '';

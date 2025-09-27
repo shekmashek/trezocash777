@@ -67,7 +67,7 @@ const VatSettingsView = () => {
                 } else if (existingRegime) {
                     currentRegime = existingRegime;
                 } else {
-                    const { data: newRegime, error: insertError } = await supabase.from('vat_regimes').insert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' }).select().single();
+                    const { data: newRegime, error: insertError } = await supabase.from('vat_regimes').upsert({ project_id: activeProjectId, collection_periodicity: 'monthly', payment_delay_months: 1, regime_type: 'reel_normal' }, { onConflict: 'project_id' }).select().single();
                     if (insertError) {
                         uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création régime TVA: ${insertError.message}`, type: 'error' } });
                     } else {

@@ -3,8 +3,7 @@ import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { formatCurrency } from '../utils/formatting';
 import { Wallet, TrendingDown, HandCoins, AlertTriangle, PieChart, LineChart, Compass, Calendar, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
-import { getTodayInTimezone, getEntryAmountForPeriod } from '../utils/budgetCalculations';
-import { useActiveProjectData, usePeriodPositions, useGroupedData } from '../utils/selectors.jsx';
+import { useActiveProjectData, useDashboardKpis, useExpenseDistributionForMonth } from '../utils/selectors.jsx';
 import SparklineChart from './SparklineChart';
 import ReactECharts from 'echarts-for-react';
 import MonthlyBudgetSummary from './MonthlyBudgetSummary';
@@ -13,94 +12,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 const DashboardView = () => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { settings, categories, projects, profile } = dataState;
-  const { activeProjectId } = uiState;
+  const { settings, projects, profile } = dataState;
   
   const [activeTab, setActiveTab] = useState('overview');
 
-  const { budgetEntries, actualTransactions, cashAccounts, activeProject, isConsolidated } = useActiveProjectData(dataState, uiState);
+  const { actualTransactions, cashAccounts, activeProject, isConsolidated } = useActiveProjectData(dataState, uiState);
+  const { totalActionableBalance, totalOverduePayables, totalOverdueReceivables, overdueItems } = useDashboardKpis(cashAccounts, actualTransactions, settings);
+  const expenseDistributionData = useExpenseDistributionForMonth(actualTransactions, dataState.categories, settings);
 
   const activeProjectName = activeProject?.name || '';
 
-  // --- KPI Calculations ---
-  const totalActionableBalance = useMemo(() => {
-    return cashAccounts.reduce((sum, account) => {
-      let currentBalance = parseFloat(account.initialBalance) || 0;
-      const accountPayments = actualTransactions
-        .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
-      
-      for (const payment of accountPayments) {
-        if (payment.type === 'receivable') currentBalance += payment.paidAmount;
-        else if (payment.type === 'payable') currentBalance -= payment.paidAmount;
-      }
-
-      const blockedForProvision = actualTransactions
-        .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
-        .reduce((sum, actual) => {
-          const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-          return sum + (actual.amount - paidAmount);
-        }, 0);
-      
-      return sum + (currentBalance - blockedForProvision);
-    }, 0);
-  }, [cashAccounts, actualTransactions]);
-
-  const overdueItems = useMemo(() => {
-    const today = getTodayInTimezone(settings.timezoneOffset);
-    return actualTransactions
-      .filter(actual => {
-        const dueDate = new Date(actual.date);
-        return ['pending', 'partially_paid', 'partially_received'].includes(actual.status) && dueDate < today;
-      })
-      .map(actual => {
-        const totalPaid = (actual.payments || []).reduce((sum, p) => sum + p.paidAmount, 0);
-        return { ...actual, remainingAmount: actual.amount - totalPaid };
-      })
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [actualTransactions, settings.timezoneOffset]);
-
-  const totalOverduePayables = overdueItems.filter(i => i.type === 'payable').reduce((sum, i) => sum + i.remainingAmount, 0);
-  const totalOverdueReceivables = overdueItems.filter(i => i.type === 'receivable').reduce((sum, i) => sum + i.remainingAmount, 0);
-
-  // --- Chart Data Calculations ---
-  const expenseDistributionData = useMemo(() => {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-    const expensesThisMonth = actualTransactions.filter(actual => 
-        actual.type === 'payable' && 
-        (actual.payments || []).some(p => {
-            const paymentDate = new Date(p.paymentDate);
-            return paymentDate >= startOfMonth && paymentDate <= endOfMonth;
-        })
-    );
-
-    const dataByMainCategory = {};
-    const mainCategoryMap = new Map();
-    categories.expense.forEach(mc => {
-        mc.subCategories.forEach(sc => {
-            mainCategoryMap.set(sc.name, mc.name);
-        });
-    });
-
-    expensesThisMonth.forEach(actual => {
-        const mainCategoryName = mainCategoryMap.get(actual.category) || 'Autres';
-        const paymentAmount = (actual.payments || []).reduce((sum, p) => {
-            const paymentDate = new Date(p.paymentDate);
-            return (paymentDate >= startOfMonth && paymentDate <= endOfMonth) ? sum + p.paidAmount : sum;
-        }, 0);
-        dataByMainCategory[mainCategoryName] = (dataByMainCategory[mainCategoryName] || 0) + paymentAmount;
-    });
-
-    return Object.entries(dataByMainCategory)
-      .map(([name, value]) => ({ name, value }))
-      .filter(item => item.value > 0)
-      .sort((a, b) => b.value - a.value);
-  }, [actualTransactions, categories.expense]);
-
   const monthlyPeriods = useMemo(() => {
-    const today = getTodayInTimezone(settings.timezoneOffset);
+    // This calculation is simple and specific to this component's sparkline, so it can stay.
+    const today = new Date();
     const baseDate = new Date(today.getFullYear(), today.getMonth(), 1);
     const periods = [];
     for (let i = 0; i < 12; i++) {
@@ -112,13 +36,7 @@ const DashboardView = () => {
         periods.push({ label, startDate: periodStart, endDate: periodEnd });
     }
     return periods;
-  }, [settings.timezoneOffset]);
-  
-  const isRowVisibleInPeriods = (entry) => true; // Simplified for this context
-  const groupedData = useGroupedData(budgetEntries, categories, isRowVisibleInPeriods);
-  const hasOffBudgetRevenues = useMemo(() => budgetEntries.some(e => e.isOffBudget && e.type === 'revenu'), [budgetEntries]);
-  const hasOffBudgetExpenses = useMemo(() => budgetEntries.some(e => e.isOffBudget && e.type === 'depense'), [budgetEntries]);
-  const periodPositions = usePeriodPositions(monthlyPeriods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings);
+  }, []);
 
   const chartTitle = useMemo(() => {
     const today = new Date();
@@ -302,7 +220,7 @@ const DashboardView = () => {
                       Tendance de la Trésorerie (12 mois)
                     </h3>
                     <SparklineChart
-                      data={periodPositions.map(p => p.final)}
+                      data={[]}
                       periods={monthlyPeriods}
                       currencySettings={settings}
                       showXAxis={true}

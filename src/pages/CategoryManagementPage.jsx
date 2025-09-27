@@ -7,7 +7,7 @@ import { saveMainCategory } from '../context/actions';
 
 const CategoryManagementPage = () => {
   const { dataState, dataDispatch } = useData();
-  const { uiState, uiDispatch } = useUI();
+  const { uiDispatch } = useUI();
   const { categories, allEntries, allActuals, projects, session } = dataState;
 
   const [editingSubCategory, setEditingSubCategory] = useState(null);
@@ -85,6 +85,11 @@ const CategoryManagementPage = () => {
     const subCat = mainCat?.subCategories.find(sc => sc.id === subId);
     if (!subCat) return;
 
+    if (subCat.isFixed) {
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: "Impossible de supprimer une sous-catégorie fixe.", type: 'error' } });
+        return;
+    }
+
     if (isSubCategoryUsedAnywhere(subCat.name)) {
       uiDispatch({ type: 'ADD_TOAST', payload: { message: `Suppression impossible: la catégorie "${subCat.name}" est utilisée.`, type: 'error' } });
       return;
@@ -158,24 +163,24 @@ const CategoryManagementPage = () => {
   };
 
   const renderCategorySection = (type, title) => (
-    <div className="mb-8">
+    <div>
       <h2 className="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {categories[type].map(mainCat => (
-          <div key={mainCat.id} className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="flex justify-between items-center group mb-3 pb-3 border-b">
+          <div key={mainCat.id} className="bg-white p-3 rounded-lg shadow-sm border">
+            <div className="flex justify-between items-center group mb-2 pb-2 border-b">
               {editingMainCategory?.id === mainCat.id ? (
                 <input 
                   type="text" 
                   value={editingMainCategory.name} 
                   onChange={(e) => setEditingMainCategory(prev => ({ ...prev, name: e.target.value }))} 
-                  className="font-bold text-lg text-gray-700 px-2 py-1 border rounded-md w-full" 
+                  className="font-semibold text-base text-gray-700 px-2 py-1 border rounded-md w-full" 
                   autoFocus 
                 />
               ) : (
-                <h3 className="font-bold text-lg text-gray-700">{mainCat.name}</h3>
+                <h3 className="font-semibold text-base text-gray-700">{mainCat.name}</h3>
               )}
-              <div className="flex items-center gap-2 pl-4">
+              <div className="flex items-center gap-1 pl-2">
                 {editingMainCategory?.id === mainCat.id ? (
                   <>
                     <button onClick={handleSaveEditMain} className="p-1 text-green-600 hover:text-green-800"><Save className="w-4 h-4" /></button>
@@ -191,60 +196,65 @@ const CategoryManagementPage = () => {
                 )}
               </div>
             </div>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-2 space-y-1">
               {mainCat.subCategories.map(subCat => {
                 const usedInProjects = getProjectsUsingSubCategory(subCat.name);
                 const isUsed = usedInProjects.length > 0;
                 const isUsedAnywhereCheck = isSubCategoryUsedAnywhere(subCat.name);
                 return (
-                  <li key={subCat.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
-                    <div className="flex items-center gap-4">
+                  <li key={subCat.id} className="group flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-gray-50">
+                    <div className="flex items-center gap-3">
                       {editingSubCategory?.subId === subCat.id ? (
-                        <input type="text" value={editingSubCategory.name} onChange={(e) => setEditingSubCategory(prev => ({ ...prev, name: e.target.value }))} className="px-2 py-1 border rounded-md" autoFocus/>
+                        <input type="text" value={editingSubCategory.name} onChange={(e) => setEditingSubCategory(prev => ({ ...prev, name: e.target.value }))} className="px-2 py-1 border rounded-md text-sm" autoFocus/>
                       ) : (
-                        <span className="text-gray-600">{subCat.name}</span>
+                        <span className="text-gray-600 text-sm">{subCat.name}</span>
                       )}
                       {isUsed && (
-                        <div className="flex items-center gap-2">
-                            {usedInProjects.map(projectName => (
-                                <span key={projectName} className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full border">
+                        <div className="flex items-center gap-1">
+                            {usedInProjects.slice(0, 2).map(projectName => (
+                                <span key={projectName} className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full border">
                                     <Folder className="w-3 h-3" />
                                     {projectName}
                                 </span>
                             ))}
+                            {usedInProjects.length > 2 && (
+                                <span className="text-xs text-gray-500">+ {usedInProjects.length - 2}</span>
+                            )}
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {editingSubCategory?.subId === subCat.id ? (
                         <>
                           <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:text-green-800"><Save className="w-4 h-4" /></button>
                           <button onClick={handleCancelEdit} className="p-1 text-gray-500 hover:text-gray-700"><X className="w-4 h-4" /></button>
                         </>
                       ) : (
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleStartEdit(type, mainCat.id, subCat.id, subCat.name)} className="p-1 text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => handleDeleteSubCategory(type, mainCat.id, subCat.id)} className="p-1 text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed" title={isUsedAnywhereCheck ? "Suppression impossible: catégorie utilisée" : "Supprimer"} disabled={isUsedAnywhereCheck}><Trash2 className="w-4 h-4" /></button>
-                        </div>
+                        !subCat.isFixed && (
+                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleStartEdit(type, mainCat.id, subCat.id, subCat.name)} className="p-1 text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
+                            <button onClick={() => handleDeleteSubCategory(type, mainCat.id, subCat.id)} className="p-1 text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed" title={isUsedAnywhereCheck ? "Suppression impossible: catégorie utilisée" : "Supprimer"} disabled={isUsedAnywhereCheck}><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        )
                       )}
                     </div>
                   </li>
                 );
               })}
             </ul>
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-3 pt-3 border-t">
               <div className="flex gap-2">
-                <input type="text" value={newSubCategory[mainCat.id] || ''} onChange={(e) => setNewSubCategory(prev => ({ ...prev, [mainCat.id]: e.target.value }))} placeholder="Nouvelle sous-catégorie" className="flex-grow px-3 py-2 border rounded-lg text-sm" onKeyPress={(e) => e.key === 'Enter' && handleAddSubCategory(type, mainCat.id)} />
-                <button onClick={() => handleAddSubCategory(type, mainCat.id)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"><Plus className="w-4 h-4" /> Ajouter</button>
+                <input type="text" value={newSubCategory[mainCat.id] || ''} onChange={(e) => setNewSubCategory(prev => ({ ...prev, [mainCat.id]: e.target.value }))} placeholder="Nouvelle sous-catégorie" className="flex-grow px-2 py-1.5 border rounded-md text-sm" onKeyPress={(e) => e.key === 'Enter' && handleAddSubCategory(type, mainCat.id)} />
+                <button onClick={() => handleAddSubCategory(type, mainCat.id)} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md font-medium flex items-center justify-center gap-1 text-sm"><Plus className="w-4 h-4" /> Ajouter</button>
               </div>
             </div>
           </div>
         ))}
-        <div className="mt-6 pt-6 border-t border-dashed">
+        <div className="mt-4 pt-4 border-t border-dashed">
             <h3 className="font-semibold text-gray-700 mb-2">Ajouter une catégorie principale</h3>
             <div className="flex gap-2">
-                <input type="text" value={newMainCategoryName[type]} onChange={(e) => setNewMainCategoryName(prev => ({...prev, [type]: e.target.value}))} placeholder={`Nouvelle catégorie de ${title.toLowerCase()}`} className="flex-grow px-3 py-2 border rounded-lg text-sm" onKeyPress={(e) => e.key === 'Enter' && handleAddMainCategory(type)} />
-                <button onClick={() => handleAddMainCategory(type)} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"><Plus className="w-4 h-4" /> Ajouter</button>
+                <input type="text" value={newMainCategoryName[type]} onChange={(e) => setNewMainCategoryName(prev => ({...prev, [type]: e.target.value}))} placeholder={`Nouvelle catégorie de ${title.toLowerCase()}`} className="flex-grow px-2 py-1.5 border rounded-md text-sm" onKeyPress={(e) => e.key === 'Enter' && handleAddMainCategory(type)} />
+                <button onClick={() => handleAddMainCategory(type)} className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md font-medium flex items-center justify-center gap-1 text-sm"><Plus className="w-4 h-4" /> Ajouter</button>
             </div>
         </div>
       </div>
@@ -252,7 +262,7 @@ const CategoryManagementPage = () => {
   );
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto p-6 max-w-7xl">
         <div className="mb-8 flex justify-between items-center flex-wrap gap-4">
             <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -275,8 +285,10 @@ const CategoryManagementPage = () => {
                 </select>
             </div>
         </div>
-        {renderCategorySection('expense', 'Catégories de Dépenses')}
-        {renderCategorySection('revenue', 'Catégories de Revenus')}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {renderCategorySection('expense', 'Catégories de Dépenses')}
+            {renderCategorySection('revenue', 'Catégories de Revenus')}
+        </div>
     </div>
   );
 };

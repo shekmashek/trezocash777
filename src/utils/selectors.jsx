@@ -76,7 +76,7 @@ export const useGroupedData = (processedEntries, categories, isRowVisibleInPerio
     }, [processedEntries, categories, isRowVisibleInPeriods]);
 };
 
-export const calculatePeriodPositions = (periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries) => {
+export function calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries) {
     if (periods.length === 0) return [];
     
     const today = getTodayInTimezone(settings.timezoneOffset);
@@ -164,11 +164,109 @@ export const calculatePeriodPositions = (periods, cashAccounts, actualTransactio
         }
     }
     return positions;
-};
+}
 
 export const usePeriodPositions = (periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries) => {
     return useMemo(() => 
         calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries), 
         [periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries]
     );
+};
+
+export const useDashboardKpis = (cashAccounts, actualTransactions, settings) => {
+    return useMemo(() => {
+        const totalActionableBalance = cashAccounts.reduce((sum, account) => {
+            let currentBalance = parseFloat(account.initialBalance) || 0;
+            const accountPayments = actualTransactions
+                .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
+            
+            for (const payment of accountPayments) {
+                if (payment.type === 'receivable') currentBalance += payment.paidAmount;
+                else if (payment.type === 'payable') currentBalance -= payment.paidAmount;
+            }
+            const blockedForProvision = actualTransactions
+                .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
+                .reduce((sum, actual) => {
+                    const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
+                    return sum + (actual.amount - paidAmount);
+                }, 0);
+            return sum + (currentBalance - blockedForProvision);
+        }, 0);
+
+        const today = getTodayInTimezone(settings.timezoneOffset);
+        const overdueItems = actualTransactions
+            .filter(actual => {
+                const dueDate = new Date(actual.date);
+                return ['pending', 'partially_paid', 'partially_received'].includes(actual.status) && dueDate < today;
+            })
+            .map(actual => {
+                const totalPaid = (actual.payments || []).reduce((sum, p) => sum + p.paidAmount, 0);
+                return { ...actual, remainingAmount: actual.amount - totalPaid };
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        const totalOverduePayables = overdueItems.filter(i => i.type === 'payable').reduce((sum, i) => sum + i.remainingAmount, 0);
+        const totalOverdueReceivables = overdueItems.filter(i => i.type === 'receivable').reduce((sum, i) => sum + i.remainingAmount, 0);
+
+        return { totalActionableBalance, totalOverduePayables, totalOverdueReceivables, overdueItems };
+    }, [cashAccounts, actualTransactions, settings]);
+};
+
+export const useExpenseDistributionForMonth = (actualTransactions, categories, settings) => {
+    return useMemo(() => {
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        const expensesThisMonth = actualTransactions.filter(actual => 
+            actual.type === 'payable' && 
+            (actual.payments || []).some(p => {
+                const paymentDate = new Date(p.paymentDate);
+                return paymentDate >= startOfMonth && paymentDate <= endOfMonth;
+            })
+        );
+
+        const dataByMainCategory = {};
+        const mainCategoryMap = new Map();
+        categories.expense.forEach(mc => {
+            mc.subCategories.forEach(sc => {
+                mainCategoryMap.set(sc.name, mc.name);
+            });
+        });
+
+        expensesThisMonth.forEach(actual => {
+            const mainCategoryName = mainCategoryMap.get(actual.category) || 'Autres';
+            const paymentAmount = (actual.payments || []).reduce((sum, p) => {
+                const paymentDate = new Date(p.paymentDate);
+                return (paymentDate >= startOfMonth && paymentDate <= endOfMonth) ? sum + p.paidAmount : sum;
+            }, 0);
+            dataByMainCategory[mainCategoryName] = (dataByMainCategory[mainCategoryName] || 0) + paymentAmount;
+        });
+
+        return Object.entries(dataByMainCategory)
+          .map(([name, value]) => ({ name, value }))
+          .filter(item => item.value > 0)
+          .sort((a, b) => b.value - a.value);
+    }, [actualTransactions, categories.expense]);
+};
+
+export const useCashflowChartData = (periods, budgetEntries, actualTransactions, cashAccounts, settings) => {
+    return useMemo(() => {
+        const periodPositions = calculatePeriodPositions(periods, cashAccounts, actualTransactions, {}, false, false, settings, budgetEntries);
+        
+        const periodFlows = periods.map(period => {
+            const realizedInflow = actualTransactions.filter(a => a.type === 'receivable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
+            const realizedOutflow = actualTransactions.filter(a => a.type === 'payable').reduce((sum, a) => sum + (a.payments || []).filter(p => new Date(p.paymentDate) >= period.startDate && new Date(p.paymentDate) < period.endDate).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
+            return { inflow: realizedInflow, outflow: realizedOutflow };
+        });
+
+        return {
+            labels: periods.map(p => p.label),
+            periods,
+            inflows: periodFlows.map(f => ({ value: f.inflow, isFuture: false })),
+            outflows: periodFlows.map(f => ({ value: f.outflow, isFuture: false })),
+            actualBalance: periodPositions.map(p => p.final),
+            projectedBalance: periodPositions.map(p => p.final),
+        };
+    }, [periods, budgetEntries, actualTransactions, cashAccounts, settings]);
 };
