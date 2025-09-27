@@ -146,6 +146,8 @@ const initialCategories = {
         { id: 'exp-sub-9-4', name: 'Frais de déplacement professionnel' },
         { id: 'exp-sub-9-5', name: 'Cotisations et frais professionnels' },
         { id: 'exp-sub-9-6', name: 'Assurance responsabilité civile pro (RC Pro)' },
+        { id: 'exp-sub-9-7', name: 'Fournitures de bureau' },
+        { id: 'exp-sub-9-8', name: 'Petit équipement' },
     ]},
     // 10. FINANCES & ASSURANCES
     { id: 'exp-main-10', name: 'FINANCES & ASSURANCES', isFixed: true, subCategories: [
@@ -175,6 +177,14 @@ const initialCategories = {
         { id: 'exp-sub-13-1', name: 'Versement épargne (Livret A, etc.)' },
         { id: 'exp-sub-13-2', name: 'Épargne retraite (PER)' },
         { id: 'exp-sub-13-3', name: 'Frais divers et imprévus' },
+    ]},
+    // 14. AMEUBLEMENT, ÉQUIPEMENT & DÉCORATION
+    { id: 'exp-main-14', name: 'AMEUBLEMENT, ÉQUIPEMENT & DÉCORATION', isFixed: true, subCategories: [
+        { id: 'exp-sub-14-1', name: 'Mobilier & Agencement' },
+        { id: 'exp-sub-14-2', name: 'Électroménager' },
+        { id: 'exp-sub-14-3', name: 'Décoration & Ambiance' },
+        { id: 'exp-sub-14-4', name: 'Matériel et outillage' },
+        { id: 'exp-sub-14-5', name: 'Location de mobilier/équipement' },
     ]},
   ]
 };
