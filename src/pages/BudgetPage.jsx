@@ -3,7 +3,12 @@ import { ListChecks, Edit, List } from 'lucide-react';
 import BudgetStateView from '../components/BudgetStateView';
 
 const BudgetPage = () => {
-    const [mode, setMode] = useState('lecture');
+    const [mode, setModeState] = useState(() => sessionStorage.getItem('budgetPageMode') || 'lecture');
+
+    const setMode = (newMode) => {
+        sessionStorage.setItem('budgetPageMode', newMode);
+        setModeState(newMode);
+    };
 
     return (
         <div className="container mx-auto p-6 max-w-full">

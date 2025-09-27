@@ -24,9 +24,6 @@ const SparklineChart = ({ data, periods, currencySettings, showXAxis = false, xA
     yAxisMax += buffer;
   }
   
-  const positiveData = cleanData.map(d => d !== null && d >= 0 ? d : null);
-  const negativeData = cleanData.map(d => d !== null && d < 0 ? d : null);
-
   const option = {
     grid: { left: 5, right: 5, top: 10, bottom: showXAxis ? 25 : 5 },
     xAxis: {
@@ -66,7 +63,7 @@ const SparklineChart = ({ data, periods, currencySettings, showXAxis = false, xA
             finalLabel = periodLabel.replace(/'(\d{2})/, ` ${fullYear}`);
         }
 
-        return `<strong>${finalLabel}</strong><br/>Solde: <strong>${formatCurrency(value, currencySettings)}</strong>`;
+        return `<strong>${finalLabel}</strong><br/>Solde Prévisionnel: <strong>${formatCurrency(value, currencySettings)}</strong>`;
       },
       backgroundColor: 'rgba(255, 255, 255, 0.9)',
       borderColor: '#e5e7eb',
@@ -76,24 +73,14 @@ const SparklineChart = ({ data, periods, currencySettings, showXAxis = false, xA
     },
     series: [
       {
-        name: 'Solde',
-        data: positiveData,
+        name: 'Solde Prévisionnel',
+        data: cleanData,
         type: 'line',
         connectNulls: true,
         smooth: true,
         symbol: 'none',
         lineStyle: { width: 2, color: '#3b82f6' },
         areaStyle: { color: '#3b82f6', opacity: 0.3 }
-      },
-      {
-        name: 'Solde',
-        data: negativeData,
-        type: 'line',
-        connectNulls: true,
-        smooth: true,
-        symbol: 'none',
-        lineStyle: { width: 2, color: '#ef4444' },
-        areaStyle: { color: '#ef4444', opacity: 0.3 }
       }
     ]
   };

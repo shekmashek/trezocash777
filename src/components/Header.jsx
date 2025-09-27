@@ -245,6 +245,25 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     };
   }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, isCustomConsolidated, consolidatedViews, categories, accountBalances]);
 
+  const projectedCashflowData = useMemo(() => {
+    if (!periods || periods.length === 0 || !periodPositions || periodPositions.length === 0) {
+      return [];
+    }
+    const today = getTodayInTimezone(settings.timezoneOffset);
+    let todayIndex = periods.findIndex(p => today >= p.startDate && today < p.endDate);
+
+    if (todayIndex === -1) {
+      if (periods.length > 0 && today < periods[0].startDate) {
+        todayIndex = -1; 
+      } else if (periods.length > 0 && today >= periods[periods.length - 1].endDate) {
+        return []; 
+      }
+    }
+    
+    return periodPositions.map((p, i) => (i >= todayIndex ? p.final : null));
+
+  }, [periods, periodPositions, settings.timezoneOffset]);
+
   const activeProjectName = useMemo(() => {
     if (isConsolidated) {
         return 'Consolidé';
@@ -504,13 +523,13 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     </div>
                     <div className="pt-2">
                         <hr className="my-2 border-gray-200" />
-                        <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <h3 className={`text-sm font-bold text-gray-800 mb-2 flex items-center gap-2 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
                             <LineChart className="w-4 h-4 text-blue-600" />
-                            Tendance de la Trésorerie
+                            {!isCollapsed && 'Tendance de la Trésorerie'}
                         </h3>
                         <div className="-mx-2">
                             <SparklineChart
-                            data={periodPositions.map(p => p.final)}
+                            data={projectedCashflowData}
                             periods={periods}
                             currencySettings={settings}
                             />

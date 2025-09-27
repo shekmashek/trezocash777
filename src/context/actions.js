@@ -1077,6 +1077,7 @@ export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, main
                 name: subCategoryName,
                 type: type,
                 is_fixed: false,
+                criticality: 'essential',
             })
             .select()
             .single();
@@ -1085,6 +1086,7 @@ export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, main
         const newSubCategory = {
             id: data.id,
             name: data.name,
+            criticality: data.criticality,
         };
 
         dataDispatch({ type: 'ADD_SUB_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newSubCategory } });
@@ -1171,6 +1173,24 @@ export const updateTierPaymentTerms = async ({ dataDispatch, uiDispatch }, { tie
         uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Conditions de paiement mises à jour.', type: 'success' } });
     } catch (error) {
         console.error("Error updating payment terms:", error);
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const updateSubCategoryCriticality = async ({ dataDispatch, uiDispatch }, { subCategoryId, newCriticality }) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_categories')
+            .update({ criticality: newCriticality })
+            .eq('id', subCategoryId)
+            .select()
+            .single();
+        if (error) throw error;
+        
+        dataDispatch({ type: 'UPDATE_SUB_CATEGORY_CRITICALITY_SUCCESS', payload: { subCategoryId, criticality: data.criticality } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Niveau de criticité mis à jour.', type: 'success' } });
+    } catch (error) {
+        console.error("Error updating sub-category criticality:", error);
         uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

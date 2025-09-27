@@ -1,9 +1,59 @@
-import React, { useState } from 'react';
-import { Edit, Trash2, Plus, Save, X, FolderKanban, Folder, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Edit, Trash2, Plus, Save, X, FolderKanban, Folder, Filter, ChevronDown } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import EmptyState from '../components/EmptyState';
-import { saveMainCategory } from '../context/actions';
+import { saveMainCategory, updateSubCategoryCriticality } from '../context/actions';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const criticalityConfig = {
+    critical: { label: 'Critique', color: 'bg-red-500', icon: '🟥' },
+    essential: { label: 'Essentiel', color: 'bg-yellow-500', icon: '🟨' },
+    discretionary: { label: 'Discrétionnaire', color: 'bg-blue-500', icon: '🟦' },
+};
+
+const CriticalityPicker = ({ subCat, type, mainId, onUpdate }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const currentCriticality = criticalityConfig[subCat.criticality] || criticalityConfig.essential;
+
+    const handleSelect = (level) => {
+        onUpdate(type, mainId, subCat.id, level);
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(p => !p)}
+                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full text-white font-semibold ${currentCriticality.color}`}
+            >
+                <span>{currentCriticality.label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                        className="absolute right-0 top-full mt-1 w-40 bg-white rounded-md shadow-lg border z-10 p-1"
+                    >
+                        {Object.entries(criticalityConfig).map(([key, config]) => (
+                            <button
+                                key={key}
+                                onClick={() => handleSelect(key)}
+                                className="w-full text-left flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-gray-100"
+                            >
+                                <span>{config.icon}</span>
+                                <span>{config.label}</span>
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 const CategoryManagementPage = () => {
   const { dataState, dataDispatch } = useData();
@@ -162,6 +212,10 @@ const CategoryManagementPage = () => {
     });
   };
 
+  const handleCriticalityChange = (type, mainId, subId, newCriticality) => {
+    updateSubCategoryCriticality({dataDispatch, uiDispatch}, { subCategoryId: subId, newCriticality });
+  };
+
   const renderCategorySection = (type, title) => (
     <div>
       <h2 className="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
@@ -223,7 +277,8 @@ const CategoryManagementPage = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                       {type === 'expense' && !subCat.isFixed && <CriticalityPicker subCat={subCat} type={type} mainId={mainCat.id} onUpdate={handleCriticalityChange} />}
                       {editingSubCategory?.subId === subCat.id ? (
                         <>
                           <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:text-green-800"><Save className="w-4 h-4" /></button>

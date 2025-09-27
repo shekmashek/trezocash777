@@ -9,6 +9,12 @@ import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const criticalityConfig = {
+    critical: { label: 'Critique', color: 'bg-red-500' },
+    essential: { label: 'Essentiel', color: 'bg-yellow-500' },
+    discretionary: { label: 'Discrétionnaire', color: 'bg-blue-500' },
+};
+
 const LectureView = ({ entries, periods, settings, actuals, isConsolidated, projects, visibleColumns, CommentButton }) => {
     const sortedEntries = useMemo(() => {
         return [...entries].sort((a, b) => {
@@ -385,6 +391,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
   }, [budgetEntries, searchTerm, isConsolidated, isCustomConsolidated, projectSearchTerm, projects]);
   
   const isRowVisibleInPeriods = useCallback((entry) => {
+    if (!periods || periods.length === 0) return false;
     for (const period of periods) { 
       if (getEntryAmountForPeriod(entry, period.startDate, period.endDate) > 0 || getActualAmountForPeriod(entry, actualTransactions, period.startDate, period.endDate) > 0) return true; 
     } 
@@ -541,7 +548,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
     const Icon = type === 'entree' ? TrendingUp : TrendingDown;
     const colorClass = type === 'entree' ? 'text-success-600' : 'text-danger-600';
 
-    const hasData = mainCategories.length > 0 || (type === 'entree' ? hasOffBudgetRevenues : hasOffBudgetExpenses);
+    const hasData = mainCategories.length > 0;
     if (!hasData) {
       return null;
     }
@@ -593,10 +600,7 @@ const BudgetTracker = ({ mode = 'edition' }) => {
 
         {/* Rows for each Main Category and Entry */}
         {!isCollapsed && mainCategories.map(mainCategory => {
-          const hasDataInView = periods.some(period => {
-            const totals = calculateMainCategoryTotals(mainCategory.entries, period, actualTransactions);
-            return totals.budget !== 0 || totals.actual !== 0;
-          });
+          const hasDataInView = mainCategory.entries.some(isRowVisibleInPeriods);
           if (!hasDataInView) return null;
 
           const isMainCollapsed = collapsedItems[mainCategory.id];
@@ -644,9 +648,17 @@ const BudgetTracker = ({ mode = 'edition' }) => {
               </tr>
               {!isMainCollapsed && mainCategory.entries.filter(isRowVisibleInPeriods).map((entry) => {
                 const project = (isConsolidated || isCustomConsolidated) ? projects.find(p => p.id === entry.projectId) : null;
+                const subCat = mainCategory.subCategories.find(sc => sc.name === entry.category);
+                const criticality = subCat?.criticality;
+                const critConfig = criticalityConfig[criticality];
                 return (
                   <tr key={entry.id} className={`border-b border-gray-100 hover:bg-gray-50 group ${entry.is_vat_child ? 'bg-gray-50/50' : (entry.is_vat_payment ? 'bg-blue-50/50' : '')}`}>
-                    <td className={`px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10 ${entry.is_vat_child ? 'pl-8' : ''}`}>{entry.category}</td>
+                    <td className={`px-4 py-1 font-normal text-gray-800 sticky left-0 bg-white group-hover:bg-gray-50 z-10 ${entry.is_vat_child ? 'pl-8' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        {critConfig && <span className={`w-2 h-2 rounded-full ${critConfig.color}`} title={`Criticité: ${critConfig.label}`}></span>}
+                        <span>{entry.category}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-1 text-gray-700 sticky bg-white group-hover:bg-gray-50 z-10" style={{ left: `${supplierColLeft}px` }}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 truncate" title={getFrequencyTitle(entry)}>
