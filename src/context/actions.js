@@ -1067,13 +1067,58 @@ export const saveMainCategory = async ({ dataDispatch, uiDispatch }, { type, nam
     }
 };
 
-export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId, subCategoryName, user }) => {
+const isUUID = (str) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+}
+
+export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId, subCategoryName, user, categories }) => {
     try {
+        let finalMainCategoryId = mainCategoryId;
+        let oldMainCatIdForDispatch = null;
+
+        if (!isUUID(mainCategoryId)) {
+            oldMainCatIdForDispatch = mainCategoryId;
+            const mainCatDetails = categories[type]?.find(mc => mc.id === mainCategoryId);
+            if (!mainCatDetails) throw new Error("Catégorie principale par défaut non trouvée.");
+
+            let { data: existingMainCat, error: findError } = await supabase
+                .from('user_categories')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('name', mainCatDetails.name)
+                .eq('type', type)
+                .is('parent_id', null)
+                .single();
+            
+            if (findError && findError.code !== 'PGRST116') {
+                throw findError;
+            }
+
+            if (existingMainCat) {
+                finalMainCategoryId = existingMainCat.id;
+            } else {
+                const { data: newMainCatDB, error: createError } = await supabase
+                    .from('user_categories')
+                    .insert({
+                        user_id: user.id,
+                        type: type,
+                        name: mainCatDetails.name,
+                        is_fixed: mainCatDetails.isFixed,
+                    })
+                    .select('id')
+                    .single();
+                
+                if (createError) throw createError;
+                finalMainCategoryId = newMainCatDB.id;
+            }
+        }
+
         const { data, error } = await supabase
             .from('user_categories')
             .insert({
                 user_id: user.id,
-                parent_id: mainCategoryId,
+                parent_id: finalMainCategoryId,
                 name: subCategoryName,
                 type: type,
                 is_fixed: false,
@@ -1087,17 +1132,27 @@ export const saveSubCategory = async ({ dataDispatch, uiDispatch }, { type, main
             id: data.id,
             name: data.name,
             criticality: data.criticality,
+            isFixed: data.is_fixed,
         };
 
-        dataDispatch({ type: 'ADD_SUB_CATEGORY_SUCCESS', payload: { type, mainCategoryId, newSubCategory } });
+        dataDispatch({ 
+            type: 'ADD_SUB_CATEGORY_SUCCESS', 
+            payload: { 
+                type, 
+                mainCategoryId: finalMainCategoryId, 
+                newSubCategory,
+                oldMainCategoryId: oldMainCatIdForDispatch 
+            } 
+        });
         uiDispatch({ type: 'ADD_TOAST', payload: { message: 'Sous-catégorie ajoutée.', type: 'success' } });
         return newSubCategory;
     } catch (error) {
         console.error("Error saving sub category:", error);
-        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+        uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de l'enregistrement: ${error.message}`, type: 'error' } });
         return null;
     }
 };
+
 
 export const updateMainCategory = async ({ dataDispatch, uiDispatch }, { type, mainCategoryId, newName }) => {
     try {

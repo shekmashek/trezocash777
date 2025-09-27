@@ -39,11 +39,8 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
                 { project_id: activeProjectId, name: 'Taux super-réduit', rate: 2.1, is_default: false },
                 { project_id: activeProjectId, name: 'Taux zéro', rate: 0, is_default: false },
             ];
-            const { data: newRates, error: insertError } = await supabase
-                .from('vat_rates')
-                .insert(defaultRatesPayload)
-                .select();
-
+            const { data: newRates, error: insertError } = await supabase.from('vat_rates').upsert(defaultRatesPayload, { onConflict: 'project_id, name' }).select();
+            
             if (insertError) {
                 uiDispatch({ type: 'ADD_TOAST', payload: { message: `Erreur création taux TVA par défaut: ${insertError.message}`, type: 'error' } });
             } else if (newRates) {
@@ -296,7 +293,8 @@ const BudgetModal = ({ isOpen, onClose, onSave, onDelete, editingData }) => {
         type: typeForDB,
         mainCategoryId: selectedMainCategoryId,
         subCategoryName: subCategoryName,
-        user: user
+        user: user,
+        categories: categories
     });
 
     if (newSubCategory) {

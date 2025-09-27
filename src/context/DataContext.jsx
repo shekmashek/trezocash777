@@ -346,6 +346,24 @@ const dataReducer = (state, action) => {
             }
             return { ...state, categories: newCategories };
         }
+        case 'ADD_SUB_CATEGORY_SUCCESS': {
+            const { type, mainCategoryId, newSubCategory, oldMainCategoryId } = action.payload;
+            const newCategories = JSON.parse(JSON.stringify(state.categories));
+            
+            const idToFind = oldMainCategoryId || mainCategoryId; 
+
+            const mainCat = newCategories[type].find(mc => mc.id === idToFind);
+            
+            if (mainCat) {
+                if (oldMainCategoryId) {
+                    mainCat.id = mainCategoryId;
+                }
+                if (!mainCat.subCategories.some(sc => sc.id === newSubCategory.id)) {
+                    mainCat.subCategories.push(newSubCategory);
+                }
+            }
+            return { ...state, categories: newCategories };
+        }
         // Add other data-related cases here
         default:
             return state;
