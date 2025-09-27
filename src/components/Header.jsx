@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown, Users, Settings } from 'lucide-react';
+import { PiggyBank, Lock, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown, Users, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../context/DataContext';
 import { useUI } from '../context/UIContext';
@@ -15,36 +15,16 @@ import { useActiveProjectData, useAccountBalances, useHeaderMetrics } from '../u
 const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
   const { dataState } = useData();
   const { uiState, uiDispatch } = useUI();
-  const { settings, allCashAccounts, allActuals, loans, consolidatedViews, projects, collaborators, allProfiles, allEntries } = dataState;
+  const { settings, allCashAccounts, allActuals, consolidatedViews, projects, collaborators, allProfiles } = dataState;
   const { activeProjectId } = uiState;
   const navigate = useNavigate();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
-  const [collapsedSections, setCollapsedSections] = useState({
-    balances: true,
-    overdue: true,
-    loans: true,
-  });
-
-  const toggleSection = (section) => {
-    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  const { isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+  
+  const { isConsolidated, isCustomConsolidated, activeProject } = useActiveProjectData(dataState, uiState);
   const accountBalances = useAccountBalances(allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews);
-  const headerMetrics = useHeaderMetrics(dataState, uiState, accountBalances);
-
-  const handleNavigate = (path) => {
-    navigate(path);
-  };
-
-  const handleOverdueClick = (type) => {
-    const view = type === 'payable' ? 'payables' : 'receivables';
-    uiDispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
-    navigate(`/app/${view}`);
-  };
-
+  
   const projectedCashflowData = useMemo(() => {
     if (!periods || periods.length === 0 || !periodPositions || periodPositions.length === 0) {
       return [];
@@ -73,9 +53,8 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
         const view = consolidatedViews.find(v => v.id === viewId);
         return view ? view.name : 'Vue Personnalisée';
     }
-    const project = projects.find(p => p.id === activeProjectId);
-    return project ? project.name : 'Projet';
-  }, [activeProjectId, projects, consolidatedViews, isConsolidated, isCustomConsolidated]);
+    return activeProject ? activeProject.name : 'Projet';
+  }, [activeProjectId, projects, consolidatedViews, isConsolidated, isCustomConsolidated, activeProject]);
 
   const projectTeam = useMemo(() => {
     if (!activeProjectId || !allProfiles.length) return [];
@@ -157,11 +136,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
       provisions: Lock,
   };
 
-  const motionVariants = {
-    open: { opacity: 1, height: 'auto', marginTop: '0.5rem' },
-    collapsed: { opacity: 0, height: 0, marginTop: '0rem' }
-  };
-
   return (
     <>
       <div className="flex items-center justify-center h-20 px-4 border-b">
@@ -178,168 +152,8 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
         </div>
 
         <div className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-            <div className="flex items-center justify-center px-2 py-2 border-b">
-              <div className={`w-full transition-all duration-300`}>
-                  <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total Cash Actionnable">
-                      <Wallet className="w-5 h-5 shrink-0 text-gray-500" />
-                      {!isCollapsed && (
-                          <div className="flex justify-between items-center w-full">
-                              <span className="font-medium text-sm text-text-secondary">Cash actionnable</span>
-                              <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.actionableCash}</span>
-                          </div>
-                      )}
-                  </div>
-              </div>
-            </div>
-
-            {!isCollapsed && (
-                <div className="px-2 py-2">
-                    <div className="mt-2">
-                        <button onClick={() => toggleSection('balances')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
-                        <span className="text-xs font-bold uppercase tracking-wider">Analyse des Soldes</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.balances ? '-rotate-90' : ''}`} />
-                        </button>
-                        <AnimatePresence>
-                        {!collapsedSections.balances && (
-                            <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                            <div className="flex items-center gap-2" title="Total Épargne">
-                                <PiggyBank className="w-5 h-5 shrink-0 text-gray-500" />
-                                <div className="flex justify-between items-center w-full">
-                                    <span className="font-medium text-sm text-text-secondary">Épargne</span>
-                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
-                                </div>
-                            </div>
-                            <button onClick={() => navigate('/app/provisions')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
-                                <div className="flex items-center gap-2" title="Total Provisions">
-                                    <Lock className="w-5 h-5 shrink-0 text-gray-500" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-medium text-sm text-text-secondary">Provision</span>
-                                        <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
-                                    </div>
-                                </div>
-                            </button>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
-
-                    <div className={`px-2 pt-2`}>
-                        <hr className="my-2 border-gray-200" />
-                        <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
-                            {isCollapsed ? '👥' : <><Users className="w-4 h-4 text-purple-600" /><span>Équipe</span></>}
-                        </h3>
-                        {!isCollapsed && (
-                            <p className="px-2 text-xs text-gray-500 font-medium mb-2 truncate">{activeProjectName}</p>
-                        )}
-                        <div className="space-y-1">
-                        {projectTeam.map(member => (
-                            <div 
-                            key={member.id} 
-                            className={`w-full text-left flex items-center gap-3 px-2 py-1.5 rounded-lg ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? `${member.full_name} (${member.role})` : ''}
-                            >
-                            <Avatar name={member.full_name} role={member.role} />
-                            {!isCollapsed && (
-                                <div className="flex-grow overflow-hidden">
-                                <div className="text-sm font-medium text-text-primary truncate">{member.full_name}</div>
-                                <div className="text-xs text-text-secondary">{member.role}</div>
-                                </div>
-                            )}
-                            </div>
-                        ))}
-                        </div>
-                        {!isCollapsed && (
-                        <div className="mt-3 px-2">
-                            <button 
-                            onClick={() => navigate('/app/collaborateurs')}
-                            className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50`}
-                            >
-                            <Settings className="w-4 h-4 shrink-0" />
-                            Gérer l'équipe
-                            </button>
-                        </div>
-                        )}
-                    </div>
-
-                    <div className="mt-2">
-                        <button onClick={() => toggleSection('overdue')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
-                        <span className="text-xs font-bold uppercase tracking-wider">Suivi des Retards</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.overdue ? '-rotate-90' : ''}`} />
-                        </button>
-                        <AnimatePresence>
-                        {!collapsedSections.overdue && (
-                            <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                            <button onClick={() => handleOverdueClick('payable')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
-                                <div className="flex items-center gap-2" title="Total des factures fournisseurs dont la date d'échéance est passée">
-                                    <FileWarning className="w-5 h-5 shrink-0 text-gray-500" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-medium text-sm text-text-secondary">Fournisseurs</span>
-                                        <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overduePayables}</span>
-                                    </div>
-                                </div>
-                            </button>
-                            <button onClick={() => handleOverdueClick('receivable')} className="w-full text-left rounded-lg transition-colors hover:bg-gray-100">
-                                <div className="flex items-center gap-2" title="Total des factures clients dont la date d'échéance est passée">
-                                    <Hourglass className="w-5 h-5 shrink-0 text-gray-500" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-medium text-sm text-text-secondary">Clients</span>
-                                        <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overdueReceivables}</span>
-                                    </div>
-                                </div>
-                            </button>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
-                    <div className="mt-2">
-                        <button onClick={() => toggleSection('loans')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
-                        <span className="text-xs font-bold uppercase tracking-wider">Dettes & Prêts</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.loans ? '-rotate-90' : ''}`} />
-                        </button>
-                        <AnimatePresence>
-                        {!collapsedSections.loans && (
-                            <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                            <button onClick={() => navigate('/app/borrowings')} className={`w-full text-left rounded-lg transition-colors hover:bg-gray-100`}>
-                                <div className="flex items-center gap-2" title="Gérer vos emprunts">
-                                    <Banknote className="w-5 h-5 shrink-0 text-gray-500" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-medium text-sm text-text-secondary">Vos emprunts</span>
-                                        <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalDebts}</span>
-                                    </div>
-                                </div>
-                            </button>
-                            <button onClick={() => navigate('/app/loans')} className={`w-full text-left rounded-lg transition-colors hover:bg-gray-100`}>
-                                <div className="flex items-center gap-2" title="Gérer vos prêts">
-                                    <Coins className="w-5 h-5 shrink-0 text-gray-500" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <span className="font-medium text-sm text-text-secondary">Vos prêts</span>
-                                        <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalCredits}</span>
-                                    </div>
-                                </div>
-                            </button>
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
-                    <div className="pt-2">
-                        <hr className="my-2 border-gray-200" />
-                        <h3 className={`text-sm font-bold text-gray-800 mb-2 flex items-center gap-2 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-                            <LineChart className="w-4 h-4 text-blue-600" />
-                            {!isCollapsed && 'Tendance de la Trésorerie'}
-                        </h3>
-                        <div className="-mx-2">
-                            <SparklineChart
-                            data={projectedCashflowData}
-                            periods={periods}
-                            currencySettings={settings}
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            {/* Liquidités section */}
             <div className={`px-2 pt-2`}>
-                <hr className="my-2 border-gray-200" />
                 <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
                     {isCollapsed ? '🏦' : <><Wallet className="w-4 h-4 text-teal-600" /><span>Liquidités</span></>}
                 </h3>
@@ -382,6 +196,61 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     <ArrowRightLeft className="w-4 h-4 shrink-0" />
                     {!isCollapsed && 'Transfert interne'}
                 </button>
+                </div>
+            </div>
+
+            {/* Équipe section */}
+            <div className={`px-2 pt-2`}>
+                <hr className="my-2 border-gray-200" />
+                <h3 className={`text-sm font-bold text-gray-800 mb-2 ${isCollapsed ? 'text-center' : 'px-2 flex items-center gap-2'}`}>
+                    {isCollapsed ? '👥' : <><Users className="w-4 h-4 text-purple-600" /><span>Équipe</span></>}
+                </h3>
+                {!isCollapsed && (
+                    <p className="px-2 text-xs text-gray-500 font-medium mb-2 truncate">{activeProjectName}</p>
+                )}
+                <div className="space-y-1">
+                {projectTeam.map(member => (
+                    <div 
+                    key={member.id} 
+                    className={`w-full text-left flex items-center gap-3 px-2 py-1.5 rounded-lg ${isCollapsed ? 'justify-center' : ''}`}
+                    title={isCollapsed ? `${member.full_name} (${member.role})` : ''}
+                    >
+                    <Avatar name={member.full_name} role={member.role} />
+                    {!isCollapsed && (
+                        <div className="flex-grow overflow-hidden">
+                        <div className="text-sm font-medium text-text-primary truncate">{member.full_name}</div>
+                        <div className="text-xs text-text-secondary">{member.role}</div>
+                        </div>
+                    )}
+                    </div>
+                ))}
+                </div>
+                {!isCollapsed && (
+                <div className="mt-3 px-2">
+                    <button 
+                    onClick={() => navigate('/app/collaborateurs')}
+                    className={`w-full flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50`}
+                    >
+                    <Settings className="w-4 h-4 shrink-0" />
+                    Gérer l'équipe
+                    </button>
+                </div>
+                )}
+            </div>
+            
+            {/* Tendance section */}
+            <div className="pt-2">
+                <hr className="my-2 border-gray-200" />
+                <h3 className={`text-sm font-bold text-gray-800 mb-2 flex items-center gap-2 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+                    <LineChart className="w-4 h-4 text-blue-600" />
+                    {!isCollapsed && 'Tendance de la Trésorerie'}
+                </h3>
+                <div className="-mx-2">
+                    <SparklineChart
+                    data={projectedCashflowData}
+                    periods={periods}
+                    currencySettings={settings}
+                    />
                 </div>
             </div>
         </div>

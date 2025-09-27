@@ -3,10 +3,14 @@ import { expandVatEntries, generateVatPaymentEntries, getEntryAmountForPeriod, g
 import { formatCurrency } from './formatting';
 
 export const useActiveProjectData = (dataState, uiState) => {
-    const { allEntries, allActuals, allCashAccounts, projects, consolidatedViews, settings } = dataState;
+    const { allEntries = {}, allActuals = {}, allCashAccounts = {}, projects = [], consolidatedViews = [], settings } = dataState;
     const { activeProjectId } = uiState;
 
     return useMemo(() => {
+        if (!settings) {
+            return { budgetEntries: [], actualTransactions: [], cashAccounts: [], activeProject: null, isConsolidated: false, isCustomConsolidated: false };
+        }
+
         const isConsolidated = activeProjectId === 'consolidated';
         const isCustomConsolidated = activeProjectId?.startsWith('consolidated_view_');
 
@@ -59,7 +63,7 @@ export const useProcessedEntries = (budgetEntries, categories, vatRegimes, activ
         const expanded = expandVatEntries(budgetEntries, categories);
         const vatRegime = vatRegimes[activeProjectId];
 
-        if (isConsolidated || isCustomConsolidated || !vatRegime) {
+        if (isConsolidated || isCustomConsolidated || !vatRegime || !periods) {
             return expanded;
         }
 
@@ -78,15 +82,24 @@ export const useGroupedData = (processedEntries, categories, isRowVisibleInPerio
             const entriesForType = processedEntries.filter(e => e.type === (type === 'entree' ? 'revenu' : 'depense'));
 
             return categories[catType].map(mainCat => {
+                if (!mainCat.subCategories) return null;
+
                 const entriesForMainCat = entriesForType.filter(entry => {
-                    const isInCategory = mainCat.subCategories && mainCat.subCategories.some(sc => sc && sc.name === entry.category);
+                    const isInCategory = mainCat.subCategories.some(sc => sc && sc.name === entry.category);
                     const isVatEntry = (entry.is_vat_child || entry.is_vat_payment) && mainCat.name === 'IMPÔTS & CONTRIBUTIONS';
                     return isInCategory || isVatEntry;
                 });
-
+                
                 if (entriesForMainCat.length === 0) return null;
                 
-                return { ...mainCat, entries: entriesForMainCat };
+                if (!isRowVisibleInPeriods) {
+                    return { ...mainCat, entries: entriesForMainCat };
+                }
+
+                const visibleEntries = entriesForMainCat.filter(isRowVisibleInPeriods);
+                if (visibleEntries.length === 0) return null;
+                
+                return { ...mainCat, entries: visibleEntries };
 
             }).filter(Boolean);
         };
@@ -95,7 +108,7 @@ export const useGroupedData = (processedEntries, categories, isRowVisibleInPerio
 };
 
 export function calculatePeriodPositions(periods, cashAccounts, actualTransactions, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses, settings, allEntries) {
-    if (periods.length === 0) return [];
+    if (!periods || periods.length === 0 || !settings) return [];
     
     const today = getTodayInTimezone(settings.timezoneOffset);
     let todayIndex = periods.findIndex(p => today >= p.startDate && today < p.endDate);
@@ -215,7 +228,7 @@ export const useCashflowChartData = (periods, budgetEntries, actualTransactions,
     const hasOffBudgetExpenses = useMemo(() => processedEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e)), [processedEntries, isRowVisibleInPeriods]);
 
     return useMemo(() => {
-        if (!periods || periods.length === 0) {
+        if (!periods || periods.length === 0 || !settings) {
             return { labels: [], inflows: [], outflows: [], actualBalance: [], projectedBalance: [] };
         }
 
@@ -260,26 +273,15 @@ export const useCashflowChartData = (periods, budgetEntries, actualTransactions,
     }, [periods, cashAccounts, actualTransactions, settings, processedEntries, groupedData, hasOffBudgetRevenues, hasOffBudgetExpenses]);
 };
 
-export const useDashboardKpis = (cashAccounts, actualTransactions, settings) => {
-    return useMemo(() => {
-        const totalActionableBalance = cashAccounts.reduce((sum, account) => {
-            let currentBalance = parseFloat(account.initialBalance) || 0;
-            const accountPayments = actualTransactions
-                .flatMap(actual => (actual.payments || []).filter(p => p.cashAccount === account.id).map(p => ({ ...p, type: actual.type })));
-            
-            for (const payment of accountPayments) {
-                if (payment.type === 'receivable') currentBalance += payment.paidAmount;
-                else if (payment.type === 'payable') currentBalance -= payment.paidAmount;
-            }
-            const blockedForProvision = actualTransactions
-                .filter(actual => actual.isProvision && actual.provisionDetails?.destinationAccountId === account.id && actual.status !== 'paid')
-                .reduce((sum, actual) => {
-                    const paidAmount = (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0);
-                    return sum + (actual.amount - paidAmount);
-                }, 0);
-            return sum + (currentBalance - blockedForProvision);
-        }, 0);
+export const useDashboardKpis = (dataState, uiState) => {
+    const { actualTransactions } = useActiveProjectData(dataState, uiState);
+    const accountBalances = useAccountBalances(dataState.allCashAccounts, dataState.allActuals, uiState.activeProjectId, uiState.activeProjectId === 'consolidated', uiState.activeProjectId?.startsWith('consolidated_view_'), dataState.consolidatedViews);
+    const { settings } = dataState;
 
+    return useMemo(() => {
+        if (!settings) {
+             return { totalActionableBalance: 0, totalOverduePayables: 0, totalOverdueReceivables: 0, overdueItems: [], totalSavings: 0, totalProvisions: 0 };
+        }
         const today = getTodayInTimezone(settings.timezoneOffset);
         const overdueItems = actualTransactions
             .filter(actual => {
@@ -295,12 +297,73 @@ export const useDashboardKpis = (cashAccounts, actualTransactions, settings) => 
         const totalOverduePayables = overdueItems.filter(i => i.type === 'payable').reduce((sum, i) => sum + i.remainingAmount, 0);
         const totalOverdueReceivables = overdueItems.filter(i => i.type === 'receivable').reduce((sum, i) => sum + i.remainingAmount, 0);
 
-        return { totalActionableBalance, totalOverduePayables, totalOverdueReceivables, overdueItems };
-    }, [cashAccounts, actualTransactions, settings]);
+        const totalActionableBalance = accountBalances.filter(acc => ['bank', 'cash', 'mobileMoney'].includes(acc.mainCategoryId)).reduce((sum, acc) => sum + acc.actionableBalance, 0);
+        const totalSavings = accountBalances.filter(acc => acc.mainCategoryId === 'savings').reduce((sum, acc) => sum + acc.actionableBalance, 0);
+        const totalProvisions = accountBalances.filter(acc => acc.mainCategoryId === 'provisions').reduce((sum, acc) => sum + acc.actionableBalance, 0);
+
+        return { totalActionableBalance, totalOverduePayables, totalOverdueReceivables, overdueItems, totalSavings, totalProvisions };
+    }, [actualTransactions, settings, accountBalances]);
+};
+
+export const useCurrentMonthBudgetStatus = (dataState, uiState) => {
+    const { budgetEntries, actualTransactions } = useActiveProjectData(dataState, uiState);
+    const { categories, vatRegimes, settings } = dataState;
+    const { activeProjectId } = uiState;
+    const isConsolidated = activeProjectId === 'consolidated' || activeProjectId?.startsWith('consolidated_view_');
+
+    const period = useMemo(() => {
+        if (!settings) return null;
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        return { startDate: startOfMonth, endDate: endOfMonth };
+    }, [settings]);
+
+    const processedEntries = useProcessedEntries(budgetEntries, categories, vatRegimes, activeProjectId, [period], isConsolidated, isConsolidated);
+
+    return useMemo(() => {
+        if (!period) return { totalBudgetedIncome: 0, totalBudgetedExpense: 0, totalActualIncome: 0, totalActualExpense: 0 };
+        const { startDate, endDate } = period;
+
+        const totalBudgetedIncome = processedEntries
+            .filter(e => e.type === 'revenu')
+            .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, startDate, endDate), 0);
+        
+        const totalBudgetedExpense = processedEntries
+            .filter(e => e.type === 'depense')
+            .reduce((sum, entry) => sum + getEntryAmountForPeriod(entry, startDate, endDate), 0);
+        
+        const totalActualIncome = actualTransactions
+            .filter(a => a.type === 'receivable')
+            .flatMap(a => a.payments || [])
+            .filter(p => {
+                const pDate = new Date(p.paymentDate);
+                return pDate >= startDate && pDate <= endDate;
+            })
+            .reduce((sum, p) => sum + p.paidAmount, 0);
+
+        const totalActualExpense = actualTransactions
+            .filter(a => a.type === 'payable')
+            .flatMap(a => a.payments || [])
+            .filter(p => {
+                const pDate = new Date(p.paymentDate);
+                return pDate >= startDate && pDate <= endDate;
+            })
+            .reduce((sum, p) => sum + p.paidAmount, 0);
+
+        return {
+            totalBudgetedIncome,
+            totalBudgetedExpense,
+            totalActualIncome,
+            totalActualExpense,
+        };
+    }, [processedEntries, actualTransactions, period]);
 };
 
 export const useExpenseDistributionForMonth = (actualTransactions, categories, settings) => {
     return useMemo(() => {
+        if (!settings) return [];
         const today = new Date();
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -315,11 +378,15 @@ export const useExpenseDistributionForMonth = (actualTransactions, categories, s
 
         const dataByMainCategory = {};
         const mainCategoryMap = new Map();
-        categories.expense.forEach(mc => {
-            mc.subCategories.forEach(sc => {
-                mainCategoryMap.set(sc.name, mc.name);
+        if (categories && categories.expense) {
+            categories.expense.forEach(mc => {
+                if (mc && mc.subCategories) {
+                    mc.subCategories.forEach(sc => {
+                        mainCategoryMap.set(sc.name, mc.name);
+                    });
+                }
             });
-        });
+        }
 
         expensesThisMonth.forEach(actual => {
             const mainCategoryName = mainCategoryMap.get(actual.category) || 'Autres';
@@ -334,11 +401,12 @@ export const useExpenseDistributionForMonth = (actualTransactions, categories, s
           .map(([name, value]) => ({ name, value }))
           .filter(item => item.value > 0)
           .sort((a, b) => b.value - a.value);
-    }, [actualTransactions, categories.expense]);
+    }, [actualTransactions, categories.expense, settings]);
 };
 
 export const useScheduleData = (actualTransactions, settings) => {
     return useMemo(() => {
+        if (!settings) return { transactionsByDate: new Map(), overdueTransactions: [] };
         const byDate = new Map();
         const overdue = [];
         const today = getTodayInTimezone(settings.timezoneOffset);
@@ -372,10 +440,10 @@ export const useScheduleData = (actualTransactions, settings) => {
         overdue.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         return { transactionsByDate: byDate, overdueTransactions: overdue };
-    }, [actualTransactions, settings.timezoneOffset]);
+    }, [actualTransactions, settings]);
 };
 
-export const useAccountBalances = (allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews) => {
+export const useAccountBalances = (allCashAccounts = {}, allActuals = {}, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews = []) => {
     return useMemo(() => {
         let accountsToProcess = [];
         if (isConsolidated) {
@@ -422,12 +490,25 @@ export const useAccountBalances = (allCashAccounts, allActuals, activeProjectId,
     }, [allCashAccounts, allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews]);
 };
 
-export const useHeaderMetrics = (dataState, uiState, accountBalances) => {
-    const { allActuals, loans, settings, projects, consolidatedViews } = dataState;
+export const useHeaderMetrics = (dataState, uiState) => {
+    const { allActuals = {}, loans = [], settings, projects = [], consolidatedViews = [] } = dataState;
     const { activeProjectId } = uiState;
     const { isConsolidated, isCustomConsolidated } = useActiveProjectData(dataState, uiState);
+    const accountBalances = useAccountBalances(dataState.allCashAccounts, dataState.allActuals, activeProjectId, isConsolidated, isCustomConsolidated, consolidatedViews);
 
     return useMemo(() => {
+        if (!settings) {
+            const defaultFormattedCurrency = formatCurrency(0, {});
+            return {
+                actionableCash: defaultFormattedCurrency,
+                savings: defaultFormattedCurrency,
+                provisions: defaultFormattedCurrency,
+                overduePayables: defaultFormattedCurrency,
+                overdueReceivables: defaultFormattedCurrency,
+                totalDebts: defaultFormattedCurrency,
+                totalCredits: defaultFormattedCurrency,
+            };
+        }
         const today = getTodayInTimezone(settings.timezoneOffset);
         const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
 
@@ -473,7 +554,7 @@ export const useHeaderMetrics = (dataState, uiState, accountBalances) => {
 };
 
 export const useTrezoScore = (dataState, uiState) => {
-    const { loans, categories } = dataState;
+    const { loans = [], categories } = dataState;
     const { budgetEntries, actualTransactions, cashAccounts } = useActiveProjectData(dataState, uiState);
     const accountBalances = useAccountBalances(dataState.allCashAccounts, dataState.allActuals, uiState.activeProjectId, uiState.activeProjectId === 'consolidated', uiState.activeProjectId?.startsWith('consolidated_view_'), dataState.consolidatedViews);
 
@@ -499,7 +580,8 @@ export const useTrezoScore = (dataState, uiState) => {
 
             const monthlyCriticalExpenses = recentActuals
                 .filter(a => {
-                    const mainCat = categories.expense.find(mc => mc.subCategories.some(sc => sc.name === a.category));
+                    if (!categories || !categories.expense) return false;
+                    const mainCat = categories.expense.find(mc => mc.subCategories && mc.subCategories.some(sc => sc.name === a.category));
                     const subCat = mainCat?.subCategories.find(sc => sc.name === a.category);
                     return a.type === 'payable' && subCat?.criticality === 'critical';
                 })
